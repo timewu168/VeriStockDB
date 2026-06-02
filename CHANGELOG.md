@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.2 - 2026-06-02
+
+### Added
+
+- Added scoped historical monthly audit options: `audit-month --market`, `--from`, `--to`, and `--skip-rollback`.
+- Added matching scoped archive options: `archive-month --market`, `--from`, `--to`, `--dir`, and `--skip-rollback`.
+- Added `finalize-close-months` to audit and archive a range of Close months with one command.
+- Scoped audits no longer mark the full-month archive audit setting as OK unless the audit covers the full month, both markets, and rollback.
+
 ## v0.2.1 - 2026-06-02
 
 ### Added

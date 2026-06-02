@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.2.1
+Version: v0.2.2
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -36,6 +36,7 @@ python main.py import-close --file data/csv/daily_close/2024/20240603CloseSII.cs
 # 批次匯入本地歷史 Close CSV，依交易日曆檢查缺檔
 # 檔名需為 yyyyMMddCloseSII.csv / yyyyMMddCloseOTC.csv
 python main.py import-close-local --dir data/csv/Close --from 2004-02-11 --to 2004-12-31
+python main.py import-close-local --dir data/csv/Close --from 2004-02-11 --to 2004-12-31 --market TWSE
 
 # 查看各批次資料狀態與最新問題
 python main.py status
@@ -52,8 +53,17 @@ python main.py query-close --stock-id 2330 --from 2024-01-01 --to 2024-12-31
 # 執行指定月份的零容忍月度檢查
 python main.py audit-month --dataset daily_close --month 2024-06
 
+# 歷史起點或單市場資料可指定月檢範圍，避免把未匯入市場或起點前交易日列為缺漏
+python main.py audit-month --dataset daily_close --month 2004-02 --market TWSE --from 2004-02-11 --skip-rollback
+
 # 月檢通過後，將該月 CSV 打包成 ZIP 並驗證後刪除 loose CSV
 python main.py archive-month --dataset daily_close --month 2024-06
+
+# 歷史本地 CSV 使用與月檢相同的 scope 封存
+python main.py archive-month --dataset daily_close --month 2004-02 --market TWSE --from 2004-02-11 --dir data/csv/Close --skip-rollback
+
+# 一次對多個月份執行月檢與封存，遇到第一個失敗月份會停止
+python main.py finalize-close-months --from 2004-02 --to 2004-12 --market TWSE --start-date 2004-02-11 --dir data/csv/Close --skip-rollback
 
 # 建立最新 SQLite DB 備份，預設只保留一份
 python main.py backup

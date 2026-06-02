@@ -14,6 +14,7 @@ from services import batch_status
 from services.backup import backup_database
 from services.monthly_archive import archive_month
 from services.monthly_audit import audit_month
+from services.monthly_finalize import finalize_close_months
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,10 +71,49 @@ def build_parser() -> argparse.ArgumentParser:
     audit = subparsers.add_parser("audit-month", help="run monthly zero-tolerance audit")
     audit.add_argument("--dataset", default=config.DATASET_DAILY_CLOSE)
     audit.add_argument("--month", required=True, help="YYYY-MM")
+    audit.add_argument("--market", choices=config.MARKETS)
+    audit.add_argument("--from", dest="start", help="audit start date YYYY-MM-DD")
+    audit.add_argument("--to", dest="end", help="audit end date YYYY-MM-DD")
+    audit.add_argument(
+        "--skip-rollback",
+        action="store_true",
+        help="skip last-day rollback requirement for historical/local audits",
+    )
 
     archive = subparsers.add_parser("archive-month", help="ZIP and verify monthly CSV files")
     archive.add_argument("--dataset", default=config.DATASET_DAILY_CLOSE)
     archive.add_argument("--month", required=True, help="YYYY-MM")
+    archive.add_argument("--market", choices=config.MARKETS)
+    archive.add_argument("--from", dest="start", help="archive start date YYYY-MM-DD")
+    archive.add_argument("--to", dest="end", help="archive end date YYYY-MM-DD")
+    archive.add_argument("--dir", help="loose CSV directory, default data/csv/daily_close/YYYY")
+    archive.add_argument(
+        "--skip-rollback",
+        action="store_true",
+        help="match a historical/local audit that skipped rollback",
+    )
+
+    finalize = subparsers.add_parser(
+        "finalize-close-months", help="audit and archive a range of Close months"
+    )
+    finalize.add_argument("--dataset", default=config.DATASET_DAILY_CLOSE)
+    finalize.add_argument("--from", dest="start_month", required=True, help="start month YYYY-MM")
+    finalize.add_argument("--to", dest="end_month", required=True, help="end month YYYY-MM")
+    finalize.add_argument("--market", choices=config.MARKETS)
+    finalize.add_argument(
+        "--start-date",
+        help="first month start date YYYY-MM-DD, for historical partial-month starts",
+    )
+    finalize.add_argument(
+        "--end-date",
+        help="last month end date YYYY-MM-DD, for partial final months",
+    )
+    finalize.add_argument("--dir", help="loose CSV directory, default data/csv/daily_close/YYYY")
+    finalize.add_argument(
+        "--skip-rollback",
+        action="store_true",
+        help="skip last-day rollback requirement for historical/local finalization",
+    )
 
     subparsers.add_parser("backup", help="create latest DB backup")
     return parser
@@ -119,6 +159,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_audit_month(conn, args)
             elif args.command == "archive-month":
                 result = _cmd_archive_month(conn, args)
+            elif args.command == "finalize-close-months":
+                result = _cmd_finalize_close_months(conn, args)
             else:
                 result = 1
             conn.commit()
@@ -273,7 +315,15 @@ def _cmd_approve_batch(conn, args: argparse.Namespace) -> int:
 
 
 def _cmd_audit_month(conn, args: argparse.Namespace) -> int:
-    result = audit_month(conn, dataset=args.dataset, month=args.month)
+    result = audit_month(
+        conn,
+        dataset=args.dataset,
+        month=args.month,
+        markets=(args.market,) if args.market else None,
+        start=args.start,
+        end=args.end,
+        require_rollback=not args.skip_rollback,
+    )
     print(f"{result.dataset} {result.month} {result.status}")
     for error in result.errors:
         print(f"  {error}")
@@ -281,9 +331,40 @@ def _cmd_audit_month(conn, args: argparse.Namespace) -> int:
 
 
 def _cmd_archive_month(conn, args: argparse.Namespace) -> int:
-    zip_path = archive_month(conn, dataset=args.dataset, month=args.month)
+    zip_path = archive_month(
+        conn,
+        dataset=args.dataset,
+        month=args.month,
+        markets=(args.market,) if args.market else None,
+        start=args.start,
+        end=args.end,
+        source_dir=Path(args.dir) if args.dir else None,
+        require_rollback=not args.skip_rollback,
+    )
     print(f"archived: {zip_path}")
     return 0
+
+
+def _cmd_finalize_close_months(conn, args: argparse.Namespace) -> int:
+    result = finalize_close_months(
+        conn,
+        dataset=args.dataset,
+        start_month=args.start_month,
+        end_month=args.end_month,
+        markets=(args.market,) if args.market else None,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        source_dir=Path(args.dir) if args.dir else None,
+        require_rollback=not args.skip_rollback,
+        log=print,
+    )
+    print(f"finalize-close-months {result.status}")
+    for month in result.months:
+        suffix = f" {month.zip_path}" if month.zip_path else ""
+        print(f"  {month.month} {month.status}{suffix}")
+        for error in month.errors:
+            print(f"    {error}")
+    return 0 if result.status == "OK" else 2
 
 
 def _print_batch(conn, market: str, trade_date: str, batch_id: str) -> None:
@@ -334,6 +415,7 @@ def _print_quickstart() -> None:
     print("  python main.py import-close --date YYYY-MM-DD")
     print("  python main.py rollback-close --date YYYY-MM-DD")
     print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
+    print("  python main.py finalize-close-months --from YYYY-MM --to YYYY-MM --dir data/csv/Close")
     print("  python main.py query-close --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")
 
 

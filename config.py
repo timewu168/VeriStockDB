@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.2.1"
+APP_VERSION = "0.2.2"
 SCHEMA_VERSION = "0.2-human-first"
 DATA_DIR = ROOT_DIR / "data"
 CSV_DIR = DATA_DIR / "csv"
