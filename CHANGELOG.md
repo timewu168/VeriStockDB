@@ -1,0 +1,28 @@
+# Changelog
+
+## v0.2.0 - 2026-06-02
+
+### Added
+
+- Added human-friendly naked CLI help and quickstart output.
+- Added `rollback-close` so the three-trading-day Close rollback can run as a separate cross-day job.
+- Added `status --problems --details` for inspecting blocked, recheck, and missing batches.
+- Added shared sparse `data_events` tracking for row-level special handling.
+- Added `DASH_FILLED_PREVIOUS_CLOSE` events for Close rows where dash OHLC is filled from the previous valid close.
+- Added `ZERO_TRADE_DASH_EXCLUDED` events for early zero-trade dash OHLC rows excluded before the first valid close.
+
+### Changed
+
+- `import-close --date` now imports only the requested date instead of automatically running rollback.
+- Official CSV filenames now use the legacy date-first names: `yyyyMMddCloseSII.csv` and `yyyyMMddCloseOTC.csv`.
+- Official downloader uses a verified non-strict SSL context for TWSE/TPEx certificate compatibility.
+- Close stock-code validation now accepts official alphanumeric IDs such as active ETF and bond-like IDs.
+- TPEX only excludes warrant-like `7`-prefix IDs when they are not four characters.
+- TPEX management sections, repeated headers, notes, and summary rows no longer block parsing.
+- Close dash OHLC handling follows documented policy: fill from previous close when provable, exclude early zero-trade cold-start rows, and recheck nonzero dash rows without a previous close.
+- Batch attempt results are committed per official attempt so interrupted imports remain visible in status reports.
+
+### Release Hygiene
+
+- Public GitHub baseline excludes local `data/`, `tests/`, `reference/`, caches, DB files, archives, logs, and temporary outputs.
+- Version constants are centralized in `config.py`.

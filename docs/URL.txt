@@ -1,0 +1,95 @@
+Viewed spider_engine.py:1-585
+Searched for "http"
+Listed directory VeriStockDB
+Viewed config.py:1-43
+
+我已從專案的 `spider_engine.py` 爬蟲引擎中，為您完整提取出所有 **CSV 下載網址** 以及 **官方 API 驗證網址**，並將其整理與說明如下：
+
+---
+
+### 一、 官方 API 驗證與日曆導引網址 (JSON 格式)
+
+這部分是系統用於「數據真理對照驗證」與「開市日曆導引」的網址：
+
+#### 1. 證交所 (TWSE) 0050 月報表 API (日曆導引與跨月自癒)
+* **網址**：
+  `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date={ym}01&stockNo=0050`
+* **參數說明**：
+  * `{ym}`：西元年月，格式為 `YYYYMM`（例如 `202605`）。
+* **功能**：獲取 0050 當月的開市日曆清單，以及作為月底對齊自癒數據的真理對照組。
+
+#### 2. 期交所最近 30 天交易日列表 (期交所日曆)
+* **網址**：
+  `https://www.taifex.com.tw/cht/3/futPrevious30DaysSalesData`
+* **功能**：獲取最近 30 天的交易日列表，藉此更新最新的開市日期。
+
+#### 3. 證交所 (TWSE) 0050 單日真實數據 (上市雙源校驗 API)
+* **網址**：
+  `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date={query_date}&stockNo=0050`
+* **參數說明**：
+  * `{query_date}`：西元年月日，格式為 `YYYYMMDD`（例如 `20260529`）。
+
+#### 4. 櫃買中心 (TPEx) 5483 單日真實數據 (上櫃雙源校驗 API)
+* **網址**：
+  `https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date={roc_date_str}&id=`
+* **參數說明**：
+  * `{roc_date_str}`：民國年日期，格式為 **前導補零之 3 碼民國年** `YYY/MM/DD`（例如 `096/07/02` 或 `115/05/29`）。
+  * *註：早於 100 年的歷史年份若沒有補零至 3 碼（如傳入 `96/07/02`），櫃買 API 會靜默返回今天最新的價格，這在 v2.3.1 中已修復強制補零。*
+
+---
+
+### 二、 CSV 數據下載網址 (上市 SII / 上櫃 OTC)
+
+這部分是系統用於下載全市場日/月資料 CSV 的網址：
+
+#### 1. 收盤行情 (Close)
+* **上市 (SII)**：
+  `https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?response=csv&date={sii_date}&type=ALLBUT0999NOTIND`
+* **上櫃 (OTC)**：
+  `https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date={otc_date_url}&id=&response=csv`
+* **參數說明**：
+  * `{sii_date}`：西元年月日 `YYYYMMDD`（例如 `20260529`）。
+  * `{otc_date_url}`：網址編碼版之西元年月日 `YYYY%2FMM%2FDD`（例如 `2026%2F05%2F29`）。
+  * *註：上市 URL 使用 `type=ALLBUT0999NOTIND` 用於過濾與排除多餘的大盤指數資料。*
+
+#### 2. 三大法人買賣超 (Legal)
+* **上市 (SII)**：
+  `https://www.twse.com.tw/rwd/zh/fund/T86?date={sii_date}&selectType=ALLBUT0999&response=csv`
+* **上櫃 (OTC)**：
+  `https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&sect=EW&date={otc_date_url}&id=&response=csv`
+
+#### 3. 信用交易資券餘額 (Margin)
+* **上市 (SII)**：
+  `https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=csv&date={sii_date}&selectType=ALL`
+* **上櫃 (OTC)**：
+  `https://www.tpex.org.tw/www/zh-tw/margin/balance?date={otc_date_url}&id=&response=csv`
+
+#### 4. 當沖交易統計 (DayTrading)
+* **上市 (SII)**：
+  `https://www.twse.com.tw/rwd/zh/dayTrading/TWTB4U?response=csv&date={sii_date}&selectType=All`
+* **上櫃 (OTC)**：
+  `https://www.tpex.org.tw/www/zh-tw/intraday/stat?type=Daily&date={otc_date_url}&id=&response=csv`
+
+#### 5. 月營收 (Revenue)
+* **上市 (SII)**：
+  `https://mopsov.twse.com.tw/server-java/FileDownLoad?step=9&functionName=show_file2&filePath=%2Ft21%2Fsii%2F&fileName=t21sc03_{roc_month}.csv`
+* **上櫃 (OTC)**：
+  `https://mopsov.twse.com.tw/server-java/FileDownLoad?step=9&functionName=show_file2&filePath=%2Ft21%2Fotc%2F&fileName=t21sc03_{roc_month}.csv`
+* **參數說明**：
+  * `{roc_month}`：申報期對應之民國年月份，格式為 `ROCYear_Month`（例如 115 年 5 月營收於 6 月申報，格式為 `115_6`）。
+  * *重要提示：下載此 CSV 時，HTTP Headers 中必須帶上 Referer `https://mops.twse.com.tw/mops/web/t21sc03_bootstrap`，否則會被伺服器拒絕存取。*
+
+#### 6. 注意股公告 (Notice - 區間一次性下載)
+* **上市 (SII)**：
+  `https://www.twse.com.tw/rwd/zh/announcement/notice?response=csv&startDate={start_date_sii}&endDate={sii_date}&stockNo=&sortKind=STKNO&querytype=1&selectType=`
+* **上櫃 (OTC)**：
+  `https://www.tpex.org.tw/www/zh-tw/bulletin/attention?startDate={start_date_otc}&endDate={end_date_otc}&code=&cate=&type=all&order=date&id=&response=csv`
+* **參數說明**：
+  * `{start_date_sii}` / `{sii_date}`：西元年月日 `YYYYMMDD`。
+  * `{start_date_otc}` / `{end_date_otc}`：網址編碼版之西元年月日 `YYYY%2FMM%2FDD`。
+
+#### 7. 處置股公告 (Disposal - 區間一次性下載)
+* **上市 (SII)**：
+  `https://www.twse.com.tw/rwd/zh/announcement/punish?response=csv&startDate={start_date_sii}&endDate={end_date_sii}&stockNo=&sortKind=DATE&querytype=&selectType=&proceType=&remarkType=`
+* **上櫃 (OTC)**：
+  `https://www.tpex.org.tw/www/zh-tw/bulletin/disposal?startDate={start_date_otc}&endDate={end_date_otc}&code=&cate=&type=all&reason=-1&measure=-1&order=date&id=&response=csv`
