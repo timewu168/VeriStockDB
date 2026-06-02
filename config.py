@@ -1,20 +1,33 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.2.4"
+APP_VERSION = "0.2.5"
 SCHEMA_VERSION = "0.2-human-first"
-DATA_DIR = ROOT_DIR / "data"
-CSV_DIR = DATA_DIR / "csv"
-DB_DIR = DATA_DIR / "db"
-BACKUP_DIR = DATA_DIR / "backup"
 
-DB_PATH = DB_DIR / "veristock.db"
-TRADING_DAY_SEED_DB = DB_DIR / "trading_days.db"
 
-DEFAULT_BACKUP_PATH = BACKUP_DIR / "veristock_latest_backup.db"
+def _path_from_env(name: str, default: Path) -> Path:
+    value = os.environ.get(name)
+    return Path(value).expanduser() if value else default
+
+
+DATA_DIR = _path_from_env("VERISTOCK_DATA_DIR", ROOT_DIR / "data")
+CSV_DIR = _path_from_env("VERISTOCK_CSV_DIR", DATA_DIR / "csv")
+DB_DIR = _path_from_env("VERISTOCK_DB_DIR", DATA_DIR / "db")
+BACKUP_DIR = _path_from_env("VERISTOCK_BACKUP_DIR", DATA_DIR / "backup")
+ARCHIVE_DIR = _path_from_env("VERISTOCK_ARCHIVE_DIR", CSV_DIR / "monthly_zip")
+
+DB_PATH = _path_from_env("VERISTOCK_DB_PATH", DB_DIR / "veristock.db")
+TRADING_DAY_SEED_DB = _path_from_env(
+    "VERISTOCK_TRADING_DAY_SEED_DB", DB_DIR / "trading_days.db"
+)
+
+DEFAULT_BACKUP_PATH = _path_from_env(
+    "VERISTOCK_BACKUP_PATH", BACKUP_DIR / "veristock_latest_backup.db"
+)
 DEFAULT_COOLDOWN_MIN_SECONDS = 10
 DEFAULT_COOLDOWN_MAX_SECONDS = 15
 

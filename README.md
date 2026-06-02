@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.2.4
+Version: v0.2.5
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -82,3 +82,16 @@ python main.py backup
 - 價格以「元 * 100」的整數分儲存。
 - 股票代號永遠當文字處理，保留官方原文與前導零。
 - CSV 入庫成功後先留存，月度零容忍檢查與 ZIP 驗證成功後才刪 loose CSV。
+
+## Ubuntu 私有部署路徑
+
+Ubuntu server 可用環境變數把熱資料與冷資料分到不同硬碟。主 DB 與未封存 CSV 建議放 M.2，封存 ZIP 與 DB backup 建議放冷資料 SSD。
+
+```bash
+export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
+export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
+export VERISTOCK_ARCHIVE_DIR=/mnt/veristock-cold/archive
+export VERISTOCK_BACKUP_DIR=/mnt/veristock-cold/backup
+```
+
+完整部署備忘見 `docs/ubuntu_private_deployment.md`。

@@ -141,7 +141,7 @@ def _zip_path(
         market_token = "-".join(markets)
         rollback_token = "with_rollback" if require_rollback else "skip_rollback"
         name = f"{dataset}_{year}_{month_number}_{start_token}_{end_token}_{market_token}_{rollback_token}.zip"
-    return config.CSV_DIR / "monthly_zip" / name
+    return config.ARCHIVE_DIR / name
 
 
 def _verify_zip(zip_path: Path, expected_names: list[str]) -> None:

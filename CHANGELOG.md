@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.5 - 2026-06-02
+
+### Added
+
+- Added `VERISTOCK_*` environment variables for private Ubuntu deployments with separate hot and cold storage paths.
+- Monthly archive ZIP output can now be routed through `VERISTOCK_ARCHIVE_DIR`, independent of hot CSV storage.
+
 ## v0.2.4 - 2026-06-02
 
 ### Added
