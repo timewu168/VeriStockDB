@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, timedelta
 import hashlib
 from pathlib import Path
 import sqlite3
@@ -281,6 +281,58 @@ def import_close_range(
     return stats
 
 
+def import_close_update(
+    conn: sqlite3.Connection,
+    *,
+    through_date: str | None = None,
+    fetcher: FetchCloseCsv = download_close_csv,
+    cooldown: CooldownController | None = None,
+    log: LogFunc | None = None,
+    require_calendar: bool = True,
+    calendar_fetcher: FetchTradingDaysJson = download_trading_days_json,
+    calendar_today: str | None = None,
+) -> dict[str, int]:
+    latest = latest_close_date(conn)
+    if latest is None:
+        raise ValueError("no existing daily_close rows; seed Close data with import-close first")
+
+    target_source = through_date or calendar_today or date.today().isoformat()
+    target = validate_iso_date(target_source)
+    if latest >= target:
+        if log:
+            log(f"INFO daily_close already current: latest={latest} target={target}")
+        return _empty_stats()
+
+    start = (date.fromisoformat(latest) + timedelta(days=1)).isoformat()
+    if log:
+        log(f"Update Close: latest={latest} range={start} -> {target}")
+    cooldown = cooldown or CooldownController()
+    if require_calendar:
+        _ensure_calendar_for_official_download(
+            conn,
+            target_date=target,
+            fetcher=calendar_fetcher,
+            cooldown=cooldown,
+            log=log,
+            calendar_today=target,
+        )
+    if not trading_days_between(conn, start, target):
+        if log:
+            log(f"INFO no open trading days to update between {start} and {target}")
+        return _empty_stats()
+    return import_close_range(
+        conn,
+        start=start,
+        end=target,
+        fetcher=fetcher,
+        cooldown=cooldown,
+        log=log,
+        require_calendar=require_calendar,
+        calendar_fetcher=calendar_fetcher,
+        calendar_today=target,
+    )
+
+
 def import_close_local_range(
     conn: sqlite3.Connection,
     *,
@@ -423,6 +475,11 @@ def previous_close(
 ) -> int | None:
     previous = previous_close_reference(conn, stock_id, trade_date, market)
     return previous.close if previous else None
+
+
+def latest_close_date(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute("SELECT MAX(trade_date) AS trade_date FROM daily_close").fetchone()
+    return row["trade_date"] if row and row["trade_date"] else None
 
 
 def previous_close_reference(
@@ -666,6 +723,10 @@ def _normalize_markets(markets: Iterable[str] | None) -> tuple[str, ...]:
     if unknown:
         raise ValueError(f"unknown market: {', '.join(unknown)}")
     return selected
+
+
+def _empty_stats() -> dict[str, int]:
+    return {"OK": 0, "FIXED": 0, "BLOCKED": 0, "RECHECK": 0, "MISSING": 0, "SKIPPED": 0}
 
 
 def _ensure_calendar_for_official_download(

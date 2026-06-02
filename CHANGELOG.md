@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.4 - 2026-06-02
+
+### Added
+
+- Added `update-close` for daily official Close updates from the latest imported `daily_close` date through today.
+- `update-close --to YYYY-MM-DD` can target a specific end date for controlled catch-up runs.
+
 ## v0.2.3 - 2026-06-02
 
 ### Added

@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.2.3
+Version: v0.2.4
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -21,12 +21,17 @@ VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資
 # 初始化 SQLite 資料庫與必要資料表
 python main.py init-db
 
+# 日常更新：從 DB 目前最後一筆 Close 日期自動補到今天
+# 全新 DB 需先用 import-close 建立 Close 起點
+python main.py update-close
+
 # 匯入指定日期的官方 Close 日收盤資料，不會執行三日回滾檢查
 # 若 trading_days 落後，會先用 TWSE FMTQIK 大盤 API 補齊交易日曆
-python main.py import-close --date 2026-05-29
+python main.py import-close --date 2026-06-02
+python main.py import-close --from 2026-06-01 --to 2026-06-02
 
 # 半夜或跨日執行三日回滾檢查
-python main.py rollback-close --date 2026-05-29
+python main.py rollback-close --date 2026-06-02
 
 # 批次下載指定日期區間內的交易日官方 Close 資料
 python main.py import-close --from 2024-01-01 --to 2024-12-31

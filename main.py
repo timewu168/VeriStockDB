@@ -32,6 +32,10 @@ def build_parser() -> argparse.ArgumentParser:
     import_close.add_argument("--to", dest="end", help="range end YYYY-MM-DD")
     import_close.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
+    update_close = subparsers.add_parser("update-close", help="update Close data from latest DB date to today")
+    update_close.add_argument("--to", dest="end", help="target end date YYYY-MM-DD, default today")
+    update_close.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
     import_close_local = subparsers.add_parser(
         "import-close-local", help="import local Close CSV files in a date range"
     )
@@ -145,6 +149,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             if args.command == "import-close":
                 result = _cmd_import_close(conn, args)
+            elif args.command == "update-close":
+                result = _cmd_update_close(conn, args)
             elif args.command == "import-close-local":
                 result = _cmd_import_close_local(conn, args)
             elif args.command == "rollback-close":
@@ -206,6 +212,18 @@ def _cmd_import_close(conn, args: argparse.Namespace) -> int:
     stats = close_importer.import_close_day(
         conn,
         trade_date=validate_iso_date(args.date),
+        cooldown=cooldown,
+        log=print,
+    )
+    print(_format_stats(stats))
+    return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
+
+
+def _cmd_update_close(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    stats = close_importer.import_close_update(
+        conn,
+        through_date=validate_iso_date(args.end) if args.end else None,
         cooldown=cooldown,
         log=print,
     )
@@ -412,6 +430,7 @@ def _print_quickstart() -> None:
     print("Quickstart:")
     print("  python main.py init-db")
     print("  python main.py status")
+    print("  python main.py update-close")
     print("  python main.py import-close --date YYYY-MM-DD")
     print("  python main.py rollback-close --date YYYY-MM-DD")
     print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
