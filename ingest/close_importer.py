@@ -13,7 +13,12 @@ from ingest.downloader import (
     download_close_csv,
     save_official_csv,
 )
-from ingest.trading_calendar import is_open, rollback_trading_days, trading_days_between
+from ingest.trading_calendar import (
+    is_open,
+    rollback_trading_days,
+    trading_days_between,
+    validate_iso_date,
+)
 from services import batch_status, data_events
 from validate.close_rules import validate_close_csv
 from validate.result import CloseRow, PreviousClose, ValidationError, ValidationOutcome
@@ -27,6 +32,10 @@ MANUAL_OVERRIDE_CODES = {
 }
 
 SUCCESS_STATUSES = {"OK", "FIXED"}
+LOCAL_CLOSE_MARKET_SUFFIX = {
+    "TWSE": "CloseSII",
+    "TPEX": "CloseOTC",
+}
 
 
 def import_close_file(
@@ -244,6 +253,52 @@ def import_close_range(
     return stats
 
 
+def import_close_local_range(
+    conn: sqlite3.Connection,
+    *,
+    directory: Path | str,
+    start: str,
+    end: str,
+    markets: Iterable[str] | None = None,
+    log: LogFunc | None = None,
+) -> dict[str, int]:
+    start_date = validate_iso_date(start)
+    end_date = validate_iso_date(end)
+    if start_date > end_date:
+        raise ValueError(f"--from must be earlier than or equal to --to: {start} > {end}")
+
+    selected_markets = _normalize_markets(markets)
+    root = Path(directory)
+    dates = trading_days_between(conn, start_date, end_date)
+    if not dates:
+        raise ValueError(f"no open trading days found between {start_date} and {end_date}")
+
+    stats = {"OK": 0, "FIXED": 0, "BLOCKED": 0, "RECHECK": 0, "MISSING": 0, "SKIPPED": 0}
+    total = len(dates) * len(selected_markets)
+    current = 0
+    if log:
+        log(f"Local range: {start_date} -> {end_date}")
+        log(f"Directory: {root}")
+    for trade_date in dates:
+        for market in selected_markets:
+            current += 1
+            path = _local_close_csv_path(root, market, trade_date)
+            if log:
+                log(f"Progress: {current} / {total}")
+                log(f"Current: {trade_date} {market} {path}")
+            if path.exists():
+                import_close_file(conn, path=path, market=market, trade_date=trade_date)
+            else:
+                _record_local_missing(conn, market, trade_date, path)
+            conn.commit()
+            batch = batch_status.get_batch(conn, config.DATASET_DAILY_CLOSE, market, trade_date)
+            if batch:
+                stats[batch["status"]] += 1
+            if log:
+                _log_stats(stats, log)
+    return stats
+
+
 def import_close_day(
     conn: sqlite3.Connection,
     *,
@@ -434,6 +489,41 @@ def _record_official_failure(
     return batch_id
 
 
+def _record_local_missing(
+    conn: sqlite3.Connection,
+    market: str,
+    trade_date: str,
+    path: Path,
+) -> str:
+    batch_id = batch_status.record_batch(
+        conn,
+        dataset=config.DATASET_DAILY_CLOSE,
+        market=market,
+        period=trade_date,
+        status="MISSING",
+        row_count=None,
+        errors=[
+            ValidationError(
+                "BLOCK",
+                "LOCAL_CSV_NOT_FOUND",
+                f"expected local Close CSV not found: {path}",
+            )
+        ],
+        source_file=str(path),
+        retry_count=0,
+        note="local_csv_range",
+    )
+    data_events.replace_batch_events(
+        conn,
+        batch_id=batch_id,
+        dataset=config.DATASET_DAILY_CLOSE,
+        market=market,
+        period=trade_date,
+        events=[],
+    )
+    return batch_id
+
+
 def _replace_daily_close_rows(
     conn: sqlite3.Connection, market: str, trade_date: str, rows: list[CloseRow]
 ) -> None:
@@ -523,6 +613,19 @@ def _excluded_note(outcome: ValidationOutcome) -> str | None:
     if outcome.excluded_count == 0:
         return None
     return f"excluded_rows={outcome.excluded_count}"
+
+
+def _normalize_markets(markets: Iterable[str] | None) -> tuple[str, ...]:
+    selected = tuple(dict.fromkeys(markets or config.MARKETS))
+    unknown = sorted(set(selected) - set(config.MARKETS))
+    if unknown:
+        raise ValueError(f"unknown market: {', '.join(unknown)}")
+    return selected
+
+
+def _local_close_csv_path(directory: Path, market: str, trade_date: str) -> Path:
+    yyyymmdd = trade_date.replace("-", "")
+    return directory / f"{yyyymmdd}{LOCAL_CLOSE_MARKET_SUFFIX[market]}.csv"
 
 
 def _log_stats(stats: dict[str, int], log: LogFunc) -> None:

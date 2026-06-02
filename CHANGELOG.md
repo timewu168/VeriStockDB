@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1 - 2026-06-02
+
+### Added
+
+- Added formal `import-close-local` command for importing local historical Close CSV ranges.
+- Local Close range imports now use the trading calendar to derive expected CSV files and record `MISSING: LOCAL_CSV_NOT_FOUND` when a trading-day file is absent.
+
 ## v0.2.0 - 2026-06-02
 
 ### Added

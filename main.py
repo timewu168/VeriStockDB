@@ -31,6 +31,18 @@ def build_parser() -> argparse.ArgumentParser:
     import_close.add_argument("--to", dest="end", help="range end YYYY-MM-DD")
     import_close.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
+    import_close_local = subparsers.add_parser(
+        "import-close-local", help="import local Close CSV files in a date range"
+    )
+    import_close_local.add_argument(
+        "--dir",
+        default=str(config.CSV_DIR / "Close"),
+        help="local Close CSV directory, default data/csv/Close",
+    )
+    import_close_local.add_argument("--from", dest="start", required=True, help="range start YYYY-MM-DD")
+    import_close_local.add_argument("--to", dest="end", required=True, help="range end YYYY-MM-DD")
+    import_close_local.add_argument("--market", choices=config.MARKETS)
+
     rollback_close = subparsers.add_parser(
         "rollback-close", help="run three-trading-day Close rollback check"
     )
@@ -93,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             if args.command == "import-close":
                 result = _cmd_import_close(conn, args)
+            elif args.command == "import-close-local":
+                result = _cmd_import_close_local(conn, args)
             elif args.command == "rollback-close":
                 result = _cmd_rollback_close(conn, args)
             elif args.command == "status":
@@ -151,6 +165,19 @@ def _cmd_import_close(conn, args: argparse.Namespace) -> int:
         conn,
         trade_date=validate_iso_date(args.date),
         cooldown=cooldown,
+        log=print,
+    )
+    print(_format_stats(stats))
+    return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
+
+
+def _cmd_import_close_local(conn, args: argparse.Namespace) -> int:
+    stats = close_importer.import_close_local_range(
+        conn,
+        directory=Path(args.dir),
+        start=validate_iso_date(args.start),
+        end=validate_iso_date(args.end),
+        markets=(args.market,) if args.market else None,
         log=print,
     )
     print(_format_stats(stats))
@@ -306,6 +333,7 @@ def _print_quickstart() -> None:
     print("  python main.py status")
     print("  python main.py import-close --date YYYY-MM-DD")
     print("  python main.py rollback-close --date YYYY-MM-DD")
+    print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
     print("  python main.py query-close --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")
 
 

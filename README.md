@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.2.0
+Version: v0.2.1
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -24,14 +24,18 @@ python main.py init-db
 # 匯入指定日期的官方 Close 日收盤資料，不會執行三日回滾檢查
 python main.py import-close --date 2026-05-29
 
-# 批次匯入指定日期區間內的交易日 Close 資料
 # 半夜或跨日執行三日回滾檢查
 python main.py rollback-close --date 2026-05-29
 
+# 批次下載指定日期區間內的交易日官方 Close 資料
 python main.py import-close --from 2024-01-01 --to 2024-12-31
 
 # 匯入本地既有 CSV 檔案，需指定日期與市場
 python main.py import-close --file data/csv/daily_close/2024/20240603CloseSII.csv --date 2024-06-03 --market TWSE
+
+# 批次匯入本地歷史 Close CSV，依交易日曆檢查缺檔
+# 檔名需為 yyyyMMddCloseSII.csv / yyyyMMddCloseOTC.csv
+python main.py import-close-local --dir data/csv/Close --from 2004-02-11 --to 2004-12-31
 
 # 查看各批次資料狀態與最新問題
 python main.py status
