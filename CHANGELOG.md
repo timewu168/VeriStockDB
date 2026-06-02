@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.3 - 2026-06-02
+
+### Added
+
+- Official Close downloads now refresh missing `trading_days` rows from the TWSE `FMTQIK` market-calendar API before downloading CSV files.
+- The trading-calendar refresh stores both open days and inferred closed days through the requested/current date, so closed days can be skipped without probing Close CSV downloads.
+
 ## v0.2.2 - 2026-06-02
 
 ### Added

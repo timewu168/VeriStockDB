@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import date
 import hashlib
 from pathlib import Path
 import sqlite3
@@ -9,11 +10,14 @@ import config
 from ingest.downloader import (
     CooldownController,
     FetchCloseCsv,
+    FetchTradingDaysJson,
     LogFunc,
     download_close_csv,
+    download_trading_days_json,
     save_official_csv,
 )
 from ingest.trading_calendar import (
+    ensure_trading_days_current,
     is_open,
     rollback_trading_days,
     trading_days_between,
@@ -161,7 +165,19 @@ def import_close_official(
     log: LogFunc | None = None,
     max_attempts: int = 3,
     require_calendar: bool = True,
+    calendar_fetcher: FetchTradingDaysJson = download_trading_days_json,
+    calendar_today: str | None = None,
 ) -> str | None:
+    cooldown = cooldown or CooldownController()
+    if require_calendar:
+        _ensure_calendar_for_official_download(
+            conn,
+            target_date=trade_date,
+            fetcher=calendar_fetcher,
+            cooldown=cooldown,
+            log=log,
+            calendar_today=calendar_today,
+        )
     open_status = is_open(conn, trade_date)
     if require_calendar and open_status is None:
         raise ValueError(f"unknown trading day: {trade_date}")
@@ -170,7 +186,6 @@ def import_close_official(
             log(f"INFO {trade_date} is not a trading day; skipped")
         return None
 
-    cooldown = cooldown or CooldownController()
     last_batch_id: str | None = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -216,12 +231,23 @@ def import_close_range(
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
     require_calendar: bool = True,
+    calendar_fetcher: FetchTradingDaysJson = download_trading_days_json,
+    calendar_today: str | None = None,
 ) -> dict[str, int]:
+    cooldown = cooldown or CooldownController()
+    if require_calendar:
+        _ensure_calendar_for_official_download(
+            conn,
+            target_date=end,
+            fetcher=calendar_fetcher,
+            cooldown=cooldown,
+            log=log,
+            calendar_today=calendar_today,
+        )
     dates = trading_days_between(conn, start, end)
     if require_calendar and not dates:
         raise ValueError(f"no open trading days found between {start} and {end}")
 
-    cooldown = cooldown or CooldownController()
     stats = {"OK": 0, "FIXED": 0, "BLOCKED": 0, "RECHECK": 0, "MISSING": 0, "SKIPPED": 0}
     total = len(dates) * len(config.MARKETS)
     current = 0
@@ -241,6 +267,8 @@ def import_close_range(
                 cooldown=cooldown,
                 log=log,
                 require_calendar=require_calendar,
+                calendar_fetcher=calendar_fetcher,
+                calendar_today=calendar_today,
             )
             if batch_id is None:
                 stats["SKIPPED"] += 1
@@ -307,6 +335,8 @@ def import_close_day(
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
     require_calendar: bool = True,
+    calendar_fetcher: FetchTradingDaysJson = download_trading_days_json,
+    calendar_today: str | None = None,
 ) -> dict[str, int]:
     cooldown = cooldown or CooldownController()
     stats = {"OK": 0, "FIXED": 0, "BLOCKED": 0, "RECHECK": 0, "MISSING": 0, "SKIPPED": 0}
@@ -321,6 +351,8 @@ def import_close_day(
             cooldown=cooldown,
             log=log,
             require_calendar=require_calendar,
+            calendar_fetcher=calendar_fetcher,
+            calendar_today=calendar_today,
         )
         if batch_id is None:
             stats["SKIPPED"] += 1
@@ -339,12 +371,23 @@ def import_close_with_rollback(
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
     require_calendar: bool = True,
+    calendar_fetcher: FetchTradingDaysJson = download_trading_days_json,
+    calendar_today: str | None = None,
 ) -> dict[str, int]:
+    cooldown = cooldown or CooldownController()
+    if require_calendar:
+        _ensure_calendar_for_official_download(
+            conn,
+            target_date=target_date,
+            fetcher=calendar_fetcher,
+            cooldown=cooldown,
+            log=log,
+            calendar_today=calendar_today,
+        )
     dates = rollback_trading_days(conn, target_date, 3)
     if require_calendar and not dates:
         raise ValueError(f"no trading calendar rows available for rollback ending {target_date}")
 
-    cooldown = cooldown or CooldownController()
     stats = {"OK": 0, "FIXED": 0, "BLOCKED": 0, "RECHECK": 0, "MISSING": 0, "SKIPPED": 0}
     all_success = True
     for trade_date in dates:
@@ -359,6 +402,8 @@ def import_close_with_rollback(
                 cooldown=cooldown,
                 log=log,
                 require_calendar=require_calendar,
+                calendar_fetcher=calendar_fetcher,
+                calendar_today=calendar_today,
             )
             if batch_id is None:
                 stats["SKIPPED"] += 1
@@ -621,6 +666,27 @@ def _normalize_markets(markets: Iterable[str] | None) -> tuple[str, ...]:
     if unknown:
         raise ValueError(f"unknown market: {', '.join(unknown)}")
     return selected
+
+
+def _ensure_calendar_for_official_download(
+    conn: sqlite3.Connection,
+    *,
+    target_date: str,
+    fetcher: FetchTradingDaysJson,
+    cooldown: CooldownController,
+    log: LogFunc | None,
+    calendar_today: str | None,
+) -> None:
+    target = validate_iso_date(target_date)
+    today = validate_iso_date(calendar_today) if calendar_today else date.today().isoformat()
+    through_date = max(target, today)
+    ensure_trading_days_current(
+        conn,
+        through_date=through_date,
+        fetcher=fetcher,
+        cooldown=cooldown,
+        log=log,
+    )
 
 
 def _local_close_csv_path(directory: Path, market: str, trade_date: str) -> Path:

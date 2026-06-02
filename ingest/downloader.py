@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import random
 import ssl
@@ -13,6 +14,7 @@ import config
 
 
 FetchCloseCsv = Callable[[str, str], bytes]
+FetchTradingDaysJson = Callable[[str], dict]
 LogFunc = Callable[[str], None]
 SleepFunc = Callable[[float], None]
 
@@ -44,6 +46,11 @@ def official_close_url(market: str, trade_date: str) -> str:
     raise ValueError(f"unknown market: {market}")
 
 
+def official_trading_days_url(month_start: str) -> str:
+    yyyymmdd = month_start.replace("-", "")
+    return config.URL_TWSE_TRADING_DAYS.format(date_yyyymmdd=yyyymmdd)
+
+
 def download_close_csv(market: str, trade_date: str) -> bytes:
     url = official_close_url(market, trade_date)
     request = Request(
@@ -55,6 +62,19 @@ def download_close_csv(market: str, trade_date: str) -> bytes:
     )
     with urlopen(request, timeout=30, context=official_ssl_context()) as response:
         return response.read()
+
+
+def download_trading_days_json(month_start: str) -> dict:
+    url = official_trading_days_url(month_start)
+    request = Request(
+        url,
+        headers={
+            "User-Agent": f"VeriStockDB/{config.APP_VERSION} (+https://github.com/timewu168/VeriStockDB)",
+            "Accept": "application/json,*/*",
+        },
+    )
+    with urlopen(request, timeout=30, context=official_ssl_context()) as response:
+        return json.loads(response.read().decode("utf-8-sig"))
 
 
 def official_ssl_context() -> ssl.SSLContext:

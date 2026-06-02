@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.2.2"
+APP_VERSION = "0.2.3"
 SCHEMA_VERSION = "0.2-human-first"
 DATA_DIR = ROOT_DIR / "data"
 CSV_DIR = DATA_DIR / "csv"
@@ -28,4 +28,8 @@ URL_TWSE_CLOSE = (
 URL_TPEX_CLOSE = (
     "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes"
     "?date={date_url}&id=&response=csv"
+)
+URL_TWSE_TRADING_DAYS = (
+    "https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK"
+    "?date={date_yyyymmdd}&response=json"
 )
