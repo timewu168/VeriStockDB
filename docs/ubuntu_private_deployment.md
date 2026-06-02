@@ -1,6 +1,6 @@
 # Ubuntu 私有部署備忘
 
-狀態：v0.2.5 起支援環境變數路徑設定，作為 SSH 部署、排程、log、backup 的起點。
+狀態：v0.2.5 起支援環境變數路徑設定；v0.2.6 起提供 systemd service/timer 範本。
 
 ## 硬碟分層
 
@@ -49,15 +49,16 @@ export VERISTOCK_BACKUP_DIR=/mnt/veristock-cold/backup
 
 ## Ubuntu 目錄建立
 
-先確認冷資料 SSD 已掛載到 `/mnt/veristock-cold`。
+先確認冷資料 SSD 已掛載到 `/app/dirty_box`。
 
 ```bash
 sudo mkdir -p /srv/veristockdb/app/data/db
 sudo mkdir -p /srv/veristockdb/app/data/csv/daily_close
-sudo mkdir -p /mnt/veristock-cold/archive
-sudo mkdir -p /mnt/veristock-cold/backup
+sudo mkdir -p /srv/veristockdb/logs
+sudo mkdir -p /app/dirty_box/veristockdb/archive
+sudo mkdir -p /app/dirty_box/veristockdb/backup
 sudo chown -R timewu:timewu /srv/veristockdb
-sudo chown -R timewu:timewu /mnt/veristock-cold/archive /mnt/veristock-cold/backup
+sudo chown -R timewu:timewu /app/dirty_box/veristockdb
 ```
 
 ## 手動驗證
@@ -69,8 +70,8 @@ cd /srv/veristockdb/app
 
 export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
 export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-export VERISTOCK_ARCHIVE_DIR=/mnt/veristock-cold/archive
-export VERISTOCK_BACKUP_DIR=/mnt/veristock-cold/backup
+export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
+export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
 
 python3 main.py status
 python3 main.py update-close
@@ -81,15 +82,89 @@ python3 main.py backup
 確認 backup 寫入冷資料 SSD：
 
 ```bash
-ls -lh /mnt/veristock-cold/backup
+ls -lh /app/dirty_box/veristockdb/backup
 ```
 
-## 後續排程方向
+## systemd 排程安裝
 
-systemd service/timer 之後應把上述環境變數寫入 service 檔，讓排程與手動 SSH 執行使用同一套路徑。
+範本位於：
+
+```text
+deploy/systemd/
+```
+
+先建立環境變數檔：
+
+```bash
+sudo mkdir -p /etc/veristockdb
+sudo cp /srv/veristockdb/app/deploy/systemd/veristockdb.env.example /etc/veristockdb/veristockdb.env
+sudo chown root:root /etc/veristockdb/veristockdb.env
+sudo chmod 0644 /etc/veristockdb/veristockdb.env
+```
+
+確認內容符合本機硬碟配置：
+
+```bash
+cat /etc/veristockdb/veristockdb.env
+```
+
+目前 private server 建議內容：
+
+```text
+VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
+VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
+VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
+VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
+```
+
+安裝 service 與 timer：
+
+```bash
+sudo cp /srv/veristockdb/app/deploy/systemd/veristockdb-*.service /etc/systemd/system/
+sudo cp /srv/veristockdb/app/deploy/systemd/veristockdb-*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+```
 
 建議排程分工：
 
-- `update-close`：每日收盤後或晚上執行。
-- `rollback-close`：半夜執行三日回滾檢查。
-- `backup`：每日或每週執行，backup 寫到冷資料 SSD。
+- `veristockdb-update-close.timer`：週一至週五 19:30 執行 `update-close`。
+- `veristockdb-rollback-close.timer`：週二至週六 01:30 執行 `rollback-close`。
+- `veristockdb-backup.timer`：每日 02:30 執行 `backup`，backup 寫到冷資料 SSD。
+
+先手動測 service：
+
+```bash
+sudo systemctl start veristockdb-update-close.service
+sudo systemctl start veristockdb-rollback-close.service
+sudo systemctl start veristockdb-backup.service
+```
+
+查看狀態：
+
+```bash
+systemctl status veristockdb-update-close.service --no-pager
+systemctl status veristockdb-rollback-close.service --no-pager
+systemctl status veristockdb-backup.service --no-pager
+```
+
+查看 log：
+
+```bash
+tail -n 100 /srv/veristockdb/logs/update-close.log
+tail -n 100 /srv/veristockdb/logs/rollback-close.log
+tail -n 100 /srv/veristockdb/logs/backup.log
+```
+
+確認手動 service 都正常後，再啟用 timer：
+
+```bash
+sudo systemctl enable --now veristockdb-update-close.timer
+sudo systemctl enable --now veristockdb-rollback-close.timer
+sudo systemctl enable --now veristockdb-backup.timer
+```
+
+列出排程：
+
+```bash
+systemctl list-timers 'veristockdb-*'
+```

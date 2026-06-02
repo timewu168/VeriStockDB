@@ -1,0 +1,10 @@
+[Unit]
+Description=Run VeriStockDB daily Close update
+
+[Timer]
+OnCalendar=Mon..Fri 19:30
+Persistent=true
+Unit=veristockdb-update-close.service
+
+[Install]
+WantedBy=timers.target

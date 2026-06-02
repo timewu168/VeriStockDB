@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.6 - 2026-06-02
+
+### Added
+
+- `rollback-close` can now omit `--date` and automatically use the latest imported Close date.
+- Added Ubuntu `systemd` service and timer templates for `update-close`, `rollback-close`, and `backup`.
+
 ## v0.2.5 - 2026-06-02
 
 ### Added

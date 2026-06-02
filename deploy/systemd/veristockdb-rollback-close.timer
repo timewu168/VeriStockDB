@@ -1,0 +1,10 @@
+[Unit]
+Description=Run VeriStockDB Close rollback check
+
+[Timer]
+OnCalendar=Tue..Sat 01:30
+Persistent=true
+Unit=veristockdb-rollback-close.service
+
+[Install]
+WantedBy=timers.target

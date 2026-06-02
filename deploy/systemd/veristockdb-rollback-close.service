@@ -1,0 +1,14 @@
+[Unit]
+Description=VeriStockDB Close rollback check
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=timewu
+Group=timewu
+WorkingDirectory=/srv/veristockdb/app
+EnvironmentFile=/etc/veristockdb/veristockdb.env
+ExecStart=/usr/bin/python3 /srv/veristockdb/app/main.py rollback-close
+StandardOutput=append:/srv/veristockdb/logs/rollback-close.log
+StandardError=append:/srv/veristockdb/logs/rollback-close.log

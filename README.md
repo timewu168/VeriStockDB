@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.2.5
+Version: v0.2.6
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -31,7 +31,7 @@ python main.py import-close --date 2026-06-02
 python main.py import-close --from 2026-06-01 --to 2026-06-02
 
 # 半夜或跨日執行三日回滾檢查
-python main.py rollback-close --date 2026-06-02
+python main.py rollback-close
 
 # 批次下載指定日期區間內的交易日官方 Close 資料
 python main.py import-close --from 2024-01-01 --to 2024-12-31
@@ -90,8 +90,8 @@ Ubuntu server 可用環境變數把熱資料與冷資料分到不同硬碟。主
 ```bash
 export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
 export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-export VERISTOCK_ARCHIVE_DIR=/mnt/veristock-cold/archive
-export VERISTOCK_BACKUP_DIR=/mnt/veristock-cold/backup
+export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
+export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
 ```
 
 完整部署備忘見 `docs/ubuntu_private_deployment.md`。

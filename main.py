@@ -51,7 +51,10 @@ def build_parser() -> argparse.ArgumentParser:
     rollback_close = subparsers.add_parser(
         "rollback-close", help="run three-trading-day Close rollback check"
     )
-    rollback_close.add_argument("--date", required=True, help="target date YYYY-MM-DD")
+    rollback_close.add_argument(
+        "--date",
+        help="target date YYYY-MM-DD, default latest imported Close date",
+    )
     rollback_close.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
     status = subparsers.add_parser("status", help="show batch status")
@@ -246,9 +249,14 @@ def _cmd_import_close_local(conn, args: argparse.Namespace) -> int:
 
 def _cmd_rollback_close(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
+    target_date = validate_iso_date(args.date) if args.date else close_importer.latest_close_date(conn)
+    if target_date is None:
+        raise ValueError("rollback-close requires --date when no daily_close rows exist")
+    if not args.date:
+        print(f"INFO rollback-close target latest daily_close date: {target_date}")
     stats = close_importer.import_close_with_rollback(
         conn,
-        target_date=validate_iso_date(args.date),
+        target_date=target_date,
         cooldown=cooldown,
         log=print,
     )
@@ -432,7 +440,7 @@ def _print_quickstart() -> None:
     print("  python main.py status")
     print("  python main.py update-close")
     print("  python main.py import-close --date YYYY-MM-DD")
-    print("  python main.py rollback-close --date YYYY-MM-DD")
+    print("  python main.py rollback-close")
     print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
     print("  python main.py finalize-close-months --from YYYY-MM --to YYYY-MM --dir data/csv/Close")
     print("  python main.py query-close --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")

@@ -1,0 +1,14 @@
+[Unit]
+Description=VeriStockDB daily Close update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=timewu
+Group=timewu
+WorkingDirectory=/srv/veristockdb/app
+EnvironmentFile=/etc/veristockdb/veristockdb.env
+ExecStart=/usr/bin/python3 /srv/veristockdb/app/main.py update-close
+StandardOutput=append:/srv/veristockdb/logs/update-close.log
+StandardError=append:/srv/veristockdb/logs/update-close.log
