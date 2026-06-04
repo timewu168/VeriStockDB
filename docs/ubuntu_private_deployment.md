@@ -16,8 +16,9 @@ Ubuntu server 目前有兩顆硬碟：
 | Git repo / CLI 程式 | `/srv/veristockdb/app` | 主程式、未來 API/PWA |
 | 主 SQLite DB | `/srv/veristockdb/app/data/db/veristock.db` | 熱資料，日常查詢與匯入會使用 |
 | 未封存 Close CSV | `/srv/veristockdb/app/data/csv/daily_close` | 月封存前暫存 |
-| 月封存 ZIP | `/mnt/veristock-cold/archive` | 冷資料，ZIP 驗證通過後可刪 loose CSV |
-| DB backup | `/mnt/veristock-cold/backup` | 備份不與主 DB 放同顆硬碟 |
+| 月封存 ZIP | `/app/dirty_box/veristockdb/archive` | 冷資料，ZIP 驗證通過後可刪 loose CSV |
+| DB backup | `/app/dirty_box/veristockdb/backup` | 備份不與主 DB 放同顆硬碟 |
+| log | `/srv/veristockdb/logs` | systemd 執行紀錄 |
 
 長期歷史 CSV 散檔若已完成 ZIP 封存且驗證通過，不需要再保留另一份 loose CSV。保留封存 ZIP 即可。
 
@@ -35,14 +36,16 @@ v0.2.5 支援以下環境變數：
 | `VERISTOCK_BACKUP_DIR` | DB backup 目錄 | `<data>/backup` |
 | `VERISTOCK_BACKUP_PATH` | 最新 DB backup 檔案 | `<backup_dir>/veristock_latest_backup.db` |
 | `VERISTOCK_ARCHIVE_DIR` | 月封存 ZIP 目錄 | `<csv_dir>/monthly_zip` |
+| `VERISTOCK_LOG_DIR` | ops-check 檢查的 log 目錄 | `<repo>/logs` |
 
 Ubuntu 私有部署建議設定：
 
 ```bash
 export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
 export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-export VERISTOCK_ARCHIVE_DIR=/mnt/veristock-cold/archive
-export VERISTOCK_BACKUP_DIR=/mnt/veristock-cold/backup
+export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
+export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
+export VERISTOCK_LOG_DIR=/srv/veristockdb/logs
 ```
 
 若沒有設定，程式仍會使用 repo 內的 `data/` 預設路徑，維持 Windows 本機開發行為。
@@ -77,6 +80,7 @@ python3 main.py status
 python3 main.py update-close
 python3 main.py status --problems --details
 python3 main.py backup
+python3 main.py ops-check --skip-systemd
 ```
 
 確認 backup 寫入冷資料 SSD：
@@ -115,6 +119,7 @@ VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
 VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
 VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
 VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
+VERISTOCK_LOG_DIR=/srv/veristockdb/logs
 ```
 
 安裝 service 與 timer：
@@ -154,6 +159,20 @@ tail -n 100 /srv/veristockdb/logs/update-close.log
 tail -n 100 /srv/veristockdb/logs/rollback-close.log
 tail -n 100 /srv/veristockdb/logs/backup.log
 ```
+
+執行正式部署健康檢查：
+
+```bash
+python3 main.py ops-check
+```
+
+`ops-check` 會檢查：
+
+- 主 DB 是否存在且可讀。
+- backup DB 是否存在且可讀。
+- archive 目錄是否存在。
+- `update-close` / `rollback-close` / `backup` log 是否存在。
+- 三個 `veristockdb-*` timer 是否啟用。
 
 確認手動 service 都正常後，再啟用 timer：
 

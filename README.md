@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.2.6
+Version: v0.2.7
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -47,6 +47,9 @@ python main.py import-close-local --dir data/csv/Close --from 2004-02-11 --to 20
 # 查看各批次資料狀態與最新問題
 python main.py status
 
+# 檢查私有部署健康狀態：DB、backup、archive、log、systemd timer
+python main.py ops-check
+
 # 列出所有被擋下、需複查或缺漏的批次與原因
 python main.py status --problems
 
@@ -92,6 +95,7 @@ export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
 export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
 export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
 export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
+export VERISTOCK_LOG_DIR=/srv/veristockdb/logs
 ```
 
 完整部署備忘見 `docs/ubuntu_private_deployment.md`。

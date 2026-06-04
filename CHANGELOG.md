@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.7 - 2026-06-04
+
+### Added
+
+- Added `ops-check` to verify deployment health across DB readability, backup readability, archive directory, logs, and systemd timers.
+- Added `VERISTOCK_LOG_DIR` so operational log checks can use the same path conventions as Ubuntu deployments.
+
 ## v0.2.6 - 2026-06-02
 
 ### Added

@@ -15,6 +15,7 @@ from services.backup import backup_database
 from services.monthly_archive import archive_month
 from services.monthly_audit import audit_month
 from services.monthly_finalize import finalize_close_months
+from services.ops_check import run_ops_check
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,6 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--dataset", default=None)
     status.add_argument("--problems", action="store_true", help="list blocked/recheck/missing batches")
     status.add_argument("--details", action="store_true", help="show problem error samples")
+
+    ops = subparsers.add_parser("ops-check", help="check deployment DB, backup, archive, logs, and timers")
+    ops.add_argument("--backup-path", default=str(config.DEFAULT_BACKUP_PATH))
+    ops.add_argument("--archive-dir", default=str(config.ARCHIVE_DIR))
+    ops.add_argument("--log-dir", default=str(config.LOG_DIR))
+    ops.add_argument("--skip-systemd", action="store_true", help="skip systemd timer checks")
 
     query = subparsers.add_parser("query-close", help="query imported Close data")
     query.add_argument("--stock-id")
@@ -146,6 +153,8 @@ def main(argv: list[str] | None = None) -> int:
             target = backup_database(db_path=db_path)
             print(f"backup written: {target}")
             return 0
+        if args.command == "ops-check":
+            return _cmd_ops_check(db_path, args)
 
         db_connection.init_db(db_path)
         conn = db_connection.connect(db_path)
@@ -307,6 +316,20 @@ def _cmd_status_problems(conn, args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ops_check(db_path: Path, args: argparse.Namespace) -> int:
+    result = run_ops_check(
+        db_path=db_path,
+        backup_path=Path(args.backup_path),
+        archive_dir=Path(args.archive_dir),
+        log_dir=Path(args.log_dir),
+        check_systemd=not args.skip_systemd,
+    )
+    print(f"ops-check {result.status}")
+    for item in result.items:
+        print(f"  {item.status:<5} {item.name:<36} {item.message}")
+    return 2 if result.has_errors else 0
+
+
 def _cmd_query_close(conn, args: argparse.Namespace) -> int:
     rows = close_importer.query_close(
         conn,
@@ -439,6 +462,7 @@ def _print_quickstart() -> None:
     print("  python main.py init-db")
     print("  python main.py status")
     print("  python main.py update-close")
+    print("  python main.py ops-check")
     print("  python main.py import-close --date YYYY-MM-DD")
     print("  python main.py rollback-close")
     print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
