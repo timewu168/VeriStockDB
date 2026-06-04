@@ -187,3 +187,45 @@ sudo systemctl enable --now veristockdb-backup.timer
 ```bash
 systemctl list-timers 'veristockdb-*'
 ```
+
+## 修改 systemd 排程時間
+
+若官方資料站在剛收盤後回應較慢，可把 `update-close` 從 15:30 這類尖峰時間改到較晚時間，例如 17:10。
+
+建議使用 systemd override，不直接手改 repo 範本：
+
+```bash
+sudo systemctl edit veristockdb-update-close.timer
+```
+
+填入以下內容：
+
+```ini
+[Timer]
+OnCalendar=
+OnCalendar=Mon..Fri 17:10
+```
+
+第一行空的 `OnCalendar=` 是清掉原本排程；第二行才是新的時間。
+
+套用並重啟 timer：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart veristockdb-update-close.timer
+```
+
+確認實際生效內容：
+
+```bash
+systemctl cat veristockdb-update-close.timer
+systemctl list-timers 'veristockdb-*' --all
+```
+
+若要取消 override，回到 repo 或 `/etc/systemd/system/` 原本 timer 設定：
+
+```bash
+sudo systemctl revert veristockdb-update-close.timer
+sudo systemctl daemon-reload
+sudo systemctl restart veristockdb-update-close.timer
+```
