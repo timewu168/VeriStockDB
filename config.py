@@ -5,13 +5,27 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.2.7"
+APP_VERSION = "0.3.0"
 SCHEMA_VERSION = "0.2-human-first"
 
 
 def _path_from_env(name: str, default: Path) -> Path:
     value = os.environ.get(name)
     return Path(value).expanduser() if value else default
+
+
+def _int_from_env(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if not value:
+        return default
+    return int(value)
+
+
+def _bool_from_env(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 DATA_DIR = _path_from_env("VERISTOCK_DATA_DIR", ROOT_DIR / "data")
@@ -34,6 +48,13 @@ DEFAULT_COOLDOWN_MAX_SECONDS = 15
 
 DATASET_DAILY_CLOSE = "daily_close"
 MARKETS = ("TWSE", "TPEX")
+
+API_HOST = os.environ.get("VERISTOCK_API_HOST", "127.0.0.1")
+API_PORT = _int_from_env("VERISTOCK_API_PORT", 8000)
+API_REQUIRE_AUTH = _bool_from_env("VERISTOCK_API_REQUIRE_AUTH", False)
+API_READ_TOKEN = os.environ.get("VERISTOCK_API_READ_TOKEN", "")
+API_OPS_TOKEN = os.environ.get("VERISTOCK_API_OPS_TOKEN", "")
+API_ADMIN_TOKEN = os.environ.get("VERISTOCK_API_ADMIN_TOKEN", "")
 
 URL_TWSE_CLOSE = (
     "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX"

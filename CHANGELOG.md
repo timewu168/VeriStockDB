@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 - 2026-06-04
+
+### Added
+
+- Added the Local Truth API read-only first version for local/private VeriStockDB access.
+- Added FastAPI endpoints for health, app info, dataset status, daily Close, trading days, batches, import errors, data events, and ops summary.
+- Added API environment variables for host, port, optional Bearer-token auth, and read/ops/admin token levels.
+- Added Local Truth API specification and version roadmap checklist documents.
+
+### Notes
+
+- Local Truth API is intended for localhost, ZeroTier, VPN, or trusted private networks only; it is not the cloud/public Edge API.
+- Cloud Edge API, cloud PWA, jobs, and exports remain future private-project or later-version work.
+
 ## v0.2.7 - 2026-06-04
 
 ### Added

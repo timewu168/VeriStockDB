@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.2.7
+Version: v0.3.0
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -99,3 +99,42 @@ export VERISTOCK_LOG_DIR=/srv/veristockdb/logs
 ```
 
 完整部署備忘見 `docs/ubuntu_private_deployment.md`。
+
+## Local Truth API
+
+`v0.3.0` 開始建立本地 Local Truth API。這套 API 只供本機、ZeroTier 或可信任內網使用，定位是 VeriStockDB 真理資料庫的管理與查詢入口，不是雲端公開 API。
+
+目前 `v0.3.0` read-only 第一版包含：
+
+- `GET /health`
+- `GET /api/v1/info`
+- `GET /api/v1/datasets`
+- `GET /api/v1/datasets/{dataset}/status`
+- `GET /api/v1/daily-close`
+- `GET /api/v1/trading-days`
+- `GET /api/v1/batches`
+- `GET /api/v1/batches/{batch_id}`
+- `GET /api/v1/errors`
+- `GET /api/v1/events`
+- `GET /api/v1/ops/summary`
+
+安裝 API 依賴：
+
+```powershell
+pip install -r requirements.txt
+```
+
+啟動本地 API：
+
+```powershell
+python -m api
+```
+
+預設綁定 `127.0.0.1:8000`。可用環境變數調整：
+
+```powershell
+$env:VERISTOCK_API_HOST = "127.0.0.1"
+$env:VERISTOCK_API_PORT = "8000"
+```
+
+完整規格見 `docs/local_truth_api_spec.md`。
