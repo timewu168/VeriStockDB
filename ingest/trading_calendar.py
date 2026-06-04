@@ -59,16 +59,34 @@ def ensure_trading_days_current(
     conn: sqlite3.Connection,
     *,
     through_date: str,
+    refresh_from: str | None = None,
     fetcher: FetchTradingDaysJson = download_trading_days_json,
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
 ) -> int:
     through = date.fromisoformat(validate_iso_date(through_date))
     latest = latest_calendar_date(conn)
-    if latest and latest >= through.isoformat():
+    refresh_start = (
+        date.fromisoformat(validate_iso_date(refresh_from))
+        if refresh_from
+        else through.replace(day=1)
+    )
+    if refresh_start > through:
+        refresh_start = through
+
+    has_missing_tail = not latest or latest < through.isoformat()
+    has_inferred_closed_rows = _has_inferred_closed_days(
+        conn, refresh_start.isoformat(), through.isoformat()
+    )
+    if latest and not has_missing_tail and not has_inferred_closed_rows:
         return 0
 
-    start = date.fromisoformat(latest) + timedelta(days=1) if latest else through.replace(day=1)
+    start = through.replace(day=1)
+    if latest and has_missing_tail:
+        next_missing = date.fromisoformat(latest) + timedelta(days=1)
+        start = next_missing
+    if has_inferred_closed_rows and refresh_start < start:
+        start = refresh_start
     month_starts = _month_starts_between(start, through)
     open_dates: set[str] = set()
     cooldown = cooldown or CooldownController()
@@ -108,6 +126,22 @@ def ensure_trading_days_current(
     if log:
         log(f"INFO trading calendar updated rows={changed} through={through.isoformat()}")
     return changed
+
+
+def _has_inferred_closed_days(conn: sqlite3.Connection, start: str, end: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM trading_days
+        WHERE trade_date BETWEEN ? AND ?
+          AND is_open = 0
+          AND source = 'twse_fmtqik'
+          AND note LIKE 'closed day inferred from TWSE FMTQIK%'
+        LIMIT 1
+        """,
+        (start, end),
+    ).fetchone()
+    return row is not None
 
 
 def parse_twse_fmtqik_open_dates(payload: dict) -> set[str]:

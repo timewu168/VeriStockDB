@@ -239,6 +239,7 @@ def import_close_range(
         _ensure_calendar_for_official_download(
             conn,
             target_date=end,
+            refresh_from=start,
             fetcher=calendar_fetcher,
             cooldown=cooldown,
             log=log,
@@ -266,7 +267,7 @@ def import_close_range(
                 fetcher=fetcher,
                 cooldown=cooldown,
                 log=log,
-                require_calendar=require_calendar,
+                require_calendar=False,
                 calendar_fetcher=calendar_fetcher,
                 calendar_today=calendar_today,
             )
@@ -311,6 +312,7 @@ def import_close_update(
         _ensure_calendar_for_official_download(
             conn,
             target_date=target,
+            refresh_from=start,
             fetcher=calendar_fetcher,
             cooldown=cooldown,
             log=log,
@@ -327,7 +329,7 @@ def import_close_update(
         fetcher=fetcher,
         cooldown=cooldown,
         log=log,
-        require_calendar=require_calendar,
+        require_calendar=False,
         calendar_fetcher=calendar_fetcher,
         calendar_today=target,
     )
@@ -431,6 +433,7 @@ def import_close_with_rollback(
         _ensure_calendar_for_official_download(
             conn,
             target_date=target_date,
+            refresh_from=target_date,
             fetcher=calendar_fetcher,
             cooldown=cooldown,
             log=log,
@@ -453,7 +456,7 @@ def import_close_with_rollback(
                 fetcher=fetcher,
                 cooldown=cooldown,
                 log=log,
-                require_calendar=require_calendar,
+                require_calendar=False,
                 calendar_fetcher=calendar_fetcher,
                 calendar_today=calendar_today,
             )
@@ -733,6 +736,7 @@ def _ensure_calendar_for_official_download(
     conn: sqlite3.Connection,
     *,
     target_date: str,
+    refresh_from: str | None = None,
     fetcher: FetchTradingDaysJson,
     cooldown: CooldownController,
     log: LogFunc | None,
@@ -744,6 +748,7 @@ def _ensure_calendar_for_official_download(
     ensure_trading_days_current(
         conn,
         through_date=through_date,
+        refresh_from=refresh_from or target,
         fetcher=fetcher,
         cooldown=cooldown,
         log=log,
