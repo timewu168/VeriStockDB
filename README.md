@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.3.2
+Version: v0.3.3
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -49,6 +49,10 @@ python main.py status
 
 # 檢查私有部署健康狀態：DB、backup、archive、log、systemd timer
 python main.py ops-check
+
+# 測試 Telegram 通知，需先設定 VERISTOCK_TELEGRAM_* 環境變數
+python main.py notify-telegram --test
+python main.py notify-telegram --message "VeriStockDB test message"
 
 # 列出所有被擋下、需複查或缺漏的批次與原因
 python main.py status --problems
@@ -99,6 +103,18 @@ export VERISTOCK_LOG_DIR=/srv/veristockdb/logs
 ```
 
 完整部署備忘見 `docs/ubuntu_private_deployment.md`。
+
+## Telegram 通知
+
+`v0.3.3` 起可透過 Telegram 接收排程完成通知。第一版只做通知，不做遠端控制。
+
+```bash
+export VERISTOCK_TELEGRAM_ENABLED=1
+export VERISTOCK_TELEGRAM_BOT_TOKEN=your-bot-token
+export VERISTOCK_TELEGRAM_CHAT_ID=your-chat-id
+```
+
+支援通知的任務包含 `update-close`、`rollback-close`、`update-attention`、`update-disposal`、`backup`；`ops-check` 只在 `WARN` 或 `ERROR` 時通知。通知失敗不會改變原本任務的 exit code。
 
 ## Local Truth API
 

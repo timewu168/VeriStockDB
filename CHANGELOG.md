@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.3 - 2026-06-05
+
+### Added
+
+- Added Telegram notification settings via `VERISTOCK_TELEGRAM_*` environment variables.
+- Added `notify-telegram --test` and `notify-telegram --message` CLI commands.
+- Added automatic Telegram notifications for `update-close`, `rollback-close`, `update-attention`, `update-disposal`, and `backup`.
+- Added abnormal `ops-check` Telegram notifications for `WARN` and `ERROR` results.
+- Added `docs/telegram_notification_spec.md` for the v0.3.3 notification-only boundary and future remote-control guardrails.
+
+### Notes
+
+- Telegram failures are logged as warnings and do not change the original task exit code.
+- Tests use mocked senders and do not require a real Telegram token.
+
 ## v0.3.2 - 2026-06-05
 
 ### Added

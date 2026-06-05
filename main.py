@@ -13,6 +13,7 @@ from ingest import disposal_notice
 from ingest.downloader import CooldownController
 from ingest.trading_calendar import validate_iso_date
 from services import batch_status
+from services import telegram_notifier
 from services.backup import backup_database
 from services.monthly_archive import archive_month
 from services.monthly_audit import audit_month
@@ -108,6 +109,12 @@ def build_parser() -> argparse.ArgumentParser:
     ops.add_argument("--archive-dir", default=str(config.ARCHIVE_DIR))
     ops.add_argument("--log-dir", default=str(config.LOG_DIR))
     ops.add_argument("--skip-systemd", action="store_true", help="skip systemd timer checks")
+
+    notify = subparsers.add_parser("notify-telegram", help="send a Telegram notification")
+    notify_target = notify.add_mutually_exclusive_group(required=True)
+    notify_target.add_argument("--test", action="store_true", help="send a VeriStockDB test notification")
+    notify_target.add_argument("--message", help="send a custom plain-text message")
+    notify.add_argument("--status", default="OK", help="notification status, default OK")
 
     query = subparsers.add_parser("query-close", help="query imported Close data")
     query.add_argument("--stock-id")
@@ -207,9 +214,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "backup":
             target = backup_database(db_path=db_path)
             print(f"backup written: {target}")
+            _emit_telegram_notification(
+                "backup",
+                "OK",
+                lines=[
+                    f"path: {target}",
+                    f"size: {_format_file_size(target)}",
+                ],
+            )
             return 0
         if args.command == "ops-check":
             return _cmd_ops_check(db_path, args)
+        if args.command == "notify-telegram":
+            return _cmd_notify_telegram(args)
         if args.command == "inspect-attention":
             return _cmd_inspect_attention(args)
         if args.command == "inspect-disposal":
@@ -261,6 +278,8 @@ def main(argv: list[str] | None = None) -> int:
             conn.close()
     except Exception as exc:
         print(f"ERROR {exc}", file=sys.stderr)
+        command = getattr(locals().get("args", None), "command", "unknown")
+        _emit_telegram_notification(command, "ERROR", lines=[f"error: {exc}"])
         return 1
     return 1
 
@@ -304,13 +323,21 @@ def _cmd_import_close(conn, args: argparse.Namespace) -> int:
 
 def _cmd_update_close(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
+    through_date = validate_iso_date(args.end) if args.end else None
+    latest_before = close_importer.latest_close_date(conn)
     stats = close_importer.import_close_update(
         conn,
-        through_date=validate_iso_date(args.end) if args.end else None,
+        through_date=through_date,
         cooldown=cooldown,
         log=print,
     )
     print(_format_stats(stats))
+    latest_after = close_importer.latest_close_date(conn)
+    _emit_stats_notification(
+        "update-close",
+        stats,
+        lines=_update_lines(through_date=through_date, latest_before=latest_before, latest_after=latest_after),
+    )
     return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
 
 
@@ -341,6 +368,11 @@ def _cmd_rollback_close(conn, args: argparse.Namespace) -> int:
         log=print,
     )
     print(_format_stats(stats))
+    _emit_stats_notification(
+        "rollback-close",
+        stats,
+        lines=[f"target: {target_date}"],
+    )
     return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
 
 
@@ -398,7 +430,38 @@ def _cmd_ops_check(db_path: Path, args: argparse.Namespace) -> int:
     print(f"ops-check {result.status}")
     for item in result.items:
         print(f"  {item.status:<5} {item.name:<36} {item.message}")
+    if result.status != "OK":
+        _emit_telegram_notification(
+            "ops-check",
+            result.status,
+            lines=[
+                f"{item.status} {item.name} {item.message}"
+                for item in result.items
+                if item.status != "OK"
+            ],
+        )
     return 2 if result.has_errors else 0
+
+
+def _cmd_notify_telegram(args: argparse.Namespace) -> int:
+    message = (
+        telegram_notifier.build_task_message(
+            "notify-telegram",
+            args.status,
+            lines=["message: test notification"],
+        )
+        if args.test
+        else str(args.message)
+    )
+    result = telegram_notifier.notify_message(message, status=args.status)
+    if result.sent:
+        print("telegram notification sent")
+        return 0
+    if result.skipped:
+        print(f"telegram notification skipped: {result.reason}")
+        return 2
+    print(f"telegram notification failed: {result.error}")
+    return 2
 
 
 def _cmd_inspect_attention(args: argparse.Namespace) -> int:
@@ -501,27 +564,55 @@ def _cmd_import_disposal(conn, args: argparse.Namespace) -> int:
 
 def _cmd_update_attention(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
+    through_date = validate_iso_date(args.end) if args.end else None
+    markets = (args.market,) if args.market else None
+    latest_before = _latest_by_market(attention_notice.latest_attention_notice_date, conn, markets)
     stats = attention_notice.import_attention_notice_update(
         conn,
-        through_date=validate_iso_date(args.end) if args.end else None,
-        markets=(args.market,) if args.market else None,
+        through_date=through_date,
+        markets=markets,
         cooldown=cooldown,
         log=print,
     )
     print(_format_stats(stats))
+    latest_after = _latest_by_market(attention_notice.latest_attention_notice_date, conn, markets)
+    _emit_stats_notification(
+        "update-attention",
+        stats,
+        lines=_update_lines(
+            through_date=through_date,
+            latest_before=_format_market_latest(latest_before),
+            latest_after=_format_market_latest(latest_after),
+            markets=markets,
+        ),
+    )
     return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
 
 
 def _cmd_update_disposal(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
+    through_date = validate_iso_date(args.end) if args.end else None
+    markets = (args.market,) if args.market else None
+    latest_before = _latest_by_market(disposal_notice.latest_disposal_notice_date, conn, markets)
     stats = disposal_notice.import_disposal_notice_update(
         conn,
-        through_date=validate_iso_date(args.end) if args.end else None,
-        markets=(args.market,) if args.market else None,
+        through_date=through_date,
+        markets=markets,
         cooldown=cooldown,
         log=print,
     )
     print(_format_stats(stats))
+    latest_after = _latest_by_market(disposal_notice.latest_disposal_notice_date, conn, markets)
+    _emit_stats_notification(
+        "update-disposal",
+        stats,
+        lines=_update_lines(
+            through_date=through_date,
+            latest_before=_format_market_latest(latest_before),
+            latest_after=_format_market_latest(latest_after),
+            markets=markets,
+        ),
+    )
     return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
 
 
@@ -753,6 +844,77 @@ def _format_stats(stats: dict[str, int]) -> str:
     )
 
 
+def _emit_stats_notification(
+    task_name: str,
+    stats: dict[str, int],
+    *,
+    lines: list[str] | None = None,
+) -> None:
+    _emit_telegram_notification(
+        task_name,
+        telegram_notifier.status_from_stats(stats),
+        stats=stats,
+        lines=lines,
+    )
+
+
+def _emit_telegram_notification(
+    task_name: str,
+    status: str,
+    *,
+    stats: dict[str, int] | None = None,
+    lines: list[str] | None = None,
+    errors: list[str] | None = None,
+) -> None:
+    result = telegram_notifier.notify_task(
+        task_name,
+        status,
+        stats=stats,
+        lines=lines,
+        errors=errors,
+    )
+    if result.sent:
+        print("INFO telegram notification sent")
+    elif result.error:
+        print(f"WARN telegram notification failed: {result.error}")
+    elif result.skipped and result.reason not in {"disabled"} and not str(result.reason).startswith("status "):
+        print(f"WARN telegram notification skipped: {result.reason}")
+
+
+def _update_lines(
+    *,
+    through_date: str | None,
+    latest_before: str | None,
+    latest_after: str | None,
+    markets: tuple[str, ...] | None = None,
+) -> list[str]:
+    lines = [f"target: {through_date or 'today'}"]
+    if markets:
+        lines.append(f"markets: {','.join(markets)}")
+    lines.append(f"latest_before: {latest_before or '-'}")
+    lines.append(f"latest_after: {latest_after or '-'}")
+    return lines
+
+
+def _latest_by_market(func, conn, markets: tuple[str, ...] | None) -> dict[str, str | None]:
+    target_markets = markets or config.MARKETS
+    return {market: func(conn, market) for market in target_markets}
+
+
+def _format_market_latest(values: dict[str, str | None]) -> str:
+    return " ".join(f"{market}={value or '-'}" for market, value in values.items())
+
+
+def _format_file_size(path: Path) -> str:
+    size = path.stat().st_size
+    value = float(size)
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if value < 1024 or unit == "GiB":
+            return f"{value:.1f}{unit}" if unit != "B" else f"{int(value)}B"
+        value /= 1024
+    return f"{size}B"
+
+
 def _format_error_sample(error) -> str:
     parts = []
     if error["sample_stock_id"]:
@@ -769,6 +931,7 @@ def _print_quickstart() -> None:
     print("  python main.py status")
     print("  python main.py update-close")
     print("  python main.py ops-check")
+    print("  python main.py notify-telegram --test")
     print("  python main.py import-close --date YYYY-MM-DD")
     print("  python main.py rollback-close")
     print("  python main.py import-attention --twse-file notice.csv --tpex-file attention.csv")

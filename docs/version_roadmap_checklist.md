@@ -26,8 +26,8 @@
 | `v0.2.8` | Close 私有部署觀察與小修 | 未開始 |
 | `v0.3.0` | API 規範 + read-only API 基礎 + PWA/CLI 中文顯示邊界 | 待發版 |
 | `v0.3.1` | 注意股公告 | 完成 |
-| `v0.3.2` | 處置股公告 | 功能完成，待發版 |
-| `v0.3.3` | Telegram Bot API：更新後訊息通知 | 未開始 |
+| `v0.3.2` | 處置股公告 | 完成 |
+| `v0.3.3` | Telegram Bot API：更新後訊息通知 | 功能完成，待部署驗證 |
 | `v0.3.4` | 三大法人 | 未開始 |
 | `v0.3.5` | 資券 | 未開始 |
 | `v0.3.6` | 當沖 | 未開始 |
@@ -165,18 +165,32 @@ GET /api/v1/disposal-notices?from=2026-05-01&to=2026-06-05&active_date=2026-06-0
 
 第一版只做通知，不做遠端控制。
 
+規格文件：
+
+- `docs/telegram_notification_spec.md`
+
 檢查清單：
 
-- [ ] 支援環境變數設定 bot token。
-- [ ] 支援環境變數設定 chat id。
-- [ ] `update-close` 完成後可通知。
-- [ ] `rollback-close` 完成後可通知。
-- [ ] `backup` 完成後可通知。
-- [ ] `ops-check` 異常時可通知。
-- [ ] 通知內容包含狀態、日期範圍、統計數字與錯誤摘要。
-- [ ] token 不寫入 repo。
-- [ ] 測試不需要真實 Telegram token。
-- [ ] 文件註明未來遠端控制需要白名單、權限、確認機制與危險命令限制。
+- [x] 通知規格文件已建立。
+- [x] 支援環境變數設定 bot token。
+- [x] 支援環境變數設定 chat id。
+- [x] `update-close` 完成後可通知。
+- [x] `rollback-close` 完成後可通知。
+- [x] `update-attention` 完成後可通知。
+- [x] `update-disposal` 完成後可通知。
+- [x] `backup` 完成後可通知。
+- [x] `ops-check` 異常時可通知。
+- [x] 通知內容包含狀態、日期範圍、統計數字與錯誤摘要。
+- [x] token 不寫入 repo。
+- [x] 測試不需要真實 Telegram token。
+- [x] 文件註明未來遠端控制需要白名單、權限、確認機制與危險命令限制。
+
+預計命令範例：
+
+```powershell
+python main.py notify-telegram --test
+python main.py notify-telegram --message "VeriStockDB test message"
+```
 
 ## v0.3.4 三大法人
 

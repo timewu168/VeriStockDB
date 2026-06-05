@@ -37,6 +37,10 @@ v0.2.5 支援以下環境變數：
 | `VERISTOCK_BACKUP_PATH` | 最新 DB backup 檔案 | `<backup_dir>/veristock_latest_backup.db` |
 | `VERISTOCK_ARCHIVE_DIR` | 月封存 ZIP 目錄 | `<csv_dir>/monthly_zip` |
 | `VERISTOCK_LOG_DIR` | ops-check 檢查的 log 目錄 | `<repo>/logs` |
+| `VERISTOCK_TELEGRAM_ENABLED` | 是否啟用 Telegram 通知 | `0` |
+| `VERISTOCK_TELEGRAM_BOT_TOKEN` | Telegram bot token | 空 |
+| `VERISTOCK_TELEGRAM_CHAT_ID` | Telegram chat id | 空 |
+| `VERISTOCK_TELEGRAM_TIMEOUT_SECONDS` | Telegram 發送 timeout | `10` |
 
 Ubuntu 私有部署建議設定：
 
@@ -121,6 +125,43 @@ VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
 VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
 VERISTOCK_LOG_DIR=/srv/veristockdb/logs
 ```
+
+## Telegram 通知
+
+v0.3.3 起可讓日常排程完成後發送 Telegram 通知。第一版只做通知，不做手機遠端控制。
+
+在 `/etc/veristockdb/veristockdb.env` 追加：
+
+```text
+VERISTOCK_TELEGRAM_ENABLED=1
+VERISTOCK_TELEGRAM_BOT_TOKEN=replace-with-real-token
+VERISTOCK_TELEGRAM_CHAT_ID=replace-with-chat-id
+VERISTOCK_TELEGRAM_TIMEOUT_SECONDS=10
+VERISTOCK_TELEGRAM_NOTIFY_SUCCESS=1
+VERISTOCK_TELEGRAM_NOTIFY_WARNING=1
+VERISTOCK_TELEGRAM_NOTIFY_FAILURE=1
+```
+
+測試通知：
+
+```bash
+cd /srv/veristockdb/app
+set -a
+. /etc/veristockdb/veristockdb.env
+set +a
+python3 main.py notify-telegram --test
+```
+
+支援通知的任務：
+
+- `update-close`
+- `rollback-close`
+- `update-attention`
+- `update-disposal`
+- `backup`
+- `ops-check`，只在 `WARN` 或 `ERROR` 時通知。
+
+Telegram 發送失敗只會寫入 log warning，不會改變原本任務 exit code。
 
 安裝 service 與 timer：
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.3.2"
+APP_VERSION = "0.3.3"
 SCHEMA_VERSION = "0.2-human-first"
 
 
@@ -57,6 +57,14 @@ API_REQUIRE_AUTH = _bool_from_env("VERISTOCK_API_REQUIRE_AUTH", False)
 API_READ_TOKEN = os.environ.get("VERISTOCK_API_READ_TOKEN", "")
 API_OPS_TOKEN = os.environ.get("VERISTOCK_API_OPS_TOKEN", "")
 API_ADMIN_TOKEN = os.environ.get("VERISTOCK_API_ADMIN_TOKEN", "")
+
+TELEGRAM_ENABLED = _bool_from_env("VERISTOCK_TELEGRAM_ENABLED", False)
+TELEGRAM_BOT_TOKEN = os.environ.get("VERISTOCK_TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("VERISTOCK_TELEGRAM_CHAT_ID", "")
+TELEGRAM_TIMEOUT_SECONDS = _int_from_env("VERISTOCK_TELEGRAM_TIMEOUT_SECONDS", 10)
+TELEGRAM_NOTIFY_SUCCESS = _bool_from_env("VERISTOCK_TELEGRAM_NOTIFY_SUCCESS", True)
+TELEGRAM_NOTIFY_WARNING = _bool_from_env("VERISTOCK_TELEGRAM_NOTIFY_WARNING", True)
+TELEGRAM_NOTIFY_FAILURE = _bool_from_env("VERISTOCK_TELEGRAM_NOTIFY_FAILURE", True)
 
 URL_TWSE_CLOSE = (
     "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX"
