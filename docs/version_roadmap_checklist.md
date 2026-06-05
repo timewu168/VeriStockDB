@@ -27,7 +27,7 @@
 | `v0.3.0` | API 規範 + read-only API 基礎 + PWA/CLI 中文顯示邊界 | 待發版 |
 | `v0.3.1` | 注意股公告 | 完成 |
 | `v0.3.2` | 處置股公告 | 完成 |
-| `v0.3.3` | Telegram Bot API：更新後訊息通知 | 功能完成，待部署驗證 |
+| `v0.3.3` | Telegram Bot API：更新後訊息通知 | 完成 |
 | `v0.3.4` | 三大法人 | 未開始 |
 | `v0.3.5` | 資券 | 未開始 |
 | `v0.3.6` | 當沖 | 未開始 |
@@ -184,6 +184,8 @@ GET /api/v1/disposal-notices?from=2026-05-01&to=2026-06-05&active_date=2026-06-0
 - [x] token 不寫入 repo。
 - [x] 測試不需要真實 Telegram token。
 - [x] 文件註明未來遠端控制需要白名單、權限、確認機制與危險命令限制。
+- [x] Telegram 手機通知中文化，並保留 `OK` / `BLOCKED` / `RECHECK` / `MISSING` / `ERROR` 狀態碼。
+- [x] Ubuntu server 已實測 Telegram 通知。
 
 預計命令範例：
 
