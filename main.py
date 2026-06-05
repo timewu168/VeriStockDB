@@ -7,6 +7,7 @@ import sys
 
 import config
 from db import connection as db_connection
+from ingest import attention_notice
 from ingest import close_importer
 from ingest.downloader import CooldownController
 from ingest.trading_calendar import validate_iso_date
@@ -58,6 +59,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rollback_close.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
+    inspect_attention = subparsers.add_parser(
+        "inspect-attention", help="inspect local attention announcement CSV files without importing"
+    )
+    inspect_attention.add_argument("--twse-file", help="local TWSE notice CSV file")
+    inspect_attention.add_argument("--tpex-file", help="local TPEX attention CSV file")
+
+    import_attention = subparsers.add_parser("import-attention", help="import attention announcement CSV files")
+    import_attention.add_argument("--file", help="single local attention CSV file")
+    import_attention.add_argument("--market", choices=config.MARKETS)
+    import_attention.add_argument("--twse-file", help="local TWSE notice CSV file")
+    import_attention.add_argument("--tpex-file", help="local TPEX attention CSV file")
+
+    update_attention = subparsers.add_parser(
+        "update-attention", help="update attention announcements from latest coverage to today"
+    )
+    update_attention.add_argument("--to", dest="end", help="target end date YYYY-MM-DD, default today")
+    update_attention.add_argument("--market", choices=config.MARKETS)
+    update_attention.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
     status = subparsers.add_parser("status", help="show batch status")
     status.add_argument("--dataset", default=None)
     status.add_argument("--problems", action="store_true", help="list blocked/recheck/missing batches")
@@ -74,6 +94,13 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("--date")
     query.add_argument("--from", dest="start")
     query.add_argument("--to", dest="end")
+
+    query_attention = subparsers.add_parser("query-attention", help="query imported attention announcements")
+    query_attention.add_argument("--market", choices=config.MARKETS)
+    query_attention.add_argument("--stock-id")
+    query_attention.add_argument("--date")
+    query_attention.add_argument("--from", dest="start")
+    query_attention.add_argument("--to", dest="end")
 
     approve = subparsers.add_parser("approve-batch", help="record manual batch approval")
     approve.add_argument("--dataset", default=config.DATASET_DAILY_CLOSE)
@@ -155,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "ops-check":
             return _cmd_ops_check(db_path, args)
+        if args.command == "inspect-attention":
+            return _cmd_inspect_attention(args)
 
         db_connection.init_db(db_path)
         conn = db_connection.connect(db_path)
@@ -167,10 +196,16 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_import_close_local(conn, args)
             elif args.command == "rollback-close":
                 result = _cmd_rollback_close(conn, args)
+            elif args.command == "import-attention":
+                result = _cmd_import_attention(conn, args)
+            elif args.command == "update-attention":
+                result = _cmd_update_attention(conn, args)
             elif args.command == "status":
                 result = _cmd_status(conn, args)
             elif args.command == "query-close":
                 result = _cmd_query_close(conn, args)
+            elif args.command == "query-attention":
+                result = _cmd_query_attention(conn, args)
             elif args.command == "approve-batch":
                 result = _cmd_approve_batch(conn, args)
             elif args.command == "audit-month":
@@ -330,6 +365,61 @@ def _cmd_ops_check(db_path: Path, args: argparse.Namespace) -> int:
     return 2 if result.has_errors else 0
 
 
+def _cmd_inspect_attention(args: argparse.Namespace) -> int:
+    targets: list[tuple[str, str]] = []
+    if args.twse_file:
+        targets.append(("TWSE", args.twse_file))
+    if args.tpex_file:
+        targets.append(("TPEX", args.tpex_file))
+    if not targets:
+        raise ValueError("inspect-attention requires --twse-file, --tpex-file, or both")
+
+    total_rows = 0
+    total_duplicates = 0
+    print("attention_notice inspect")
+    for market, path in targets:
+        result = attention_notice.parse_attention_notice_file(path, market)
+        summary = attention_notice.summarize_attention_notice(result)
+        total_rows += summary.row_count
+        total_duplicates += summary.duplicate_keys
+        print(f"{market}")
+        print(f"  file             {summary.source_file}")
+        print(f"  encoding         {summary.encoding}")
+        print(f"  rows             {summary.row_count}")
+        print(f"  date_range       {summary.first_date} -> {summary.last_date}")
+        print(f"  unique_stock_ids {summary.unique_stock_ids}")
+        print(f"  duplicate_keys   {summary.duplicate_keys}")
+        print(f"  no_notice_rows   {summary.no_notice_rows}")
+        print(f"  metadata_rows    {summary.metadata_rows}")
+        print(f"  skipped_rows     {summary.skipped_rows}")
+    print(f"TOTAL rows={total_rows} duplicate_keys={total_duplicates}")
+    return 0 if total_duplicates == 0 else 2
+
+
+def _cmd_import_attention(conn, args: argparse.Namespace) -> int:
+    targets = _attention_targets(args)
+    exit_code = 0
+    for market, path in targets:
+        result = attention_notice.import_attention_notice_file(conn, path=path, market=market)
+        _print_attention_import_result(result)
+        if result.status not in {"OK", "FIXED"}:
+            exit_code = 2
+    return exit_code
+
+
+def _cmd_update_attention(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    stats = attention_notice.import_attention_notice_update(
+        conn,
+        through_date=validate_iso_date(args.end) if args.end else None,
+        markets=(args.market,) if args.market else None,
+        cooldown=cooldown,
+        log=print,
+    )
+    print(_format_stats(stats))
+    return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
+
+
 def _cmd_query_close(conn, args: argparse.Namespace) -> int:
     rows = close_importer.query_close(
         conn,
@@ -346,6 +436,25 @@ def _cmd_query_close(conn, args: argparse.Namespace) -> int:
             f"{row['trade_date']} {row['market']} {row['stock_id']} {row['stock_name']} "
             f"{_money(row['open'])} {_money(row['high'])} {_money(row['low'])} {_money(row['close'])} "
             f"{row['volume']} {row['amount']} {row['transactions']}"
+        )
+    return 0
+
+
+def _cmd_query_attention(conn, args: argparse.Namespace) -> int:
+    rows = attention_notice.query_attention_notices(
+        conn,
+        market=args.market,
+        stock_id=args.stock_id,
+        trade_date=validate_iso_date(args.date) if args.date else None,
+        start=validate_iso_date(args.start) if args.start else None,
+        end=validate_iso_date(args.end) if args.end else None,
+    )
+    print("trade_date\tmarket\tstock_id\tstock_name\tnotice_text")
+    for row in rows:
+        notice_text = " ".join(str(row["notice_text"]).split())
+        print(
+            f"{row['trade_date']}\t{row['market']}\t{row['stock_id']}\t"
+            f"{row['stock_name']}\t{notice_text}"
         )
     return 0
 
@@ -416,6 +525,24 @@ def _cmd_finalize_close_months(conn, args: argparse.Namespace) -> int:
     return 0 if result.status == "OK" else 2
 
 
+def _attention_targets(args: argparse.Namespace) -> list[tuple[str, str]]:
+    targets: list[tuple[str, str]] = []
+    if args.file or args.market:
+        if not args.file or not args.market:
+            raise ValueError("--file import requires --file and --market")
+        targets.append((args.market, args.file))
+    if args.twse_file:
+        targets.append(("TWSE", args.twse_file))
+    if args.tpex_file:
+        targets.append(("TPEX", args.tpex_file))
+    if not targets:
+        raise ValueError("attention import requires --file/--market, --twse-file, or --tpex-file")
+    markets = [market for market, _path in targets]
+    if len(markets) != len(set(markets)):
+        raise ValueError("attention import received duplicate files for the same market")
+    return targets
+
+
 def _print_batch(conn, market: str, trade_date: str, batch_id: str) -> None:
     batch = batch_status.get_batch(conn, config.DATASET_DAILY_CLOSE, market, trade_date)
     if not batch:
@@ -434,6 +561,15 @@ def _status_exit_code(conn, market: str, trade_date: str) -> int:
     if batch and batch["status"] in {"OK", "FIXED"}:
         return 0
     return 2
+
+
+def _print_attention_import_result(result: attention_notice.AttentionNoticeImportResult) -> None:
+    print(
+        f"{result.period} {result.market} {result.status} rows={result.row_count} "
+        f"no_notice_rows={result.no_notice_rows} metadata_rows={result.metadata_rows}"
+    )
+    if result.duplicate_keys or result.skipped_rows:
+        print(f"  duplicate_keys={result.duplicate_keys} skipped_rows={result.skipped_rows}")
 
 
 def _money(cents: int) -> str:
@@ -465,6 +601,9 @@ def _print_quickstart() -> None:
     print("  python main.py ops-check")
     print("  python main.py import-close --date YYYY-MM-DD")
     print("  python main.py rollback-close")
+    print("  python main.py import-attention --twse-file notice.csv --tpex-file attention.csv")
+    print("  python main.py update-attention")
+    print("  python main.py query-attention --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")
     print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
     print("  python main.py finalize-close-months --from YYYY-MM --to YYYY-MM --dir data/csv/Close")
     print("  python main.py query-close --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")

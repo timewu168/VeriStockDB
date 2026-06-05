@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 import config
 from api.routes import (
+    attention_notices,
     batches,
     daily_close,
     datasets,
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(info.router, prefix="/api/v1")
     app.include_router(datasets.router, prefix="/api/v1")
     app.include_router(daily_close.router, prefix="/api/v1")
+    app.include_router(attention_notices.router, prefix="/api/v1")
     app.include_router(trading_days.router, prefix="/api/v1")
     app.include_router(batches.router, prefix="/api/v1")
     app.include_router(errors.router, prefix="/api/v1")

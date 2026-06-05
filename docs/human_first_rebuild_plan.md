@@ -253,6 +253,7 @@ CREATE TABLE daily_close (
 
 CREATE INDEX idx_daily_close_date ON daily_close(trade_date);
 CREATE INDEX idx_daily_close_stock ON daily_close(stock_id);
+CREATE INDEX idx_daily_close_date_stock ON daily_close(trade_date, stock_id);
 ```
 
 設計理由：
@@ -262,6 +263,8 @@ CREATE INDEX idx_daily_close_stock ON daily_close(stock_id);
 - 不可把價格改成 SQLite `REAL`。
 - 不放工程欄位。
 - `stock_id` 必須是 `TEXT`，不能轉成整數，避免 `006201` 類型前導零被吃掉。
+- 以交易日和股票代號為主要查詢條件的主資料表，都必須建立 `(trade_date, stock_id)` 複合索引。
+  這是回測、選股與跨資料表 join 的固定索引規範；未來注意股、處置股、法人、資券、當沖、月營收等資料表也要比照辦理。
 
 ### 4.2 批次狀態表：`import_batches`
 

@@ -42,6 +42,11 @@ Local Truth API 是 VeriStockDB 的本地真理資料庫 API。
    - PWA 或外部專案需要顯示時自行除以 `100`。
    - API 不以 float 作為價格真理值。
 
+6. 查詢可以不帶市場，但入庫與索引要保留市場邊界。
+   - 主資料表可以用 `trade_date + market + stock_id` 作為安全主鍵，避免特殊跨市場代號碰撞。
+   - API / PWA / 回測查詢不得強迫使用者一定要帶 `market`。
+   - 所有以交易日和股票代號為主要查詢條件的主資料表，都必須建立 `(trade_date, stock_id)` 複合索引，讓日期加代號查詢與跨資料表 join 成為固定路徑。
+
 ## 3. 非目標
 
 `v0.3.0` 不做以下功能：
@@ -282,6 +287,7 @@ require_quality=any
 | `GET` | `/api/v1/datasets` | read | 第一版實作 | dataset 清單 |
 | `GET` | `/api/v1/datasets/{dataset}/status` | read | 第一版實作 | dataset 批次狀態 |
 | `GET` | `/api/v1/daily-close` | read | 第一版實作 | Close 查詢 |
+| `GET` | `/api/v1/attention-notices` | read | `v0.3.1` 實作 | 注意股公告查詢 |
 | `GET` | `/api/v1/trading-days` | read | 第一版實作 | 交易日查詢 |
 | `GET` | `/api/v1/batches` | read | 第一版實作 | batch 查詢 |
 | `GET` | `/api/v1/batches/{batch_id}` | read | 第一版實作 | batch 單筆查詢 |
@@ -502,6 +508,37 @@ Query：
   }
 ]
 ```
+
+### 13.6a `GET /api/v1/attention-notices`
+
+用途：查詢注意股公告。
+
+Query：
+
+| 參數 | 必填 | 說明 |
+| --- | --- | --- |
+| `from` | 是 | 起始日期，`YYYY-MM-DD` |
+| `to` | 是 | 結束日期，`YYYY-MM-DD` |
+| `stock_id` | 否 | 單一股票代號 |
+| `stock_ids` | 否 | 多股票代號，逗號分隔 |
+| `market` | 否 | `TWSE` 或 `TPEX` |
+| `fields` | 否 | 欄位白名單，逗號分隔 |
+| `require_quality` | 否 | `ok` / `allow_recheck` / `any`，預設 `any` |
+| `limit` | 否 | 預設 `1000`，最大 `10000` |
+| `offset` | 否 | 預設 `0` |
+
+回傳欄位：
+
+- `trade_date`
+- `market`
+- `stock_id`
+- `stock_name`
+- `notice_text`
+
+注意：
+
+- 查詢不強迫帶 `market`，但回傳會包含 `market`。
+- `notice_text` 保留官方原文，不在 API 層拆條款。
 
 ### 13.7 `GET /api/v1/batches`
 

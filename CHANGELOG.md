@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.1 - 2026-06-05
+
+### Added
+
+- Added `attention_notices` for listed and OTC attention announcement records.
+- Added `inspect-attention`, `import-attention`, `update-attention`, and `query-attention` CLI commands.
+- Added official TWSE and TPEx attention announcement CSV downloads.
+- Added `(trade_date, stock_id)` composite indexes for Close and attention announcement query/join workflows.
+
+### Notes
+
+- Attention announcement imports keep official notice text as-is and preserve stock IDs using the same no-global-zero-padding policy as Close.
+- Historical CSV imports and official updates are tracked through `import_batches` as dataset `attention_notice`.
+
 ## v0.3.0 - 2026-06-04
 
 ### Added

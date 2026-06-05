@@ -19,6 +19,20 @@ CREATE TABLE IF NOT EXISTS daily_close (
 
 CREATE INDEX IF NOT EXISTS idx_daily_close_date ON daily_close(trade_date);
 CREATE INDEX IF NOT EXISTS idx_daily_close_stock ON daily_close(stock_id);
+CREATE INDEX IF NOT EXISTS idx_daily_close_date_stock ON daily_close(trade_date, stock_id);
+
+CREATE TABLE IF NOT EXISTS attention_notices (
+  trade_date TEXT NOT NULL,
+  market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),
+  stock_id TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  notice_text TEXT NOT NULL,
+  PRIMARY KEY (trade_date, market, stock_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_attention_notices_date ON attention_notices(trade_date);
+CREATE INDEX IF NOT EXISTS idx_attention_notices_stock ON attention_notices(stock_id);
+CREATE INDEX IF NOT EXISTS idx_attention_notices_date_stock ON attention_notices(trade_date, stock_id);
 
 CREATE TABLE IF NOT EXISTS import_batches (
   batch_id TEXT PRIMARY KEY,
