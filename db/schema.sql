@@ -34,6 +34,24 @@ CREATE INDEX IF NOT EXISTS idx_attention_notices_date ON attention_notices(trade
 CREATE INDEX IF NOT EXISTS idx_attention_notices_stock ON attention_notices(stock_id);
 CREATE INDEX IF NOT EXISTS idx_attention_notices_date_stock ON attention_notices(trade_date, stock_id);
 
+CREATE TABLE IF NOT EXISTS disposal_notices (
+  trade_date TEXT NOT NULL,
+  market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),
+  stock_id TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  disposal_start_date TEXT NOT NULL,
+  disposal_end_date TEXT NOT NULL,
+  reason_text TEXT NOT NULL,
+  disposal_text TEXT NOT NULL,
+  PRIMARY KEY (trade_date, market, stock_id, disposal_start_date, disposal_end_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_disposal_notices_date ON disposal_notices(trade_date);
+CREATE INDEX IF NOT EXISTS idx_disposal_notices_stock ON disposal_notices(stock_id);
+CREATE INDEX IF NOT EXISTS idx_disposal_notices_date_stock ON disposal_notices(trade_date, stock_id);
+CREATE INDEX IF NOT EXISTS idx_disposal_notices_active_stock
+ON disposal_notices(disposal_start_date, disposal_end_date, stock_id);
+
 CREATE TABLE IF NOT EXISTS import_batches (
   batch_id TEXT PRIMARY KEY,
   dataset TEXT NOT NULL,

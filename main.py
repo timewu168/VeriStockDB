@@ -9,6 +9,7 @@ import config
 from db import connection as db_connection
 from ingest import attention_notice
 from ingest import close_importer
+from ingest import disposal_notice
 from ingest.downloader import CooldownController
 from ingest.trading_calendar import validate_iso_date
 from services import batch_status
@@ -65,11 +66,23 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_attention.add_argument("--twse-file", help="local TWSE notice CSV file")
     inspect_attention.add_argument("--tpex-file", help="local TPEX attention CSV file")
 
+    inspect_disposal = subparsers.add_parser(
+        "inspect-disposal", help="inspect local disposal announcement CSV files without importing"
+    )
+    inspect_disposal.add_argument("--twse-file", help="local TWSE disposal CSV file")
+    inspect_disposal.add_argument("--tpex-file", help="local TPEX disposal CSV file")
+
     import_attention = subparsers.add_parser("import-attention", help="import attention announcement CSV files")
     import_attention.add_argument("--file", help="single local attention CSV file")
     import_attention.add_argument("--market", choices=config.MARKETS)
     import_attention.add_argument("--twse-file", help="local TWSE notice CSV file")
     import_attention.add_argument("--tpex-file", help="local TPEX attention CSV file")
+
+    import_disposal = subparsers.add_parser("import-disposal", help="import disposal announcement CSV files")
+    import_disposal.add_argument("--file", help="single local disposal CSV file")
+    import_disposal.add_argument("--market", choices=config.MARKETS)
+    import_disposal.add_argument("--twse-file", help="local TWSE disposal CSV file")
+    import_disposal.add_argument("--tpex-file", help="local TPEX disposal CSV file")
 
     update_attention = subparsers.add_parser(
         "update-attention", help="update attention announcements from latest coverage to today"
@@ -77,6 +90,13 @@ def build_parser() -> argparse.ArgumentParser:
     update_attention.add_argument("--to", dest="end", help="target end date YYYY-MM-DD, default today")
     update_attention.add_argument("--market", choices=config.MARKETS)
     update_attention.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
+    update_disposal = subparsers.add_parser(
+        "update-disposal", help="update disposal announcements from latest coverage to today"
+    )
+    update_disposal.add_argument("--to", dest="end", help="target end date YYYY-MM-DD, default today")
+    update_disposal.add_argument("--market", choices=config.MARKETS)
+    update_disposal.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
     status = subparsers.add_parser("status", help="show batch status")
     status.add_argument("--dataset", default=None)
@@ -101,6 +121,14 @@ def build_parser() -> argparse.ArgumentParser:
     query_attention.add_argument("--date")
     query_attention.add_argument("--from", dest="start")
     query_attention.add_argument("--to", dest="end")
+
+    query_disposal = subparsers.add_parser("query-disposal", help="query imported disposal announcements")
+    query_disposal.add_argument("--market", choices=config.MARKETS)
+    query_disposal.add_argument("--stock-id")
+    query_disposal.add_argument("--date")
+    query_disposal.add_argument("--from", dest="start")
+    query_disposal.add_argument("--to", dest="end")
+    query_disposal.add_argument("--active-date", help="filter rows active on YYYY-MM-DD")
 
     approve = subparsers.add_parser("approve-batch", help="record manual batch approval")
     approve.add_argument("--dataset", default=config.DATASET_DAILY_CLOSE)
@@ -184,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_ops_check(db_path, args)
         if args.command == "inspect-attention":
             return _cmd_inspect_attention(args)
+        if args.command == "inspect-disposal":
+            return _cmd_inspect_disposal(args)
 
         db_connection.init_db(db_path)
         conn = db_connection.connect(db_path)
@@ -198,14 +228,20 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_rollback_close(conn, args)
             elif args.command == "import-attention":
                 result = _cmd_import_attention(conn, args)
+            elif args.command == "import-disposal":
+                result = _cmd_import_disposal(conn, args)
             elif args.command == "update-attention":
                 result = _cmd_update_attention(conn, args)
+            elif args.command == "update-disposal":
+                result = _cmd_update_disposal(conn, args)
             elif args.command == "status":
                 result = _cmd_status(conn, args)
             elif args.command == "query-close":
                 result = _cmd_query_close(conn, args)
             elif args.command == "query-attention":
                 result = _cmd_query_attention(conn, args)
+            elif args.command == "query-disposal":
+                result = _cmd_query_disposal(conn, args)
             elif args.command == "approve-batch":
                 result = _cmd_approve_batch(conn, args)
             elif args.command == "audit-month":
@@ -396,6 +432,51 @@ def _cmd_inspect_attention(args: argparse.Namespace) -> int:
     return 0 if total_duplicates == 0 else 2
 
 
+def _cmd_inspect_disposal(args: argparse.Namespace) -> int:
+    targets: list[tuple[str, str]] = []
+    if args.twse_file:
+        targets.append(("TWSE", args.twse_file))
+    if args.tpex_file:
+        targets.append(("TPEX", args.tpex_file))
+    if not targets:
+        raise ValueError("inspect-disposal requires --twse-file, --tpex-file, or both")
+
+    total_rows = 0
+    total_duplicates = 0
+    total_skipped = 0
+    print("disposal_notice inspect")
+    for market, path in targets:
+        result = disposal_notice.parse_disposal_notice_file(path, market)
+        summary = disposal_notice.summarize_disposal_notice(result)
+        total_rows += summary.row_count
+        total_duplicates += summary.duplicate_keys
+        total_skipped += summary.skipped_rows
+        print(f"{market}")
+        print(f"  file                     {summary.source_file}")
+        print(f"  encoding                 {summary.encoding}")
+        print(f"  rows                     {summary.row_count}")
+        print(f"  trade_date_range         {summary.first_date} -> {summary.last_date}")
+        print(
+            f"  disposal_date_range      {summary.first_disposal_date} -> "
+            f"{summary.last_disposal_date}"
+        )
+        print(f"  unique_stock_ids         {summary.unique_stock_ids}")
+        print(f"  duplicate_keys           {summary.duplicate_keys}")
+        print(f"  duplicate_date_stock     {summary.duplicate_date_stock_keys}")
+        print(f"  metadata_rows            {summary.metadata_rows}")
+        print(f"  no_disposal_rows         {summary.no_disposal_rows}")
+        print(f"  blank_stock_name_rows    {summary.blank_stock_name_rows}")
+        print(f"  blank_reason_text_rows   {summary.blank_reason_text_rows}")
+        print(f"  blank_disposal_text_rows {summary.blank_disposal_text_rows}")
+        print(f"  skipped_rows             {summary.skipped_rows}")
+        print(f"  invalid_period_rows      {summary.invalid_period_rows}")
+    print(
+        f"TOTAL rows={total_rows} duplicate_keys={total_duplicates} "
+        f"skipped_rows={total_skipped}"
+    )
+    return 0 if total_duplicates == 0 and total_skipped == 0 else 2
+
+
 def _cmd_import_attention(conn, args: argparse.Namespace) -> int:
     targets = _attention_targets(args)
     exit_code = 0
@@ -407,9 +488,33 @@ def _cmd_import_attention(conn, args: argparse.Namespace) -> int:
     return exit_code
 
 
+def _cmd_import_disposal(conn, args: argparse.Namespace) -> int:
+    targets = _disposal_targets(args)
+    exit_code = 0
+    for market, path in targets:
+        result = disposal_notice.import_disposal_notice_file(conn, path=path, market=market)
+        _print_disposal_import_result(result)
+        if result.status not in {"OK", "FIXED"}:
+            exit_code = 2
+    return exit_code
+
+
 def _cmd_update_attention(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
     stats = attention_notice.import_attention_notice_update(
+        conn,
+        through_date=validate_iso_date(args.end) if args.end else None,
+        markets=(args.market,) if args.market else None,
+        cooldown=cooldown,
+        log=print,
+    )
+    print(_format_stats(stats))
+    return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
+
+
+def _cmd_update_disposal(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    stats = disposal_notice.import_disposal_notice_update(
         conn,
         through_date=validate_iso_date(args.end) if args.end else None,
         markets=(args.market,) if args.market else None,
@@ -455,6 +560,31 @@ def _cmd_query_attention(conn, args: argparse.Namespace) -> int:
         print(
             f"{row['trade_date']}\t{row['market']}\t{row['stock_id']}\t"
             f"{row['stock_name']}\t{notice_text}"
+        )
+    return 0
+
+
+def _cmd_query_disposal(conn, args: argparse.Namespace) -> int:
+    rows = disposal_notice.query_disposal_notices(
+        conn,
+        market=args.market,
+        stock_id=args.stock_id,
+        trade_date=validate_iso_date(args.date) if args.date else None,
+        start=validate_iso_date(args.start) if args.start else None,
+        end=validate_iso_date(args.end) if args.end else None,
+        active_date=validate_iso_date(args.active_date) if args.active_date else None,
+    )
+    print(
+        "trade_date\tmarket\tstock_id\tstock_name\tdisposal_start_date\t"
+        "disposal_end_date\treason_text\tdisposal_text"
+    )
+    for row in rows:
+        reason_text = " ".join(str(row["reason_text"]).split())
+        disposal_text = " ".join(str(row["disposal_text"]).split())
+        print(
+            f"{row['trade_date']}\t{row['market']}\t{row['stock_id']}\t"
+            f"{row['stock_name']}\t{row['disposal_start_date']}\t"
+            f"{row['disposal_end_date']}\t{reason_text}\t{disposal_text}"
         )
     return 0
 
@@ -543,6 +673,24 @@ def _attention_targets(args: argparse.Namespace) -> list[tuple[str, str]]:
     return targets
 
 
+def _disposal_targets(args: argparse.Namespace) -> list[tuple[str, str]]:
+    targets: list[tuple[str, str]] = []
+    if args.file or args.market:
+        if not args.file or not args.market:
+            raise ValueError("--file import requires --file and --market")
+        targets.append((args.market, args.file))
+    if args.twse_file:
+        targets.append(("TWSE", args.twse_file))
+    if args.tpex_file:
+        targets.append(("TPEX", args.tpex_file))
+    if not targets:
+        raise ValueError("disposal import requires --file/--market, --twse-file, or --tpex-file")
+    markets = [market for market, _path in targets]
+    if len(markets) != len(set(markets)):
+        raise ValueError("disposal import received duplicate files for the same market")
+    return targets
+
+
 def _print_batch(conn, market: str, trade_date: str, batch_id: str) -> None:
     batch = batch_status.get_batch(conn, config.DATASET_DAILY_CLOSE, market, trade_date)
     if not batch:
@@ -570,6 +718,28 @@ def _print_attention_import_result(result: attention_notice.AttentionNoticeImpor
     )
     if result.duplicate_keys or result.skipped_rows:
         print(f"  duplicate_keys={result.duplicate_keys} skipped_rows={result.skipped_rows}")
+
+
+def _print_disposal_import_result(result: disposal_notice.DisposalNoticeImportResult) -> None:
+    print(
+        f"{result.period} {result.market} {result.status} rows={result.row_count} "
+        f"no_disposal_rows={result.no_disposal_rows} metadata_rows={result.metadata_rows}"
+    )
+    details = []
+    if result.blank_stock_name_rows:
+        details.append(f"blank_stock_name_rows={result.blank_stock_name_rows}")
+    if result.blank_reason_text_rows:
+        details.append(f"blank_reason_text_rows={result.blank_reason_text_rows}")
+    if result.blank_disposal_text_rows:
+        details.append(f"blank_disposal_text_rows={result.blank_disposal_text_rows}")
+    if result.duplicate_keys:
+        details.append(f"duplicate_keys={result.duplicate_keys}")
+    if result.skipped_rows:
+        details.append(f"skipped_rows={result.skipped_rows}")
+    if result.invalid_period_rows:
+        details.append(f"invalid_period_rows={result.invalid_period_rows}")
+    if details:
+        print("  " + " ".join(details))
 
 
 def _money(cents: int) -> str:
@@ -604,6 +774,9 @@ def _print_quickstart() -> None:
     print("  python main.py import-attention --twse-file notice.csv --tpex-file attention.csv")
     print("  python main.py update-attention")
     print("  python main.py query-attention --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")
+    print("  python main.py import-disposal --twse-file punish.csv --tpex-file disposal.csv")
+    print("  python main.py update-disposal")
+    print("  python main.py query-disposal --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")
     print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
     print("  python main.py finalize-close-months --from YYYY-MM --to YYYY-MM --dir data/csv/Close")
     print("  python main.py query-close --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")

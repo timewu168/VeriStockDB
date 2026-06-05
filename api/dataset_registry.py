@@ -28,7 +28,14 @@ SUPPORTED_DATASETS = {
         period_type="date_range",
         markets=config.MARKETS,
         status_endpoint=f"/api/v1/datasets/{config.DATASET_ATTENTION_NOTICE}/status",
-    )
+    ),
+    config.DATASET_DISPOSAL_NOTICE: DatasetDefinition(
+        dataset=config.DATASET_DISPOSAL_NOTICE,
+        title="Disposal Notices",
+        period_type="date_range",
+        markets=config.MARKETS,
+        status_endpoint=f"/api/v1/datasets/{config.DATASET_DISPOSAL_NOTICE}/status",
+    ),
 }
 
 

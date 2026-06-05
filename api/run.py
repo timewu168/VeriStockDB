@@ -13,3 +13,7 @@ def main() -> int:
 
     uvicorn.run("api.app:app", host=config.API_HOST, port=config.API_PORT)
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

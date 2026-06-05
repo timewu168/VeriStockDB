@@ -26,7 +26,7 @@
 | `v0.2.8` | Close 私有部署觀察與小修 | 未開始 |
 | `v0.3.0` | API 規範 + read-only API 基礎 + PWA/CLI 中文顯示邊界 | 待發版 |
 | `v0.3.1` | 注意股公告 | 完成 |
-| `v0.3.2` | 處置股公告 | 未開始 |
+| `v0.3.2` | 處置股公告 | 功能完成，待發版 |
 | `v0.3.3` | Telegram Bot API：更新後訊息通知 | 未開始 |
 | `v0.3.4` | 三大法人 | 未開始 |
 | `v0.3.5` | 資券 | 未開始 |
@@ -128,17 +128,36 @@
 
 檢查清單：
 
-- [ ] 官方來源 URL 與參數確認。
-- [ ] schema 定案。
-- [ ] import command 定案。
-- [ ] API 查詢 endpoint 定案。
-- [ ] 支援日期查詢。
-- [ ] 支援股票代號查詢。
-- [ ] 支援市場別查詢。
-- [ ] 生效日、結束日若官方有提供，需要保存。
-- [ ] 處置原因或處置條件可保存。
-- [ ] 原始來源批次可追查。
-- [ ] 異常公告格式會寫入 `import_errors` 或 `data_events`。
+- [x] 官方來源 URL 與參數確認。
+- [x] schema 定案。
+- [x] import command 定案。
+- [x] update command 定案。
+- [x] API 查詢 endpoint 定案。
+- [x] 支援日期查詢。
+- [x] 支援股票代號查詢。
+- [x] 支援市場別查詢。
+- [x] 支援處置期間 `active_date` 查詢。
+- [x] 生效日、結束日若官方有提供，需要保存。
+- [x] 處置原因或處置條件可保存。
+- [x] 官方處置內容原文可保存。
+- [x] 原始來源批次可追查。
+- [x] 異常公告格式會寫入 `import_errors`。
+
+正式命令範例：
+
+```powershell
+python main.py import-disposal --twse-file tmp\disposal_notice_samples\punish.csv --tpex-file tmp\disposal_notice_samples\disposal_information_20030901_20260601.csv
+python main.py update-disposal
+python main.py query-disposal --stock-id 52811 --from 2018-10-01 --to 2018-10-31
+python main.py query-disposal --active-date 2026-06-05
+```
+
+API 查詢範例：
+
+```text
+GET /api/v1/disposal-notices?from=2026-05-01&to=2026-06-05&stock_id=52811
+GET /api/v1/disposal-notices?from=2026-05-01&to=2026-06-05&active_date=2026-06-05
+```
 
 ## v0.3.3 Telegram Bot API 通知
 

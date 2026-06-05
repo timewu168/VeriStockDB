@@ -10,6 +10,7 @@ from api.routes import (
     batches,
     daily_close,
     datasets,
+    disposal_notices,
     errors,
     events,
     health,
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(datasets.router, prefix="/api/v1")
     app.include_router(daily_close.router, prefix="/api/v1")
     app.include_router(attention_notices.router, prefix="/api/v1")
+    app.include_router(disposal_notices.router, prefix="/api/v1")
     app.include_router(trading_days.router, prefix="/api/v1")
     app.include_router(batches.router, prefix="/api/v1")
     app.include_router(errors.router, prefix="/api/v1")

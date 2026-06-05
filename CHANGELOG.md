@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.2 - 2026-06-05
+
+### Added
+
+- Added `disposal_notices` for listed and OTC disposal announcement records.
+- Added `inspect-disposal`, `import-disposal`, `update-disposal`, and `query-disposal` CLI commands.
+- Added official TWSE and TPEx disposal announcement CSV downloads.
+- Added `/api/v1/disposal-notices` with date, stock ID, market, active-date, field, quality, and pagination filters.
+- Added `(trade_date, stock_id)` and active-period indexes for disposal announcement query/join workflows.
+
+### Notes
+
+- Disposal imports preserve official reason/condition text and full disposal text without parsing measures into derived fields.
+- Official disposal updates use upsert behavior because official range queries can include announcements published before the requested range while still active during it.
+- Historical TWSE/TPEX edge cases such as blank early stock names, blank disposal text, blank TPEX reason text, and official no-disposal rows are tracked in import summaries.
+
 ## v0.3.1 - 2026-06-05
 
 ### Added

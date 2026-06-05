@@ -288,6 +288,7 @@ require_quality=any
 | `GET` | `/api/v1/datasets/{dataset}/status` | read | 第一版實作 | dataset 批次狀態 |
 | `GET` | `/api/v1/daily-close` | read | 第一版實作 | Close 查詢 |
 | `GET` | `/api/v1/attention-notices` | read | `v0.3.1` 實作 | 注意股公告查詢 |
+| `GET` | `/api/v1/disposal-notices` | read | `v0.3.2` 實作 | 處置股公告查詢 |
 | `GET` | `/api/v1/trading-days` | read | 第一版實作 | 交易日查詢 |
 | `GET` | `/api/v1/batches` | read | 第一版實作 | batch 查詢 |
 | `GET` | `/api/v1/batches/{batch_id}` | read | 第一版實作 | batch 單筆查詢 |
@@ -539,6 +540,44 @@ Query：
 
 - 查詢不強迫帶 `market`，但回傳會包含 `market`。
 - `notice_text` 保留官方原文，不在 API 層拆條款。
+
+### 13.6b `GET /api/v1/disposal-notices`
+
+用途：查詢處置股公告。
+
+Query：
+
+| 參數 | 必填 | 說明 |
+| --- | --- | --- |
+| `from` | 是 | 公布日期起始日，`YYYY-MM-DD` |
+| `to` | 是 | 公布日期結束日，`YYYY-MM-DD` |
+| `stock_id` | 否 | 單一股票代號 |
+| `stock_ids` | 否 | 多股票代號，逗號分隔 |
+| `market` | 否 | `TWSE` 或 `TPEX` |
+| `active_date` | 否 | 只回傳該日仍在處置期間內的資料，`YYYY-MM-DD` |
+| `fields` | 否 | 欄位白名單，逗號分隔 |
+| `require_quality` | 否 | `ok` / `allow_recheck` / `any`，預設 `any` |
+| `limit` | 否 | 預設 `1000`，最大 `10000` |
+| `offset` | 否 | 預設 `0` |
+
+回傳欄位：
+
+- `trade_date`
+- `market`
+- `stock_id`
+- `stock_name`
+- `disposal_start_date`
+- `disposal_end_date`
+- `reason_text`
+- `disposal_text`
+
+注意：
+
+- 查詢不強迫帶 `market`，但回傳會包含 `market`。
+- `trade_date` 是官方公布日期。
+- `disposal_start_date` / `disposal_end_date` 是處置起迄期間。
+- `reason_text` 統一保存 TWSE 的「處置條件」或 TPEX 的「處置原因」。
+- `disposal_text` 保留官方處置內容原文，不在 API 層解析條款或措施。
 
 ### 13.7 `GET /api/v1/batches`
 

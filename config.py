@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.3.2"
 SCHEMA_VERSION = "0.2-human-first"
 
 
@@ -48,6 +48,7 @@ DEFAULT_COOLDOWN_MAX_SECONDS = 15
 
 DATASET_DAILY_CLOSE = "daily_close"
 DATASET_ATTENTION_NOTICE = "attention_notice"
+DATASET_DISPOSAL_NOTICE = "disposal_notice"
 MARKETS = ("TWSE", "TPEX")
 
 API_HOST = os.environ.get("VERISTOCK_API_HOST", "127.0.0.1")
@@ -78,4 +79,14 @@ URL_TPEX_ATTENTION_NOTICE = (
     "https://www.tpex.org.tw/www/zh-tw/bulletin/attention"
     "?startDate={start_date_url}&endDate={end_date_url}"
     "&code=&cate=&type=all&order=date&id=&response=csv"
+)
+URL_TWSE_DISPOSAL_NOTICE = (
+    "https://www.twse.com.tw/rwd/zh/announcement/punish"
+    "?response=csv&startDate={start_date_yyyymmdd}&endDate={end_date_yyyymmdd}"
+    "&stockNo=&sortKind=DATE&querytype=&selectType=&proceType=&remarkType="
+)
+URL_TPEX_DISPOSAL_NOTICE = (
+    "https://www.tpex.org.tw/www/zh-tw/bulletin/disposal"
+    "?startDate={start_date_url}&endDate={end_date_url}"
+    "&code=&cate=&type=all&reason=-1&measure=-1&order=date&id=&response=csv"
 )
