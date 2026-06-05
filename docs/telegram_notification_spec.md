@@ -85,38 +85,39 @@ python main.py notify-telegram --message "VeriStockDB test message"
 基本格式：
 
 ```text
-VeriStockDB update-close OK
-time: 2026-06-05 19:30:12 CST
-range: 2026-06-03 -> 2026-06-05
-stats: OK=4 FIXED=0 BLOCKED=0 RECHECK=0 MISSING=0 SKIPPED=0
-db: /srv/veristockdb/app/data/db/veristock.db
+VeriStockDB Close 日常更新 OK
+時間：2026-06-05 19:30:12 CST
+目標：今天
+更新前：2026-06-04
+更新後：2026-06-05
+統計：成功=4 修正=0 阻擋=0 複查=0 缺漏=0 略過=0
 ```
 
 有問題時：
 
 ```text
-VeriStockDB update-close RECHECK
-time: 2026-06-05 19:30:12 CST
-range: 2026-06-03 -> 2026-06-05
-stats: OK=3 FIXED=0 BLOCKED=1 RECHECK=0 MISSING=0 SKIPPED=0
-errors:
+VeriStockDB Close 日常更新 BLOCKED
+時間：2026-06-05 19:30:12 CST
+目標：2026-06-05
+統計：成功=3 修正=0 阻擋=1 複查=0 缺漏=0 略過=0
+錯誤：
 - 2026-06-05 TWSE DOWNLOAD_FAILED: SSL certificate verify failed
 ```
 
 backup 成功：
 
 ```text
-VeriStockDB backup OK
-time: 2026-06-05 02:30:10 CST
-path: /app/dirty_box/veristockdb/backup/veristock_latest_backup.db
-size: 1.2GiB
+VeriStockDB DB 備份 OK
+時間：2026-06-05 02:30:10 CST
+路徑：/app/dirty_box/veristockdb/backup/veristock_latest_backup.db
+大小：1.2GiB
 ```
 
 ops-check 異常：
 
 ```text
-VeriStockDB ops-check WARN
-time: 2026-06-05 08:00:00 CST
+VeriStockDB 部署健康檢查 WARN
+時間：2026-06-05 08:00:00 CST
 - WARN log:update-disposal.log missing log file
 - OK backup readable tables=8 size=1.2GiB
 ```

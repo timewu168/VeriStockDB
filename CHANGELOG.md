@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Localized Telegram task notification messages in Chinese while preserving status codes such as `OK`, `BLOCKED`, `RECHECK`, `MISSING`, and `ERROR`.
+
 ## v0.3.3 - 2026-06-05
 
 ### Added

@@ -12,6 +12,28 @@ import config
 
 MAX_MESSAGE_LENGTH = 3900
 TELEGRAM_SEND_MESSAGE_URL = "https://api.telegram.org/bot{token}/sendMessage"
+TASK_LABELS = {
+    "update-close": "Close 日常更新",
+    "rollback-close": "Close 三日回滾",
+    "update-attention": "注意股公告更新",
+    "update-disposal": "處置股公告更新",
+    "backup": "DB 備份",
+    "ops-check": "部署健康檢查",
+    "notify-telegram": "Telegram 通知測試",
+}
+LINE_LABELS = {
+    "target": "目標",
+    "markets": "市場",
+    "latest_before": "更新前",
+    "latest_after": "更新後",
+    "path": "路徑",
+    "size": "大小",
+    "message": "訊息",
+    "error": "錯誤",
+}
+VALUE_LABELS = {
+    "today": "今天",
+}
 
 
 class UrlOpen(Protocol):
@@ -140,16 +162,17 @@ def build_task_message(
     generated_at: datetime | None = None,
 ) -> str:
     timestamp = generated_at or datetime.now().astimezone()
+    task_label = TASK_LABELS.get(task_name, task_name)
     parts = [
-        f"VeriStockDB {task_name} {status.upper()}",
-        f"time: {timestamp.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        f"VeriStockDB {task_label} {status.upper()}",
+        f"時間：{timestamp.strftime('%Y-%m-%d %H:%M:%S %Z')}",
     ]
     if lines:
-        parts.extend(line for line in lines if line)
+        parts.extend(_format_detail_line(line) for line in lines if line)
     if stats is not None:
-        parts.append(f"stats: {format_stats(stats)}")
+        parts.append(f"統計：{format_stats(stats)}")
     if errors:
-        parts.append("errors:")
+        parts.append("錯誤：")
         parts.extend(f"- {error}" for error in errors if error)
     return "\n".join(parts)
 
@@ -166,10 +189,19 @@ def status_from_stats(stats: dict[str, int]) -> str:
 
 def format_stats(stats: dict[str, int]) -> str:
     return (
-        f"OK={stats.get('OK', 0)} FIXED={stats.get('FIXED', 0)} "
-        f"BLOCKED={stats.get('BLOCKED', 0)} RECHECK={stats.get('RECHECK', 0)} "
-        f"MISSING={stats.get('MISSING', 0)} SKIPPED={stats.get('SKIPPED', 0)}"
+        f"成功={stats.get('OK', 0)} 修正={stats.get('FIXED', 0)} "
+        f"阻擋={stats.get('BLOCKED', 0)} 複查={stats.get('RECHECK', 0)} "
+        f"缺漏={stats.get('MISSING', 0)} 略過={stats.get('SKIPPED', 0)}"
     )
+
+
+def _format_detail_line(line: str) -> str:
+    key, separator, value = line.partition(":")
+    if not separator:
+        return line
+    label = LINE_LABELS.get(key.strip(), key.strip())
+    display_value = VALUE_LABELS.get(value.strip(), value.strip())
+    return f"{label}：{display_value}"
 
 
 def _should_notify_status(status: str, settings: TelegramSettings) -> bool:
@@ -184,7 +216,7 @@ def _should_notify_status(status: str, settings: TelegramSettings) -> bool:
 def _trim_message(message: str) -> str:
     if len(message) <= MAX_MESSAGE_LENGTH:
         return message
-    return message[: MAX_MESSAGE_LENGTH - 20].rstrip() + "\n... truncated ..."
+    return message[: MAX_MESSAGE_LENGTH - 20].rstrip() + "\n... 已截斷 ..."
 
 
 def _response_status(response) -> int:
