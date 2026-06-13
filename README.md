@@ -26,7 +26,7 @@ python main.py init-db
 python main.py update-close
 
 # 匯入指定日期的官方 Close 日收盤資料，不會執行三日回滾檢查
-# 若 trading_days 落後，會先用 TWSE FMTQIK 大盤 API 補齊交易日曆
+# 若 trading_days 落後，會先用 TWSE FMTQIK 大盤 API 補齊交易日曆；TWSE 異常時改用 TPEx tradingIndex 備援
 python main.py import-close --date 2026-06-02
 python main.py import-close --from 2026-06-01 --to 2026-06-02
 

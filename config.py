@@ -78,6 +78,10 @@ URL_TWSE_TRADING_DAYS = (
     "https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK"
     "?date={date_yyyymmdd}&response=json"
 )
+URL_TPEX_TRADING_DAYS = (
+    "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex"
+    "?date={date_url}&id=&response=json"
+)
 URL_TWSE_ATTENTION_NOTICE = (
     "https://www.twse.com.tw/rwd/zh/announcement/notice"
     "?response=csv&startDate={start_date_yyyymmdd}&endDate={end_date_yyyymmdd}"

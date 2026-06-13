@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 import hashlib
 from pathlib import Path
 import csv
@@ -16,7 +16,12 @@ from ingest.downloader import (
     download_attention_csv,
     save_official_attention_csv,
 )
-from ingest.trading_calendar import validate_iso_date
+from ingest.trading_calendar import (
+    ensure_trading_days_current,
+    latest_open_trading_day_on_or_before,
+    next_open_trading_day_after,
+    validate_iso_date,
+)
 from services import batch_status
 from validate.close_rules import _clean_stock_id, _normalize_date
 from validate.result import ValidationError
@@ -263,28 +268,59 @@ def import_attention_notice_update(
     today: str | None = None,
 ) -> dict[str, int]:
     target_source = through_date or today or date.today().isoformat()
-    target = validate_iso_date(target_source)
+    requested_target = validate_iso_date(target_source)
     selected_markets = markets or config.MARKETS
     stats = _empty_stats()
     cooldown = cooldown or CooldownController()
+    ensure_trading_days_current(
+        conn,
+        through_date=requested_target,
+        cooldown=cooldown,
+        log=log,
+    )
+    target = latest_open_trading_day_on_or_before(conn, requested_target)
+    if target is None:
+        raise ValueError(
+            f"no open trading day found on or before attention_notice target {requested_target}"
+        )
+
     for market in selected_markets:
         latest = latest_attention_notice_date(conn, market)
         if latest is None:
             raise ValueError(
                 f"no existing attention_notice coverage for {market}; seed with import-attention first"
             )
-        if latest >= target:
+        latest_open = latest_open_trading_day_on_or_before(conn, latest)
+        if latest_open is None:
+            raise ValueError(
+                f"no open trading day found on or before attention_notice latest {latest} for {market}"
+            )
+        if latest_open >= target:
             if log:
-                log(f"INFO attention_notice {market} already current: latest={latest} target={target}")
+                log(
+                    f"INFO attention_notice {market} already current: "
+                    f"latest_open={latest_open} target_open={target} requested_target={requested_target}"
+                )
             stats["SKIPPED"] += 1
             continue
-        start = (date.fromisoformat(latest) + timedelta(days=1)).isoformat()
+        first_open = next_open_trading_day_after(conn, latest_open, target)
+        if first_open is None:
+            if log:
+                log(
+                    f"INFO attention_notice {market} no open trading days to update: "
+                    f"latest_open={latest_open} target_open={target} requested_target={requested_target}"
+                )
+            stats["SKIPPED"] += 1
+            continue
         if log:
-            log(f"Update Attention: {market} latest={latest} range={start} -> {target}")
+            log(
+                f"Update Attention: {market} latest={latest} latest_open={latest_open} "
+                f"range={first_open} -> {target} requested_target={requested_target}"
+            )
         result = import_attention_notice_official(
             conn,
             market=market,
-            start=start,
+            start=first_open,
             end=target,
             fetcher=fetcher,
             cooldown=cooldown,

@@ -53,6 +53,11 @@ def official_trading_days_url(month_start: str) -> str:
     return config.URL_TWSE_TRADING_DAYS.format(date_yyyymmdd=yyyymmdd)
 
 
+def official_tpex_trading_days_url(month_start: str) -> str:
+    date_url = quote(month_start.replace("-", "/"), safe="")
+    return config.URL_TPEX_TRADING_DAYS.format(date_url=date_url)
+
+
 def official_attention_url(market: str, start: str, end: str) -> str:
     start_yyyymmdd = start.replace("-", "")
     end_yyyymmdd = end.replace("-", "")
@@ -126,6 +131,19 @@ def download_disposal_csv(market: str, start: str, end: str) -> bytes:
 
 def download_trading_days_json(month_start: str) -> dict:
     url = official_trading_days_url(month_start)
+    request = Request(
+        url,
+        headers={
+            "User-Agent": f"VeriStockDB/{config.APP_VERSION} (+https://github.com/timewu168/VeriStockDB)",
+            "Accept": "application/json,*/*",
+        },
+    )
+    with urlopen(request, timeout=30, context=official_ssl_context()) as response:
+        return json.loads(response.read().decode("utf-8-sig"))
+
+
+def download_tpex_trading_days_json(month_start: str) -> dict:
+    url = official_tpex_trading_days_url(month_start)
     request = Request(
         url,
         headers={

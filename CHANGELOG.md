@@ -5,6 +5,8 @@
 ### Changed
 
 - Localized Telegram task notification messages in Chinese while preserving status codes such as `OK`, `BLOCKED`, `RECHECK`, `MISSING`, and `ERROR`.
+- Official trading-calendar refresh now falls back from TWSE FMTQIK to TPEx tradingIndex when TWSE is unavailable or returns no open days.
+- Attention and disposal notice updates now use `trading_days` to skip closed targets and avoid advancing coverage from weekend scheduler runs.
 
 ## v0.3.3 - 2026-06-05
 

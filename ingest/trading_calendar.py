@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, timedelta
 import sqlite3
 
@@ -7,8 +8,15 @@ from ingest.downloader import (
     CooldownController,
     FetchTradingDaysJson,
     LogFunc,
+    download_tpex_trading_days_json,
     download_trading_days_json,
 )
+
+
+@dataclass(frozen=True)
+class TradingCalendarMonth:
+    source: str
+    open_dates: set[str]
 
 
 def is_open(conn: sqlite3.Connection, trade_date: str) -> bool | None:
@@ -32,6 +40,37 @@ def trading_days_between(conn: sqlite3.Connection, start: str, end: str) -> list
         (start, end),
     ).fetchall()
     return [row["trade_date"] for row in rows]
+
+
+def latest_open_trading_day_on_or_before(
+    conn: sqlite3.Connection, target_date: str
+) -> str | None:
+    target = validate_iso_date(target_date)
+    row = conn.execute(
+        """
+        SELECT MAX(trade_date) AS trade_date
+        FROM trading_days
+        WHERE is_open = 1 AND trade_date <= ?
+        """,
+        (target,),
+    ).fetchone()
+    return row["trade_date"] if row and row["trade_date"] else None
+
+
+def next_open_trading_day_after(
+    conn: sqlite3.Connection, trade_date: str, through_date: str
+) -> str | None:
+    start = validate_iso_date(trade_date)
+    through = validate_iso_date(through_date)
+    row = conn.execute(
+        """
+        SELECT MIN(trade_date) AS trade_date
+        FROM trading_days
+        WHERE is_open = 1 AND trade_date > ? AND trade_date <= ?
+        """,
+        (start, through),
+    ).fetchone()
+    return row["trade_date"] if row and row["trade_date"] else None
 
 
 def rollback_trading_days(
@@ -61,6 +100,7 @@ def ensure_trading_days_current(
     through_date: str,
     refresh_from: str | None = None,
     fetcher: FetchTradingDaysJson = download_trading_days_json,
+    fallback_fetcher: FetchTradingDaysJson = download_tpex_trading_days_json,
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
 ) -> int:
@@ -89,43 +129,93 @@ def ensure_trading_days_current(
         start = refresh_start
     month_starts = _month_starts_between(start, through)
     open_dates: set[str] = set()
+    month_sources: dict[str, str] = {}
     cooldown = cooldown or CooldownController()
     if log:
         log(f"INFO refreshing trading calendar {start.isoformat()} -> {through.isoformat()}")
     for month_start in month_starts:
         cooldown.before_request(log)
-        payload = fetcher(month_start.isoformat())
-        month_open_dates = parse_twse_fmtqik_open_dates(payload)
+        month_calendar = _fetch_trading_calendar_month(
+            month_start.isoformat(),
+            fetcher=fetcher,
+            fallback_fetcher=fallback_fetcher,
+            log=log,
+        )
+        month_open_dates = month_calendar.open_dates
+        month_source = month_calendar.source
         open_dates.update(month_open_dates)
+        month_sources[month_start.isoformat()] = month_source
         if log:
-            log(f"INFO trading calendar month {month_start.strftime('%Y-%m')} open days={len(month_open_dates)}")
+            log(
+                f"INFO trading calendar month {month_start.strftime('%Y-%m')} "
+                f"source={month_source} open days={len(month_open_dates)}"
+            )
 
     before = conn.total_changes
     current = start
     while current <= through:
         trade_date = current.isoformat()
+        month_source = month_sources[current.replace(day=1).isoformat()]
+        source_label = _trading_calendar_source_label(month_source)
         is_open_value = 1 if trade_date in open_dates else 0
         note = (
-            "open day from TWSE FMTQIK"
+            f"open day from {source_label}"
             if is_open_value
-            else "closed day inferred from TWSE FMTQIK"
+            else f"closed day inferred from {source_label}"
         )
         conn.execute(
             """
             INSERT INTO trading_days(trade_date, is_open, source, note)
-            VALUES (?, ?, 'twse_fmtqik', ?)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(trade_date) DO UPDATE SET
               is_open = excluded.is_open,
               source = excluded.source,
               note = excluded.note
             """,
-            (trade_date, is_open_value, note),
+            (trade_date, is_open_value, month_source, note),
         )
         current += timedelta(days=1)
     changed = conn.total_changes - before
     if log:
         log(f"INFO trading calendar updated rows={changed} through={through.isoformat()}")
     return changed
+
+
+def _fetch_trading_calendar_month(
+    month_start: str,
+    *,
+    fetcher: FetchTradingDaysJson,
+    fallback_fetcher: FetchTradingDaysJson,
+    log: LogFunc | None = None,
+) -> TradingCalendarMonth:
+    primary_error: Exception | None = None
+    try:
+        twse_open_dates = parse_twse_fmtqik_open_dates(fetcher(month_start))
+        if twse_open_dates:
+            return TradingCalendarMonth("twse_fmtqik", twse_open_dates)
+        primary_error = ValueError("TWSE FMTQIK returned 0 open days")
+    except Exception as exc:
+        primary_error = exc
+
+    if log:
+        log(
+            "WARN TWSE FMTQIK trading calendar unavailable for "
+            f"{month_start}: {primary_error}; trying TPEx tradingIndex"
+        )
+
+    try:
+        tpex_open_dates = parse_tpex_trading_index_open_dates(fallback_fetcher(month_start))
+    except Exception as exc:
+        raise ValueError(
+            "trading calendar unavailable from TWSE FMTQIK and TPEx "
+            f"tradingIndex for {month_start}"
+        ) from exc
+    if not tpex_open_dates:
+        raise ValueError(
+            "trading calendar has no open days from TWSE FMTQIK or TPEx "
+            f"tradingIndex for {month_start}"
+        ) from primary_error
+    return TradingCalendarMonth("tpex_trading_index", tpex_open_dates)
 
 
 def _has_inferred_closed_days(conn: sqlite3.Connection, start: str, end: str) -> bool:
@@ -135,8 +225,11 @@ def _has_inferred_closed_days(conn: sqlite3.Connection, start: str, end: str) ->
         FROM trading_days
         WHERE trade_date BETWEEN ? AND ?
           AND is_open = 0
-          AND source = 'twse_fmtqik'
-          AND note LIKE 'closed day inferred from TWSE FMTQIK%'
+          AND source IN ('twse_fmtqik', 'tpex_trading_index')
+          AND (
+            note LIKE 'closed day inferred from TWSE FMTQIK%'
+            OR note LIKE 'closed day inferred from TPEx tradingIndex%'
+          )
         LIMIT 1
         """,
         (start, end),
@@ -157,6 +250,48 @@ def parse_twse_fmtqik_open_dates(payload: dict) -> set[str]:
         if len(row) <= date_index:
             continue
         open_dates.add(_roc_date_to_iso(str(row[date_index])))
+    return open_dates
+
+
+def parse_tpex_trading_index_open_dates(payload: dict) -> set[str]:
+    if payload.get("stat") != "ok":
+        raise ValueError(f"TPEx tradingIndex returned non-ok status: {payload.get('stat')}")
+
+    open_dates = set()
+    tables = payload.get("tables") or []
+    if tables:
+        for table in tables:
+            if not isinstance(table, dict):
+                continue
+            open_dates.update(
+                _parse_tpex_trading_index_rows(
+                    table.get("data") or [], table.get("fields") or []
+                )
+            )
+        return open_dates
+
+    return _parse_tpex_trading_index_rows(
+        payload.get("data") or [], payload.get("fields") or []
+    )
+
+
+def _parse_tpex_trading_index_rows(rows: list, fields: list) -> set[str]:
+    date_index = 0
+    for candidate in ("日期", "Date"):
+        if candidate in fields:
+            date_index = fields.index(candidate)
+            break
+
+    open_dates = set()
+    for row in rows:
+        if isinstance(row, dict):
+            value = row.get("日期") or row.get("Date") or row.get("date")
+        else:
+            if len(row) <= date_index:
+                continue
+            value = row[date_index]
+        if value:
+            open_dates.add(_roc_date_to_iso(str(value)))
     return open_dates
 
 
@@ -187,3 +322,11 @@ def _roc_date_to_iso(value: str) -> str:
     month = int(parts[1])
     day = int(parts[2])
     return date(year, month, day).isoformat()
+
+
+def _trading_calendar_source_label(source: str) -> str:
+    if source == "twse_fmtqik":
+        return "TWSE FMTQIK"
+    if source == "tpex_trading_index":
+        return "TPEx tradingIndex"
+    return source

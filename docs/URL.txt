@@ -11,25 +11,32 @@ Viewed config.py:1-43
 
 這部分是系統用於「數據真理對照驗證」與「開市日曆導引」的網址：
 
-#### 1. 證交所 (TWSE) 0050 月報表 API (日曆導引與跨月自癒)
+#### 1. 證交所 (TWSE) FMTQIK 月交易日 API (交易日主來源)
 * **網址**：
-  `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date={ym}01&stockNo=0050`
+  `https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={date_yyyymmdd}&response=json`
 * **參數說明**：
-  * `{ym}`：西元年月，格式為 `YYYYMM`（例如 `202605`）。
-* **功能**：獲取 0050 當月的開市日曆清單，以及作為月底對齊自癒數據的真理對照組。
+  * `{date_yyyymmdd}`：西元年月日，格式為 `YYYYMMDD`，通常使用該月 1 日（例如 `20260601`）。
+* **功能**：補齊 `trading_days` 開市日與推定休市日，是 `import-close` / `update-close` 的交易日主來源。
 
-#### 2. 期交所最近 30 天交易日列表 (期交所日曆)
+#### 2. 櫃買中心 (TPEx) tradingIndex 月指數 API (交易日備援來源)
+* **網址**：
+  `https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex?date={date_url}&id=&response=json`
+* **參數說明**：
+  * `{date_url}`：網址編碼版之西元年月日 `YYYY%2FMM%2FDD`，通常使用該月 1 日（例如 `2026%2F06%2F01`）。
+* **功能**：當 TWSE FMTQIK 無法取得或回傳 0 個開市日時，作為交易日曆備援。若 TWSE 與 TPEx 同時失敗或都沒有交易日，程式會明確報錯，不會默默把日期視為休市。
+
+#### 3. 期交所最近 30 天交易日列表 (期交所日曆)
 * **網址**：
   `https://www.taifex.com.tw/cht/3/futPrevious30DaysSalesData`
 * **功能**：獲取最近 30 天的交易日列表，藉此更新最新的開市日期。
 
-#### 3. 證交所 (TWSE) 0050 單日真實數據 (上市雙源校驗 API)
+#### 4. 證交所 (TWSE) 0050 單日真實數據 (上市雙源校驗 API)
 * **網址**：
   `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date={query_date}&stockNo=0050`
 * **參數說明**：
   * `{query_date}`：西元年月日，格式為 `YYYYMMDD`（例如 `20260529`）。
 
-#### 4. 櫃買中心 (TPEx) 5483 單日真實數據 (上櫃雙源校驗 API)
+#### 5. 櫃買中心 (TPEx) 5483 單日真實數據 (上櫃雙源校驗 API)
 * **網址**：
   `https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date={roc_date_str}&id=`
 * **參數說明**：
