@@ -49,6 +49,7 @@ DEFAULT_COOLDOWN_MAX_SECONDS = 15
 DATASET_DAILY_CLOSE = "daily_close"
 DATASET_ATTENTION_NOTICE = "attention_notice"
 DATASET_DISPOSAL_NOTICE = "disposal_notice"
+DATASET_LEGAL_INVESTOR = "legal_investor"
 MARKETS = ("TWSE", "TPEX")
 
 API_HOST = os.environ.get("VERISTOCK_API_HOST", "127.0.0.1")
@@ -91,6 +92,14 @@ URL_TPEX_ATTENTION_NOTICE = (
     "https://www.tpex.org.tw/www/zh-tw/bulletin/attention"
     "?startDate={start_date_url}&endDate={end_date_url}"
     "&code=&cate=&type=all&order=date&id=&response=csv"
+)
+URL_TWSE_LEGAL_INVESTOR = (
+    "https://www.twse.com.tw/rwd/zh/fund/T86"
+    "?date={date_yyyymmdd}&selectType=ALLBUT0999&response=csv"
+)
+URL_TPEX_LEGAL_INVESTOR = (
+    "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade"
+    "?type=Daily&sect=EW&date={date_url}&id=&response=csv"
 )
 URL_TWSE_DISPOSAL_NOTICE = (
     "https://www.twse.com.tw/rwd/zh/announcement/punish"

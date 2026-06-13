@@ -54,6 +54,11 @@ python main.py ops-check
 python main.py notify-telegram --test
 python main.py notify-telegram --message "VeriStockDB test message"
 
+# 第一階段三大法人：只下載/檢查官方 CSV，不入庫
+python main.py download-legal --from 2019-08-21 --to 2026-06-12
+python main.py inspect-legal --date 2026-06-12 --market TWSE
+python main.py inspect-legal --date 2026-06-12 --market TPEX
+
 # 列出所有被擋下、需複查或缺漏的批次與原因
 python main.py status --problems
 

@@ -10,6 +10,7 @@ from db import connection as db_connection
 from ingest import attention_notice
 from ingest import close_importer
 from ingest import disposal_notice
+from ingest import legal_investor
 from ingest.downloader import CooldownController
 from ingest.trading_calendar import validate_iso_date
 from services import batch_status
@@ -72,6 +73,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect_disposal.add_argument("--twse-file", help="local TWSE disposal CSV file")
     inspect_disposal.add_argument("--tpex-file", help="local TPEX disposal CSV file")
+
+    download_legal = subparsers.add_parser(
+        "download-legal", help="download official legal investor CSV files without importing"
+    )
+    download_legal.add_argument("--date", help="target date YYYY-MM-DD")
+    download_legal.add_argument("--from", dest="start", help="range start YYYY-MM-DD")
+    download_legal.add_argument("--to", dest="end", help="range end YYYY-MM-DD")
+    download_legal.add_argument("--market", choices=config.MARKETS)
+    download_legal.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
+    inspect_legal = subparsers.add_parser(
+        "inspect-legal", help="inspect local legal investor CSV files without importing"
+    )
+    inspect_legal.add_argument("--file", help="single local legal investor CSV file")
+    inspect_legal.add_argument("--market", choices=config.MARKETS)
+    inspect_legal.add_argument("--date", help="inspect standard saved CSV for YYYY-MM-DD")
+    inspect_legal.add_argument("--sample-size", type=int, default=3, help="sample rows to print, default 3")
 
     import_attention = subparsers.add_parser("import-attention", help="import attention announcement CSV files")
     import_attention.add_argument("--file", help="single local attention CSV file")
@@ -231,6 +249,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_inspect_attention(args)
         if args.command == "inspect-disposal":
             return _cmd_inspect_disposal(args)
+        if args.command == "inspect-legal":
+            return _cmd_inspect_legal(args)
 
         db_connection.init_db(db_path)
         conn = db_connection.connect(db_path)
@@ -251,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_update_attention(conn, args)
             elif args.command == "update-disposal":
                 result = _cmd_update_disposal(conn, args)
+            elif args.command == "download-legal":
+                result = _cmd_download_legal(conn, args)
             elif args.command == "status":
                 result = _cmd_status(conn, args)
             elif args.command == "query-close":
@@ -538,6 +560,63 @@ def _cmd_inspect_disposal(args: argparse.Namespace) -> int:
         f"skipped_rows={total_skipped}"
     )
     return 0 if total_duplicates == 0 and total_skipped == 0 else 2
+
+
+def _cmd_download_legal(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    if args.date:
+        if args.start or args.end:
+            raise ValueError("download-legal accepts --date or --from/--to, not both")
+        start = end = validate_iso_date(args.date)
+    else:
+        if not args.start or not args.end:
+            raise ValueError("download-legal requires --date or both --from and --to")
+        start = validate_iso_date(args.start)
+        end = validate_iso_date(args.end)
+    markets = (args.market,) if args.market else None
+    results = legal_investor.download_legal_range(
+        conn,
+        start=start,
+        end=end,
+        markets=markets,
+        cooldown=cooldown,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == "OK")
+    failed = [result for result in results if result.status != "OK"]
+    print(f"legal_investor download OK={ok} MISSING={len(failed)}")
+    for result in failed[:10]:
+        print(f"  {result.trade_date} {result.market} {result.status} {result.error}")
+    return 0 if not failed else 2
+
+
+def _cmd_inspect_legal(args: argparse.Namespace) -> int:
+    if args.sample_size < 0:
+        raise ValueError("--sample-size must be >= 0")
+    if args.file or args.date:
+        if bool(args.file) == bool(args.date):
+            raise ValueError("inspect-legal requires exactly one of --file or --date")
+        if not args.market:
+            raise ValueError("inspect-legal requires --market")
+    else:
+        raise ValueError("inspect-legal requires --file or --date")
+
+    path = Path(args.file) if args.file else legal_investor.legal_csv_path(args.market, args.date)
+    summary = legal_investor.inspect_legal_file(path, args.market, sample_size=args.sample_size)
+    print("legal_investor inspect")
+    print(f"{summary.market}")
+    print(f"  file         {summary.source_file}")
+    print(f"  encoding     {summary.encoding}")
+    print(f"  header_index {summary.header_index}")
+    print(f"  fields       {len(summary.fields)}")
+    for index, field in enumerate(summary.fields):
+        print(f"    {index}: {field}")
+    print(f"  rows         {summary.row_count}")
+    if summary.sample_rows:
+        print("  samples")
+        for row in summary.sample_rows:
+            print("    " + " | ".join(row))
+    return 0
 
 
 def _cmd_import_attention(conn, args: argparse.Namespace) -> int:
@@ -939,6 +1018,8 @@ def _print_quickstart() -> None:
     print("  python main.py query-attention --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")
     print("  python main.py import-disposal --twse-file punish.csv --tpex-file disposal.csv")
     print("  python main.py update-disposal")
+    print("  python main.py download-legal --from 2019-08-21 --to YYYY-MM-DD")
+    print("  python main.py inspect-legal --date YYYY-MM-DD --market TWSE")
     print("  python main.py query-disposal --stock-id 2330 --from YYYY-MM-DD --to YYYY-MM-DD")
     print("  python main.py import-close-local --from YYYY-MM-DD --to YYYY-MM-DD --dir data/csv/Close")
     print("  python main.py finalize-close-months --from YYYY-MM --to YYYY-MM --dir data/csv/Close")

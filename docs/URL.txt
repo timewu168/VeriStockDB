@@ -64,6 +64,10 @@ Viewed config.py:1-43
   `https://www.twse.com.tw/rwd/zh/fund/T86?date={sii_date}&selectType=ALLBUT0999&response=csv`
 * **上櫃 (OTC)**：
   `https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&sect=EW&date={otc_date_url}&id=&response=csv`
+* **參數說明**：
+  * `{sii_date}`：西元年月日 `YYYYMMDD`。
+  * `{otc_date_url}`：網址編碼版之西元年月日 `YYYY%2FMM%2FDD`。
+* **目前狀態**：第一階段只做 `download-legal` 與 `inspect-legal`，保存官方原始 CSV 並檢查欄位，不入庫。
 
 #### 3. 信用交易資券餘額 (Margin)
 * **上市 (SII)**：
