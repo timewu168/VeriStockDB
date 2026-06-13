@@ -5,7 +5,9 @@ __pycache__/
 htmlcov/
 
 data/
-tests/
+tests/fixtures/
+tests/tmp/
+tests/data/
 reference/
 *.db
 *.db-*
