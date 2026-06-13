@@ -81,6 +81,7 @@ def download_legal_range(
             try:
                 cooldown.before_request(log)
                 raw = fetcher(market, trade_date)
+                validate_legal_csv_bytes(raw, market, trade_date)
                 path = save_official_legal_csv(raw, market, trade_date)
                 results.append(
                     LegalDownloadResult(
@@ -134,15 +135,29 @@ def legal_csv_path(market: str, trade_date: str) -> Path:
     return official_legal_csv_path(market, validate_iso_date(trade_date))
 
 
+def validate_legal_csv_bytes(raw: bytes, market: str, trade_date: str) -> None:
+    if market not in config.MARKETS:
+        raise ValueError(f'unknown market: {market}')
+    text, _encoding = _decode_legal_text(raw, f'{market} {trade_date}')
+    rows = list(csv.reader(text.splitlines()))
+    header_index = _find_header_index(rows)
+    data_rows = [row for row in rows[header_index + 1 :] if _is_data_row(row)]
+    if not data_rows:
+        raise ValueError(f'legal investor CSV has no data rows: {trade_date} {market}')
+
+
 def _read_text(path: Path) -> tuple[str, str]:
-    raw = path.read_bytes()
+    return _decode_legal_text(path.read_bytes(), str(path))
+
+
+def _decode_legal_text(raw: bytes, source: str) -> tuple[str, str]:
     last_error: Exception | None = None
     for encoding in SUPPORTED_ENCODINGS:
         try:
             return raw.decode(encoding), encoding
         except UnicodeDecodeError as exc:
             last_error = exc
-    raise ValueError(f'cannot decode legal investor CSV: {path}') from last_error
+    raise ValueError(f'cannot decode legal investor CSV: {source}') from last_error
 
 
 def _find_header_index(rows: list[list[str]]) -> int:
