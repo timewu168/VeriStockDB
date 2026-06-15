@@ -91,7 +91,33 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_legal.add_argument("--date", help="inspect standard saved CSV for YYYY-MM-DD")
     inspect_legal.add_argument("--sample-size", type=int, default=3, help="sample rows to print, default 3")
 
+    import_legal = subparsers.add_parser(
+        "import-legal", help="import or dry-run legal investor CSV normalization"
+    )
+    import_legal.add_argument("--dry-run", action="store_true", help="parse and validate only")
+    import_legal.add_argument("--file", help="single local legal investor CSV file")
+    import_legal.add_argument("--market", choices=config.MARKETS)
+    import_legal.add_argument("--date", help="target date YYYY-MM-DD")
+    import_legal.add_argument("--from", dest="start", help="range start YYYY-MM-DD")
+    import_legal.add_argument("--to", dest="end", help="range end YYYY-MM-DD")
+
+    report_legal = subparsers.add_parser(
+        "report-legal", help="report full legal investor CSV dry-run status without importing"
+    )
+    report_legal.add_argument("--from", dest="start", help="range start YYYY-MM-DD, default first local CSV per market")
+    report_legal.add_argument("--to", dest="end", help="range end YYYY-MM-DD, default last local CSV per market")
+    report_legal.add_argument("--market", choices=config.MARKETS)
+    report_legal.add_argument("--all", action="store_true", help="print OK rows too; default prints problems only")
+
+    update_legal = subparsers.add_parser(
+        "update-legal", help="manually update one legal investor trading day without overwriting existing rows"
+    )
+    update_legal.add_argument("--date", required=True, help="target date YYYY-MM-DD")
+    update_legal.add_argument("--market", choices=config.MARKETS)
+    update_legal.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
     import_attention = subparsers.add_parser("import-attention", help="import attention announcement CSV files")
+
     import_attention.add_argument("--file", help="single local attention CSV file")
     import_attention.add_argument("--market", choices=config.MARKETS)
     import_attention.add_argument("--twse-file", help="local TWSE notice CSV file")
@@ -250,7 +276,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "inspect-disposal":
             return _cmd_inspect_disposal(args)
         if args.command == "inspect-legal":
-            return _cmd_inspect_legal(args)
+            return _cmd_inspect_legal(args, db_path)
+        if args.command == "report-legal":
+            conn = db_connection.connect(db_path)
+            try:
+                return _cmd_report_legal(conn, args)
+            finally:
+                conn.close()
 
         db_connection.init_db(db_path)
         conn = db_connection.connect(db_path)
@@ -273,6 +305,10 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_update_disposal(conn, args)
             elif args.command == "download-legal":
                 result = _cmd_download_legal(conn, args)
+            elif args.command == "import-legal":
+                result = _cmd_import_legal(conn, args)
+            elif args.command == "update-legal":
+                result = _cmd_update_legal(conn, args)
             elif args.command == "status":
                 result = _cmd_status(conn, args)
             elif args.command == "query-close":
@@ -590,7 +626,7 @@ def _cmd_download_legal(conn, args: argparse.Namespace) -> int:
     return 0 if not failed else 2
 
 
-def _cmd_inspect_legal(args: argparse.Namespace) -> int:
+def _cmd_inspect_legal(args: argparse.Namespace, db_path: Path) -> int:
     if args.sample_size < 0:
         raise ValueError("--sample-size must be >= 0")
     if args.file or args.date:
@@ -602,7 +638,20 @@ def _cmd_inspect_legal(args: argparse.Namespace) -> int:
         raise ValueError("inspect-legal requires --file or --date")
 
     path = Path(args.file) if args.file else legal_investor.legal_csv_path(args.market, args.date)
-    summary = legal_investor.inspect_legal_file(path, args.market, sample_size=args.sample_size)
+    close_row_count = None
+    if args.date:
+        trade_date = validate_iso_date(args.date)
+        conn = db_connection.connect(db_path)
+        try:
+            close_row_count = legal_investor.daily_close_row_count(conn, args.market, trade_date)
+        finally:
+            conn.close()
+    summary = legal_investor.inspect_legal_file(
+        path,
+        args.market,
+        sample_size=args.sample_size,
+        daily_close_row_count=close_row_count,
+    )
     print("legal_investor inspect")
     print(f"{summary.market}")
     print(f"  file         {summary.source_file}")
@@ -612,11 +661,147 @@ def _cmd_inspect_legal(args: argparse.Namespace) -> int:
     for index, field in enumerate(summary.fields):
         print(f"    {index}: {field}")
     print(f"  rows         {summary.row_count}")
+    if close_row_count is not None:
+        print(f"  close_rows   {close_row_count}")
     if summary.sample_rows:
         print("  samples")
         for row in summary.sample_rows:
             print("    " + " | ".join(row))
     return 0
+
+
+def _cmd_import_legal(conn, args: argparse.Namespace) -> int:
+    if args.file:
+        if not args.dry_run:
+            raise ValueError('import-legal --file supports --dry-run only')
+        if args.start or args.end:
+            raise ValueError('import-legal --file cannot be combined with --from/--to')
+        if not args.date or not args.market:
+            raise ValueError('import-legal --file requires --date and --market')
+        result = legal_investor.dry_run_legal_file(
+            Path(args.file), args.market, validate_iso_date(args.date)
+        )
+        _print_legal_dry_run_results([result])
+        return 0 if result.status == 'OK' else 2
+
+    if args.date:
+        if args.start or args.end:
+            raise ValueError('import-legal accepts --date or --from/--to, not both')
+        start = end = validate_iso_date(args.date)
+    else:
+        if not args.start or not args.end:
+            raise ValueError('import-legal requires --file, --date, or both --from and --to')
+        start = validate_iso_date(args.start)
+        end = validate_iso_date(args.end)
+    markets = (args.market,) if args.market else None
+    if args.dry_run:
+        results = legal_investor.dry_run_legal_range(conn, start=start, end=end, markets=markets)
+        _print_legal_dry_run_results(results)
+        return 0 if all(result.status == 'OK' for result in results) else 2
+
+    results = legal_investor.import_legal_range(conn, start=start, end=end, markets=markets)
+    total_days = sum(result.open_days for result in results)
+    total_rows = sum(result.row_count for result in results)
+    print(f'legal_investor import OK markets={len(results)} open_days={total_days} rows={total_rows}')
+    for result in results:
+        print(
+            f'  {result.market} range={result.start} -> {result.end} '
+            f'open_days={result.open_days} rows={result.row_count}'
+        )
+    return 0
+
+
+def _print_legal_dry_run_results(results: list[legal_investor.LegalDryRunResult]) -> None:
+    ok = sum(1 for result in results if result.status == 'OK')
+    blocked = sum(1 for result in results if result.status == 'BLOCKED')
+    missing = sum(1 for result in results if result.status == 'MISSING')
+    print(f'legal_investor dry-run OK={ok} BLOCKED={blocked} MISSING={missing}')
+    for result in results:
+        source = result.source_file or '-'
+        line = f'  {result.trade_date} {result.market} {result.status} rows={result.row_count} file={source}'
+        if result.error:
+            line += f' error={result.error}'
+        print(line)
+
+
+
+def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    results = legal_investor.update_legal_day(
+        conn,
+        trade_date=validate_iso_date(args.date),
+        markets=(args.market,) if args.market else None,
+        cooldown=cooldown,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == 'OK')
+    exists = sum(1 for result in results if result.status == 'EXISTS')
+    closed = sum(1 for result in results if result.status == 'CLOSED')
+    blocked = sum(1 for result in results if result.status == 'BLOCKED')
+    print(
+        f'legal_investor update OK={ok} EXISTS={exists} CLOSED={closed} BLOCKED={blocked}'
+    )
+    for result in results:
+        source = result.source_file or '-'
+        line = (
+            f'  {result.trade_date} {result.market} {result.status} '
+            f'rows={result.row_count} file={source}'
+        )
+        if result.error:
+            line += f' error={result.error}'
+        print(line)
+    return 0 if blocked == 0 else 2
+
+def _cmd_report_legal(conn, args: argparse.Namespace) -> int:
+    markets = (args.market,) if args.market else None
+    report = legal_investor.legal_csv_report(
+        conn,
+        start=validate_iso_date(args.start) if args.start else None,
+        end=validate_iso_date(args.end) if args.end else None,
+        markets=markets,
+    )
+    _print_legal_report(report, include_ok=args.all)
+    return 0 if not report.problems else 2
+
+
+def _print_legal_report(report: legal_investor.LegalReport, *, include_ok: bool = False) -> None:
+    total_open_days = sum(summary.open_days for summary in report.summaries)
+    total_ok = sum(summary.ok for summary in report.summaries)
+    total_blocked = sum(summary.blocked for summary in report.summaries)
+    total_missing = sum(summary.missing for summary in report.summaries)
+    total_rows = sum(summary.rows for summary in report.summaries)
+    print(
+        'legal_investor report '
+        f'open_days={total_open_days} OK={total_ok} BLOCKED={total_blocked} '
+        f'MISSING={total_missing} rows={total_rows}'
+    )
+    for summary in report.summaries:
+        date_range = f'{summary.start} -> {summary.end}' if summary.start and summary.end else '-'
+        print(
+            f'  {summary.market} range={date_range} open_days={summary.open_days} '
+            f'OK={summary.ok} BLOCKED={summary.blocked} MISSING={summary.missing} rows={summary.rows}'
+        )
+    if report.problems:
+        print('Problems:')
+        for result in report.problems:
+            source = result.source_file or '-'
+            print(
+                f'  {result.trade_date} {result.market} {result.status} '
+                f'rows={result.row_count} file={source} error={result.error}'
+            )
+    elif not include_ok:
+        print('Problems: none')
+    if include_ok:
+        print('All results:')
+        for result in report.results:
+            source = result.source_file or '-'
+            line = (
+                f'  {result.trade_date} {result.market} {result.status} '
+                f'rows={result.row_count} file={source}'
+            )
+            if result.error:
+                line += f' error={result.error}'
+            print(line)
 
 
 def _cmd_import_attention(conn, args: argparse.Namespace) -> int:

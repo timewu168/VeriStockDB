@@ -52,6 +52,30 @@ CREATE INDEX IF NOT EXISTS idx_disposal_notices_date_stock ON disposal_notices(t
 CREATE INDEX IF NOT EXISTS idx_disposal_notices_active_stock
 ON disposal_notices(disposal_start_date, disposal_end_date, stock_id);
 
+CREATE TABLE IF NOT EXISTS legal_investors (
+  trade_date TEXT NOT NULL,
+  market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),
+  stock_id TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  foreign_buy INTEGER NOT NULL,
+  foreign_sell INTEGER NOT NULL,
+  foreign_net INTEGER NOT NULL,
+  investment_trust_buy INTEGER NOT NULL,
+  investment_trust_sell INTEGER NOT NULL,
+  investment_trust_net INTEGER NOT NULL,
+  dealer_buy INTEGER NOT NULL,
+  dealer_sell INTEGER NOT NULL,
+  dealer_net INTEGER NOT NULL,
+  dealer_hedge_buy INTEGER NOT NULL,
+  dealer_hedge_sell INTEGER NOT NULL,
+  dealer_hedge_net INTEGER NOT NULL,
+  PRIMARY KEY (trade_date, market, stock_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_legal_investors_date ON legal_investors(trade_date);
+CREATE INDEX IF NOT EXISTS idx_legal_investors_stock ON legal_investors(stock_id);
+CREATE INDEX IF NOT EXISTS idx_legal_investors_date_stock ON legal_investors(trade_date, stock_id);
+
 CREATE TABLE IF NOT EXISTS import_batches (
   batch_id TEXT PRIMARY KEY,
   dataset TEXT NOT NULL,

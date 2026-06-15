@@ -1,0 +1,2078 @@
+Workbook-Open
+Private Sub Workbook_Open()
+    Dim strSelect As String
+    AppStop
+    Sheets("SetUp").[C4].Value = Date '輸入最新日期
+    If Day(Date) > 10 Then '如果在10號之後
+        Sheets("SetUp").[C17].Value = DateAdd("m", -1, Date - Day(Date) + 1)
+    ElseIf Day(Date) <= 10 Then '如果在10號之前
+        Sheets("SetUp").[C17].Value = DateAdd("m", -2, Date - Day(Date) + 1)
+    End If
+    Sheets("TradingDay").Select '作用工作表移到TradingDay
+    Sheets("TradingDay").Cells(2, "A").Resize(10000, 1).ClearContents
+    Call GetCheckData("", "交易日", 1, "HTML", "UTF-8", 1) '呼叫爬蟲取得期交所最新交易日
+    Range("A2:A31").Sort key1:=Range("A2:A31"), Order1:=1, Header:=xlNo '排序，最舊到最新
+    '時間判定，晚上九點前不更新最新交易日
+    If Weekday(Date) = 1 Or Weekday(Date) = 7 Then '判斷是否是星期六日
+        Sheets("TradingDay").[A1048576].End(xlUp).ClearContents
+    ElseIf Time < TimeValue("15:30:00") Then '如果是星期一到五的下午15:30前
+        Sheets("TradingDay").[A1048576].End(xlUp).ClearContents
+    End If
+    Sheets("SetUp").Cells(5, "C").Value = Sheets("TradingDay").[A1048576].End(xlUp).Value '最新交易日=交易日期最後一列的值
+    '=====連結資料庫取得各資料表最新日期=====
+    strSelect = "SELECT 交易日期 FROM Close order by 交易日期 desc LIMIT 1" 'select 日收盤資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 6, "C") '取得日收盤最新日期
+    Call GetYesterDayData '呼叫取得最後交易日收盤資料程式
+    strSelect = "SELECT 交易日期 FROM Legal order by 交易日期 desc LIMIT 1" 'select 日法人資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 7, "C") '取得日法人最新日期
+    strSelect = "SELECT 交易日期 FROM Margin order by 交易日期 desc LIMIT 1" 'select 日資券資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 8, "C") '取得日資券最新日期
+    strSelect = "SELECT 交易日期 FROM DayTrading order by 交易日期 desc LIMIT 1" 'select 日當沖資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 9, "C") '取得日當沖最新日期
+    strSelect = "SELECT 交易日期 FROM Revenue order by 交易日期 desc LIMIT 1" 'select 月營收資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 18, "C") '取得日當沖最新日期
+    strSelect = "SELECT 公告日期 FROM Notice order by 公告日期 desc LIMIT 1" 'select 注意資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 10, "C") '取得日當沖最新日期
+    strSelect = "SELECT 公告日期 FROM Disposal WHERE 市場別 = '上市' order by 公告日期 desc LIMIT 1" 'select 上市處資資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 11, "C") '取得日當沖最新日期
+    strSelect = "SELECT 公告日期 FROM Disposal WHERE 市場別 = '上櫃' order by 公告日期 desc LIMIT 1" 'select 上櫃處置資料庫最新日期
+    Call SQLiteDB(strSelect, "SetUp", 12, "C") '取得日當沖最新日期
+    Sheets("SetUP").Select
+    AppStart
+End Sub
+
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+    ActiveWorkbook.Saved = True
+    Application.Quit
+End Sub
+
+
+工作表1 (SetUp)
+Private Sub cbt_dbManage_Click()
+    DataBaseManage.Show
+End Sub
+
+Private Sub cbt_VersionUpdate_Click()
+    Dim strUpdate As String
+    i = 1
+    Do While Sheets("VersionUpdate").Cells(i, "B") <> "" '檔名不為空白
+    If Sheets("VersionUpdate").Cells(i, "A") <> "" Then
+        strUpdate = strUpdate & Sheets("VersionUpdate").Cells(i, "A") & vbTab & Sheets("VersionUpdate").Cells(i, "B") & vbCrLf
+    Else
+        strUpdate = strUpdate & vbTab & Sheets("VersionUpdate").Cells(i, "B") & vbCrLf
+    End If
+    i = i + 1
+    Loop
+    Debug.Print strUpdate
+    MsgBox strUpdate, vbInformation, "=====更新紀錄====="
+End Sub
+
+
+Private Sub CommandButton1_Click()
+    AppStop
+    If Sheets("SetUp").[C5].Value = "" Then
+        MsgBox ("尚未更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value = Sheets("SetUp").[C6].Value Then
+        MsgBox ("資料已是最新，或請更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value > Sheets("SetUp").[C6].Value Then
+        Sheets("CheckData").Select
+        Sheets("CheckData").Cells(1, "A").Resize(400, 13).ClearContents '刪除舊資料
+        Call GetCheckData("0050", "收盤", 1, "HTML", "UTF-8", 0)
+        Sheets("SetUp").Select
+        Call DLcsv("Close", 6)
+        Call AllMergeData("Close")
+    End If
+    AppStart
+End Sub
+
+Private Sub CommandButton2_Click()
+    AppStop
+    If Sheets("SetUp").[C5].Value = "" Then
+        MsgBox ("尚未更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value = Sheets("SetUp").[C7].Value Then
+        MsgBox ("資料已是最新，或請更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value > Sheets("SetUp").[C7].Value Then
+        Sheets("CheckData").Select
+        Sheets("CheckData").Cells(1, "O").Resize(400, 24).ClearContents '刪除舊資料
+        Call GetCheckData("0050", "法人", 15, "HTML", "Big5", 2)
+        Sheets("SetUp").Select
+        Call DLcsv("Legal", 7)
+        Call AllMergeData("Legal")
+    End If
+    AppStart
+End Sub
+
+Private Sub CommandButton3_Click()
+    AppStop
+    If Sheets("SetUp").[C5].Value = "" Then
+        MsgBox ("尚未更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value = Sheets("SetUp").[C8].Value Then
+        MsgBox ("資料已是最新，或請更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value > Sheets("SetUp").[C8].Value Then
+        Sheets("CheckData").Select
+        Sheets("CheckData").Cells(1, "AM").Resize(400, 31).ClearContents '刪除舊資料
+        Call GetCheckData("0050", "資券", 39, "HTML", "Big5", 2)
+        Sheets("SetUp").Select
+        Call DLcsv("Margin", 8)
+        Call AllMergeData("Margin")
+    End If
+    AppStart
+End Sub
+
+Private Sub CommandButton4_Click()
+    AppStop
+    If Sheets("SetUp").[C5].Value = "" Then
+        MsgBox ("尚未更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value = Sheets("SetUp").[C9].Value Then
+        MsgBox ("資料已是最新，或請更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value > Sheets("SetUp").[C9].Value Then
+        Sheets("CheckData").Select
+        Sheets("CheckData").Cells(1, "BS").Resize(400, 18).ClearContents '刪除舊資料
+        'Call GetCheckData("0050", "當沖", 71, "HTML", "UTF-8", 2) '下載當沖
+'        Call GetCheckData("0050", "當沖", 71, "HTML", "Big5", 1) '下載當沖
+        Call GetCheckData("0050", "當沖", 71, "HTML", "UTF-8", 18) '下載當沖
+        Sheets("SetUp").Select
+        Call DLcsv("DayTrading", 9)
+        Call AllMergeData("DayTrading")
+    End If
+    AppStart
+End Sub
+
+Private Sub CommandButton5_Click()
+    AppStop
+    If Sheets("SetUp").[C17].Value = Sheets("SetUp").[C18].Value Then
+        MsgBox ("資料已是最新，請於每月10號之後再更新")
+    ElseIf Sheets("SetUp").[C17].Value > Sheets("SetUp").[C18].Value Then
+        Sheets("CheckData").Select
+        Sheets("CheckData").Cells(1, "DB").Resize(400, 6).ClearContents '刪除舊資料
+        Call GetCheckData(1102, "營收", 106, "HTML", "Big5", 2) '下載當沖
+        Sheets("SetUp").Select
+        Call DLcsv("Revenue", 18)
+        Call AllMergeData("Revenue")
+    End If
+    AppStart
+End Sub
+
+Private Sub CommandButton6_Click()
+    AppStop
+    If Sheets("SetUp").[C5].Value = "" Then
+        MsgBox ("尚未更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value = Sheets("SetUp").[C10].Value Then
+        MsgBox ("資料已是最新，或請更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value > Sheets("SetUp").[C10].Value Then
+        Call DLcsv("Notice", 10)
+        Call AllMergeData("Notice")
+    End If
+    AppStart
+End Sub
+
+Private Sub CommandButton7_Click()
+    AppStop
+    If Sheets("SetUp").[C5].Value = "" Then
+        MsgBox ("尚未更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value = Sheets("SetUp").[C11].Value Then
+        MsgBox ("資料已是最新，或請更新最新交易日")
+    ElseIf Sheets("SetUp").[C5].Value > Sheets("SetUp").[C11].Value Then
+        Call DLcsv("Disposal", 11)
+        Call AllMergeData("Disposal")
+    End If
+    AppStart
+End Sub
+
+表單-DataBaseManage
+Private Sub cbt_BackUp_Click()
+    FileCopy MyPath("Data") & "Stock.db", MyPath("Data") & tbx_dbName
+    Unload Me
+End Sub
+
+Private Sub cbt_DelDB_Click()
+    Kill MyPath("Data") & cbx_dbName.Text '刪掉剛剛的檔案
+    Unload Me
+End Sub
+
+Private Sub tbx_dbName_Change()
+
+End Sub
+
+Private Sub UserForm_Activate()
+    tbx_dbName.Text = "Stock" & Format(Sheets("SetUp").Cells(6, "C").Value, "YYYYMMDD") & ".db"
+    myFileName = Dir(MyPath("Data") & "*") '取得檔案名稱
+    Do While myFileName <> "" '檔名不為空白
+        If myFileName <> "Stock.db" Then cbx_dbName.AddItem myFileName
+        myFileName = Dir
+    Loop
+End Sub
+
+模組-Common
+'全域變數宣告
+Public StartRow As Long, EndRow As Long, cRow As Long, fS As Long '宣告起始列、最後列、code2row、檔案容量變數
+Public strSelect As String, strSheets As String, strColumn As String, strCode As String, TableName As String '宣告select、工作表、欄位號、股票代號、資料表變數
+Public siiDate As String, otcDate As String '宣告上市櫃日期格式字串變數
+Public NewTradingDay As Date, FileDay As Date, DBDay As Date '宣告最新交易日、檔案日期、資料庫日期變數
+
+
+'    Dim myFileName As String  ' 設定檔案名稱變數
+'    Dim FileDay As Date, DBDay As Date '設定檔案日期變數
+'    Dim strMarket As String '設定市場變數
+'    Dim MyFile As Object '設定檔案物件變數
+
+'    Dim sURL As String
+'    Dim UrlSii As String, UrlOtc As String '宣告url變數
+'    Dim CheckDay As String, CheckData As String, CheckCode As String '宣告檢查項目變數
+'    Dim NewTradingDay As Date,DBDay As Date '宣告交易日變數
+
+
+
+'0-1事前準備，調用以下WindowsAPI
+Public Sub DelSheet(StrSheetName As String)
+    Dim ShtTemp As Worksheet
+    Application.DisplayAlerts = False
+    For Each ShtTemp In ActiveWorkbook.Sheets
+        If ShtTemp.Name = StrSheetName Then
+            ShtTemp.Delete
+        End If
+    Next
+End Sub
+
+Public Sub ShowHideTemplate(StrSheetName As String)
+    Sheets(StrSheetName & "Template").Visible = True
+    Sheets(StrSheetName & "Template").Select
+    Sheets(StrSheetName & "Template").Copy Before:=Sheets(Sheets.Count)
+    ActiveSheet.Name = StrSheetName
+    Sheets(StrSheetName & "Template").Select
+    ActiveWindow.SelectedSheets.Visible = False
+    Sheets(StrSheetName).Select
+End Sub
+
+Sub DelErrName()
+    On Error Resume Next
+    Dim RngNameTemp As Name
+    For Each RngNameTemp In ActiveWorkbook.Names
+        If InStr(RngNameTemp.RefersTo, "#REF") > 0 Then
+            RngNameTemp.Delete
+        End If
+    Next
+End Sub
+
+Sub DownloadCSV(strUrl As String, StrFileName As String, StrPath As String)
+    Dim LocalFileName As String
+    Dim Filename As String
+    LocalFileName = StrPath & StrFileName & ".csv"
+    DoEvents
+    StrFileName = URLDownloadToFile(0, strUrl, LocalFileName, 0, 0)
+End Sub
+
+Public Function CorrectionCode(strCode As String)
+    If Len(strCode) = 3 Then '如果證券代號只有3碼
+        CorrectionCode = "00" & CStr(strCode) '股票代號"
+    ElseIf strCode = "6201" Then  '如果是元大富櫃50
+        CorrectionCode = "00" & CStr(strCode) '股票代號"
+    ElseIf Len(strCode) = 5 And Mid(strCode, 1, 1) = "2" Then '如果證券代號只有5碼，而且第一碼=2
+        CorrectionCode = "0" & CStr(strCode) '股票代號"
+    Else
+        CorrectionCode = CStr(strCode) '股票代號"
+    End If
+End Function
+
+Public Function MyPath(strSheets As String) As String
+    Select Case strSheets
+        Case "File"
+            MyPath = ThisWorkbook.Path & "\"
+        Case "csv"
+            MyPath = ThisWorkbook.Path & "\csv\"
+        Case "Data"
+            MyPath = ThisWorkbook.Path & "\Data\"
+        Case "SQLite"
+            MyPath = ThisWorkbook.Path & "\SQLite\"
+        Case "txt"
+            MyPath = ThisWorkbook.Path & "\txt\"
+        Case "DLF"
+            MyPath = "C:\Users\" & Environ$("username") & "\Downloads\"
+    End Select
+End Function
+
+Public Function Code2Row(strCode, cRange) As String
+    On Error Resume Next
+    Dim strRow As String
+    Dim rngCode As Range
+    Select Case cRange
+        Case "Close"
+            Set rngCode = Sheets("TradingDay").Range("C:C")
+        Case "ChCloseS"
+            Set rngCode = Sheets("CheckData").Range("A:A")
+        Case "ChCloseO"
+            Set rngCode = Sheets("CheckData").Range("H:H")
+    End Select
+    If WorksheetFunction.CountIf(rngCode, strCode) > 0 Then
+        strRow = WorksheetFunction.Match(strCode, rngCode, 0)
+    End If
+    If strRow <> "" Then
+        Code2Row = strRow
+    Else
+        Code2Row = 0
+    End If
+End Function
+
+Public Function GetStrUrl(strCode As String, strPar As String)
+    '取得券商網址
+    Dim intUrl As Integer
+    Dim strUrl As String
+    If strPar = "收盤" And Sheets("SetUp").[C5].Value - Sheets("SetUp").[C6].Value < 25 Then
+'        intUrl = 9'因鉅享網停止更新舊版網站內容，所以這部份沒用了
+        intUrl = WorksheetFunction.RandBetween(1, 8)
+    ElseIf strPar = "交易日" Then
+        intUrl = 10
+    ElseIf strPar = "當沖" Then
+        intUrl = 11
+    Else
+        intUrl = WorksheetFunction.RandBetween(1, 8)
+    End If
+    Select Case intUrl
+    Case 1
+        strUrl = "http://fubon-ebrokerdj.fbs.com.tw/"
+    Case 2
+        strUrl = "http://justdata.moneydj.com/"
+    Case 3
+        strUrl = "http://jdata.yuanta.com.tw/"
+    Case 4
+        strUrl = "http://moneydj.emega.com.tw/"
+    Case 5
+        strUrl = "http://djfubonholdingfund.fbs.com.tw/"
+    Case 6
+        strUrl = "https://sjmain.esunsec.com.tw/"
+    Case 7
+        strUrl = "http://kgieworld.moneydj.com/"
+    Case 8
+        strUrl = "http://newjust.masterlink.com.tw/"
+    Case 9
+        strUrl = "https://www.cnyes.com/archive/twstock/ps_historyprice/" & strCode & ".htm"
+    Case 10
+        strUrl = "https://www.taifex.com.tw/cht/3/futPrevious30DaysSalesData" '期交所取得最新交易日期
+    Case 11
+        'strUrl = "https://histock.tw/stock/chips.aspx?no=" & strCode & "&m=mg"
+        strUrl = "https://goodinfo.tw/tw/DayTrading.asp?STOCK_ID=" & strCode & "&CHT_CAT=DATE"
+'        strUrl = "https://tv.moneydj.com/Z/ZC/ZC09/ZC09.DJHTM?A=" & strCode & "&C=&POID=E"
+    End Select
+    If strPar = "法人" Then
+        FileDay = Format(Sheets("SetUp").[C7].Value + 1, "YYYY-MM-DD") '這邊改一下，不用-3+4
+        GetStrUrl = strUrl & "z/zc/zcl/zcl.djhtm?a=" & strCode & "&c=" & FileDay - 3 & "&d=" & Format(CDate(Sheets("SetUp").[C5].Value), "YYYY-MM-DD")
+    ElseIf strPar = "資券" Then
+        FileDay = Format(Sheets("SetUp").[C8].Value + 1, "YYYY-MM-DD") '這邊改一下，不用-3+4
+        GetStrUrl = strUrl & "z/zc/zcn/zcn.djhtm?a=" & strCode & "&c=" & FileDay - 3 & "&d=" & Format(CDate(Sheets("SetUp").[C5].Value), "YYYY-MM-DD")
+    ElseIf strPar = "營收" Then '如果是月營收
+        GetStrUrl = strUrl & "z/zc/zch/zch_" & strCode & ".djhtm"
+    ElseIf strPar = "收盤" Or strPar = "交易日" Or strPar = "當沖" Then
+        If intUrl >= 9 Then
+            GetStrUrl = strUrl
+        Else
+            GetStrUrl = strUrl & "z/BCD/czkc1.djbcd?a=" & strCode & "&b=D&c=2880&E=1&ver=5"
+        End If
+    End If
+End Function
+
+Function convertraw(rawdata, char)
+    Dim rawstr
+    Set rawstr = CreateObject("adodb.stream")
+    With rawstr
+        .Type = 1
+        .Mode = 3
+        .Open
+        .Write rawdata
+        .Position = 0
+        .Type = 2
+        .Charset = char
+        convertraw = .ReadText
+        .Close
+    End With
+    Set rawstr = Nothing
+End Function
+
+Public Function FunCheckData(FNameM As String, DBDay As Date)
+    Dim strC As String, strF As String
+    Select Case FNameM
+        Case "CloseSII"
+            strC = "A"
+            strF = "E"
+        Case "CloseOTC"
+            strC = "H"
+            strF = "L"
+        Case "LegalSII"
+            strC = "O"
+            strF = "P"
+        Case "LegalOTC"
+            strC = "AA"
+            strF = "AB"
+        Case "MarginSII"
+            strC = "AM"
+            strF = "AN"
+        Case "MarginOTC"
+            strC = "BC"
+            strF = "BD"
+        Case "DayTradingSII"
+            strC = "BS"
+            strF = "CA"
+        Case "DayTradingOTC"
+            strC = "CJ"
+            strF = "CR"
+        Case "RevenueSII"
+            strC = "DB"
+            strF = "DC"
+        Case "RevenueOTC"
+            strC = "DH"
+            strF = "DI"
+    End Select
+    i = 2
+    If Mid(FNameM, 1, 5) = "Close" Or Mid(FNameM, 1, 5) = "DayTr" Then
+        FileDay = DBDay
+    ElseIf Mid(FNameM, 1, 5) = "Reven" Then
+        FileDay = Format(CStr(DateAdd("m", 1, DBDay - Day(DBDay) + 1)), "yyyy") & "/" & Format(CStr(DateAdd("m", 1, DBDay - Day(DBDay) + 1)), "mm")  '取得下個月月營收日期格式
+        For d = 7 To 54
+            If Mid(Sheets("CheckData").Cells(d, strC), 1, 1) = "1" Then
+                Sheets("CheckData").Cells(d, strC) = Mid(Sheets("CheckData").Cells(d, strC), 1, 3) + 1911 & Mid(Sheets("CheckData").Cells(d, strC), 4, 3) & "/01"
+            End If
+        Next
+    Else
+        FileDay = Year(DBDay) - 1911 & "/" & Month(DBDay) & "/" & Day(DBDay)
+    End If
+    Do While Sheets("CheckData").Cells(i, strC) <> FileDay
+        If i > 500 Then
+            MsgBox ("找不到交易日")
+            End
+        End If
+        i = i + 1
+        cRow = i
+    Loop
+    FunCheckData = Sheets("CheckData").Cells(i, strF)
+End Function
+
+
+Sub AppStop()
+    Application.ScreenUpdating = False '停止畫面更新
+'    Application.DisplayStatusBar = False '暫停更新狀態列
+    Application.EnableEvents = False '暫停事件處理
+    Application.Calculation = xlCalculationManual '暫停公式自動計算
+End Sub
+
+Sub AppStart()
+    Application.ScreenUpdating = True '停止畫面更新
+'    Application.DisplayStatusBar = True ' 恢復狀態列更新
+    Application.EnableEvents = True '恢復事件處理
+    Application.Calculation = xlCalculationAutomatic '恢復公式自動計算
+End Sub
+
+
+
+模組-MergeData
+Sub testnot()
+    Call AllMergeData("Disposal")
+End Sub
+'=====數據清理程式=====
+Sub AllMergeData(strSheets As String)
+    Dim myFileName As String  ' 設定檔案名稱變數
+    Dim strMarket As String '設定市場變數
+    Dim MyFile As Object '設定檔案物件變數
+    Sheets("MergeData").Select     '作用中的工作表轉移到MergeData
+    Columns("B:B").NumberFormatLocal = "@" 'b欄位為文字
+    myFileName = Dir(MyPath("csv") & "*") '取得檔案名稱
+    Do While myFileName <> "" '檔名不為空白
+        If strSheets = "Revenue" Then '如果是月營收
+            FileDay = Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & "01" '取得日期並改格式
+        Else '如果不是月營收
+            FileDay = Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & Mid(myFileName, 7, 2) '取得日期並改格式
+        End If
+        Select Case strSheets
+            Case "Close"
+                DBDay = DateValue(Sheets("SetUp").Cells(6, "C"))
+            Case "Legal"
+                DBDay = DateValue(Sheets("SetUp").Cells(7, "C"))
+            Case "Margin"
+                DBDay = DateValue(Sheets("SetUp").Cells(8, "C"))
+            Case "DayTrading"
+                DBDay = DateValue(Sheets("SetUp").Cells(9, "C"))
+            Case "Revenue"
+                DBDay = DateValue(Sheets("SetUp").Cells(18, "C"))
+            Case "Notice"
+                DBDay = DateValue(Sheets("SetUp").Cells(10, "C"))
+            Case "Disposal"
+                DBDay = DateValue(Sheets("SetUp").Cells(11, "C"))
+        End Select
+        Application.StatusBar = "目前進度:" & myFileName '顯示進度
+        DoEvents '回應使用者操作事件
+        If strSheets = "Revenue" And DateValue(FileDay) > DateValue(DBDay) And DateValue(FileDay) <= DateValue(Sheets("SetUp").Cells(17, "C")) Then GoTo startRevenue '跳到開始處理月營收資料
+        If Right(myFileName, 3) = "csv" And Mid(myFileName, 9, 5) = Mid(strSheets, 1, 5) And DateValue(FileDay) > DateValue(DBDay) And DateValue(FileDay) <= DateValue(Sheets("SetUp").Cells(5, "C")) Then ' 判斷檔案格式及日期
+startRevenue: '開始處理月營收資料
+            strMarket = Mid(Right(myFileName, 7), 1, 3) '取得市場別
+            With ActiveSheet.QueryTables.Add("TEXT;" & MyPath("csv") & myFileName, Sheets("MergeData").[$T$1])
+                .TextFileParseType = xlDelimited '文件解析類型為使用分隔符分割
+                If strSheets = "Revenue" Then .TextFilePlatform = 65001 'UTF-8
+                .TextFileTabDelimiter = False '取消tab鍵
+                .TextFileCommaDelimiter = True '使用","
+                .Refresh BackgroundQuery:=False '是否背景執行
+                Sheets("MergeData").Range("S1") = FileDay '輸入FileDay給處理資料的程式使用
+                Call SheetsMarket(strSheets & strMarket)
+                .ResultRange.Clear '把處理好的資料刪掉
+                .Delete '把連線及名稱刪掉
+                Sheets("MergeData").Range("S1").ClearContents '刪掉FileDay
+            End With
+            '移動處理好的csv
+            Set MyFile = CreateObject("Scripting.FileSystemObject")
+            MyFile.MoveFile MyPath("csv") & myFileName, MyPath("csv") & strSheets & "\"
+            Set MyFile = Nothing
+        End If
+        myFileName = Dir '取得下一個檔名
+        If strSheets = "Revenue" And myFileName <> "" Then '如果還有月營收檔案
+            FileDay = Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & "01" '取得日期並改格式
+            GoTo startRevenue '繼續處理資料
+        ElseIf strSheets = "Revenue" And myFileName = "" Then '如果是最後一個月營收檔案
+            GoTo RevenueUpDB '把處理好的資料上傳資料庫
+        End If
+        If FileDay <> Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & Mid(myFileName, 7, 2) And DateValue(FileDay) > DateValue(DBDay) And DateValue(FileDay) <= DateValue(Sheets("SetUp").Cells(5, "C")) Then  '如果下一個檔名的日期<>FileDay，就開始處理整理好的資料
+RevenueUpDB: '把處理好的資料上傳資料庫
+            Call InputTitle(strSheets) '輸入Title
+            StartRow = Sheets("MergeData").[A1048576].End(xlUp).Row '取得最後一列
+            strColumn = Sheets("MergeData").[A1].End(xlToRight).Column  '取得最後一欄
+            EndRow = Sheets("MergeData").Cells(1, CInt(strColumn) - 1).End(xlDown).Row '取得最後一欄的最後一列，檢查用
+            If strSheets = "Disposal" And StartRow = 1 Then '如果當天沒資料
+                Sheets("SetUp").Select     '作用中的工作表轉移到SetUp
+                End '就結束程式
+            End If
+            If StartRow = EndRow Then
+                Sheets.Add After:=Sheets(Sheets.Count)  ' 新增最後1張工作表
+                Sheets(Sheets.Count).Select       ' 選取最後一張工作表
+                Sheets(Sheets.Count).Name = strSheets '工作表改名
+                Columns("B:B").NumberFormatLocal = "@" 'b欄位為文字
+                Columns("A:A").NumberFormatLocal = "yyyy-MM-dd" '設定為這個格式，日期才能正確排序
+                Sheets(strSheets).[A1].Resize(StartRow, strColumn).Value = Sheets("MergeData").[A1].Resize(StartRow, strColumn).Value '把整理好的資料移到新的工作表
+                Sheets(strSheets).Move '移動工作表至新的活頁簿
+                '另存為csv_UTF8格式，但副檔名要改成txt，這樣子股票代號才會完整，而且中文股名才會顯示出來
+                ActiveWorkbook.SaveAs Filename:="" & MyPath("SQLite") & "All" & strSheets & ".txt", _
+                    FileFormat:=xlCSVUTF8, CreateBackup:=False
+                ActiveWindow.Close '關掉作用中的活頁簿
+                Sheets("MergeData").Select '作用中的工作表轉移到MergeData
+                Cells.Select '全選工作表
+                Selection.Delete Shift:=xlUp '刪除(不能用ClearContents，有時會留下""資料欄位)
+                '上傳資料庫
+                fS = FileLen(MyPath("Data") & "Stock.db")  '取得db的容量
+                Script = Shell(MyPath("SQLite") & "SQLite.bat " & MyPath("Data") & "stock.db " & strSheets, 0)  '上傳資料庫
+                ss = 1
+                If strSheets <> "Disposal" Then '因處置資料量少，所以跳過不檢查(或是改成檢查日期，這部份再想想)
+                    Do While FileLen(MyPath("Data") & "Stock.db") = fS
+                        '如果容量沒改變，代表還沒上傳完成，所以等待1秒再判斷容量是否改變了
+                        Application.Wait (Now + TimeValue("0:00:01"))  '設定等待秒數
+                        ss = ss + 1
+                        If ss = 5 Then MsgBox "ERROR"
+                        DoEvents '回應使用者操作事件
+                    Loop
+                End If
+                If strSheets = "Close" Then Sheets("SetUp").Cells(6, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Legal" Then Sheets("SetUp").Cells(7, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Margin" Then Sheets("SetUp").Cells(8, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "DayTrading" Then Sheets("SetUp").Cells(9, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Notice" Then Sheets("SetUp").Cells(10, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Disposal" Then
+                    Sheets("SetUp").Cells(11, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                    Application.Wait (Now + TimeValue("0:00:01"))  '設定等待秒數，如果是處置資料，這邊要等一秒，資料才會完整
+                End If
+                If strSheets = "Close" Then Sheets("TradingDay").[A1048576].End(xlUp).Offset(1, 0).Value = FileDay '更新交易日日期(改成只有close要做)
+                Kill MyPath("SQLite") & "All" & strSheets & ".txt" '如果a15的值等於空白就刪掉剛剛的檔案"
+                If strSheets = "Close" Then Call GetYesterDayData '取得最新資料庫日期的資料
+            Else
+                MsgBox ("資料有缺，請檢查原始資料")
+                End
+            End If
+        End If
+    Loop
+    Sheets("SetUp").Select     '作用中的工作表轉移到SetUp
+End Sub
+
+'=====判斷資料及市場、檢查標題=====
+
+'判斷資料及市場並呼叫資料清理程式
+Sub SheetsMarket(strSheetsMarket As String)
+    Select Case strSheetsMarket
+        Case "CloseSII"
+            CloseSIIMerge
+        Case "CloseOTC"
+            CloseOTCMerge
+        Case "MarginSII"
+            MarginSIIMerge
+        Case "MarginOTC"
+            MarginOTCMerge
+        Case "LegalSII"
+            LegalSIIMerge
+        Case "LegalOTC"
+            LegalOTCMerge
+        Case "DayTradingSII", "DayTradingOTC"
+            DayTradingMerge
+        Case "RevenueSII", "RevenueOTC"
+            RevenueMerge
+        Case "NoticeSII"
+            NoticeSIIMerge
+        Case "NoticeOTC"
+            NoticeOTCMerge
+        Case "DisposalSII"
+            DisposalSIIMerge
+        Case "DisposalOTC"
+            DisposalOTCMerge
+    End Select
+End Sub
+
+'檢查Csv的標題是否正確
+Sub CheckCsvTitle(strSheetsMarket As String, StartRow As Integer, FileDay As Date)
+    Dim Ref
+    Dim strRef As String
+    Select Case strSheetsMarket
+        Case "CloseSII"
+            Ref = Array("證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價", "最高價", "最低價", "收盤價")
+        Case "CloseOTC"
+            Ref = Array("代號", "名稱", "收盤", "漲跌", "開盤", "最高", "最低", "均價", "成交股數", "成交金額(元)", "成交筆數")
+        Case "LegalSII"
+            If FileDay >= DateValue("2017/12/18") Then
+                Ref = Array("證券代號", "證券名稱", "外陸資買進股數(不含外資自營商)", "外陸資賣出股數(不含外資自營商)", "外陸資買賣超股數(不含外資自營商)", "外資自營商買進股數", "外資自營商賣出股數", "外資自營商買賣超股數", "投信買進股數", "投信賣出股數", "投信買賣超股數", "自營商買賣超股數", "自營商買進股數(自行買賣)", "自營商賣出股數(自行買賣)", "自營商買賣超股數(自行買賣)", "自營商買進股數(避險)", "自營商賣出股數(避險)", "自營商買賣超股數(避險)", "三大法人買賣超股數")
+            ElseIf FileDay >= DateValue("2014/12/01") Then
+                Ref = Array("證券代號", "證券名稱", "外資買進股數", "外資賣出股數", "外資買賣超股數", "投信買進股數", "投信賣出股數", "投信買賣超股數", "自營商買賣超股數", "自營商買進股數(自行買賣)", "自營商賣出股數(自行買賣)", "自營商買賣超股數(自行買賣)", "自營商買進股數(避險)", "自營商賣出股數(避險)", "自營商買賣超股數(避險)", "三大法人買賣超股數")
+            ElseIf FileDay < DateValue("2014/12/01") Then
+                Ref = Array("證券代號", "證券名稱", "外資買進股數", "外資賣出股數", "外資買賣超股數", "投信買進股數", "投信賣出股數", "投信買賣超股數", "自營商買賣超股數", "自營商買進股數", "自營商賣出股數", "三大法人買賣超股數")
+            End If
+        Case "LegalOTC"
+            If FileDay >= DateValue("2018/01/15") Then
+                Ref = Array("代號", "名稱", "外資及陸資(不含外資自營商)-買進股數", "外資及陸資(不含外資自營商)-賣出股數", "外資及陸資(不含外資自營商)-買賣超股數", "外資自營商-買進股數", "外資自營商-賣出股數", "外資自營商-買賣超股數", "外資及陸資-買進股數", "外資及陸資-賣出股數", "外資及陸資-買賣超股數", "投信-買進股數", "投信-賣出股數", "投信-買賣超股數", "自營商(自行買賣)-買進股數", "自營商(自行買賣)-賣出股數", "自營商(自行買賣)-買賣超股數", "自營商(避險)-買進股數", "自營商(避險)-賣出股數", "自營商(避險)-買賣超股數", "自營商-買進股數", "自營商-賣出股數", "自營商-買賣超股數", "三大法人買賣超股數合計")
+            ElseIf FileDay >= DateValue("2014/12/01") Then
+                Ref = Array("代號", "名稱", "外資及陸資買股數", "外資及陸資賣股數", "外資及陸資淨買股數", "投信買進股數", "投信賣股數", "投信淨買股數", "自營淨買股數", "自營商(自行買賣)買股數", "自營商(自行買賣)賣股數", "自營商(自行買賣)淨買股數", "自營商(避險)買股數", "自營商(避險)賣股數", "自營商(避險)淨買股數", "三大法人買賣超股數")
+            ElseIf FileDay < DateValue("2014/12/01") Then
+                Ref = Array("代號", "名稱", "外資及陸資買股數", "外資及陸資賣股數", "外資及陸資淨買股數", "投信買進股數", "投信賣股數", "投信淨買股數", "自營商買股數", "自營商賣股數", "自營淨買股數", "三大法人買賣超股數")
+            End If
+        Case "MarginOTC"
+            Ref = Array("代號", "名稱", "前資餘額(張)", "資買", "資賣", "現償", "資餘額", "資屬證金", "資使用率(%)", "資限額", "前券餘額(張)", "券賣", "券買", "券償", "券餘額", "券屬證金", "券使用率(%)", "券限額", "資券相抵(張)", "備註")
+        Case "MarginSII"
+            Ref = Array("股票代號", "股票名稱", "買進", "賣出", "現金償還", "前日餘額", "今日餘額", "限額", "買進", "賣出", "現券償還", "前日餘額", "今日餘額", "限額", "資券互抵", "註記")
+        Case "DayTrading"
+            Ref = Array("證券代號", "證券名稱", "暫停現股賣出後現款買進當沖註記", "當日沖銷交易成交股數", "當日沖銷交易買進成交金額", "當日沖銷交易賣出成交金額")
+        Case "Revenue"
+            Ref = Array("出表日期", "資料年月", "公司代號", "公司名稱", "產業別", "營業收入-當月營收", "營業收入-上月營收", "營業收入-去年當月營收", "營業收入-上月比較增減(%)", "營業收入-去年同月增減(%)", "累計營業收入-當月累計營收", "累計營業收入-去年累計營收", "累計營業收入-前期比較增減(%)", "備註")
+        Case "NoticeSII"
+            Ref = Array("編號", "證券代號", "證券名稱", "累計次數", "注意交易資訊", "日期", "收盤價", "本益比")
+        Case "NoticeOTC"
+            Ref = Array("編號", "證券代號", "證券名稱", "注意交易資訊", "公告日期", "收盤價", "本益比")
+        Case "DisposalSII"
+            Ref = Array("編號", "公布日期", "證券代號", "證券名稱", "累計", "處置條件", "處置起迄時間", "處置措施", "處置內容")
+        Case "DisposalOTC"
+            Ref = Array("編號", "公布日期", "證券代號", "證券名稱", "處置起訖時間", "處置原因", "處置內容")
+    End Select
+    For T = 0 To UBound(Ref) '用For迴圈去跑陣列中字串
+        strRef = Ref(T) '取出當下迴圈的字串
+        If Trim(Sheets("MergeData").Cells(StartRow, T + 20)) <> strRef Then
+            MsgBox ("'" & Sheets("MergeData").Cells(StartRow, T + 20) & "' 欄位有誤，請檢查欄位格式是否改版")
+            End
+        End If
+    Next
+End Sub
+
+'輸入標題
+Sub InputTitle(strSheets As String)
+    Dim Ref
+    Dim strRef As String
+        Select Case strSheets
+        Case "Close"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "開盤價", "最高價", "最低價", "收盤價", "成交股數", "成交金額", "成交筆數")
+        Case "Legal"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "外陸資買進", "外陸資賣出", "外陸資買賣超", "外資自營商買進", "外資自營商賣出", "外資自營商買賣超", "投信買進", "投信賣出", "投信買賣超", "自營商買進", "自營商賣出", "自營商買賣超", "自營商避險買進", "自營商避險賣出", "自營商避險買賣超")
+        Case "Margin"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "融資買進", "融資賣出", "融資現償", "前資餘額", "融資餘額", "融資限額", "融券買進", "融券賣出", "融券現償", "前券餘額", "融券餘額", "融券限額", "資券互抵", "註記")
+        Case "DayTrading"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "當沖註記", "當沖股數", "當沖買進", "當沖賣出")
+        Case "Revenue"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "產業別", "當月營收", "備註")
+        Case "Notice"
+            Ref = Array("公告日期", "證券代號", "證券名稱", "市場別", "注意資訊")
+        Case "Disposal"
+            Ref = Array("公告日期", "證券代號", "證券名稱", "市場別", "起始日", "結束日", "處置原因", "處置方式", "處置內容")
+    End Select
+    For T = 0 To UBound(Ref) '用For迴圈去跑陣列中字串
+        strRef = Ref(T) '取出當下迴圈的字串
+        Sheets("MergeData").Cells(1, T + 1) = strRef
+    Next
+End Sub
+
+'=====資料清理格式=====
+'月營收
+Sub RevenueMerge()
+        '選取範圍並復制到B欄
+        StartRow = Evaluate("MATCH(""出表日期"",T:T,0)+1")
+        EndRow = [W1048576].End(xlUp).Row
+        strColumn = Sheets("MergeData").Cells(StartRow - 1, "T").End(xlToRight).Column - 2 '取得最後一欄
+        Call CheckCsvTitle("Revenue", StartRow - 1, CDate(Sheets("MergeData").[S1].Value)) '檢查Title
+        C = EndRow - StartRow
+        m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+        e = m + C
+        Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+        Range("B" & m & ":E" & e).Value = Range("V" & StartRow & ":Y" & EndRow).Value '代號、名稱、產業別、當月營收
+        Range("F" & m & ":F" & e).Value = Range("AG" & StartRow & ":AG" & EndRow).Value '備註
+        For i = m To e
+            Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+            Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+        Next
+End Sub
+
+'日當沖
+Sub DayTradingMerge()
+        '選取範圍並復制到B欄
+        StartRow = Evaluate("MATCH(""證券代號"",T:T,0)+1")
+        EndRow = [W1048576].End(xlUp).Row
+        strColumn = Sheets("MergeData").Cells(StartRow - 1, "T").End(xlToRight).Column - 19 '取得最後一欄
+        Call CheckCsvTitle("DayTrading", StartRow - 1, CDate(Sheets("MergeData").[S1].Value)) '檢查Title
+        C = EndRow - StartRow
+        m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+        e = m + C
+        Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+        '<= 2014/06/27 otc少一欄，>=2014/06/30都一樣，要處理一下
+        If strColumn = 6 Then
+            Range("B" & m & ":G" & e).Value = Range("T" & StartRow & ":Y" & EndRow).Value '所有資料
+        Else
+            Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '所有資料
+            Range("E" & m & ":G" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '所有資料
+        End If
+        For i = m To e
+            Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+            Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+        Next
+End Sub
+
+'上市收盤
+Sub CloseSIIMerge()
+    StartRow = Evaluate("MATCH(""證券代號"",T:T,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("CloseSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    For Z = StartRow To EndRow
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = Trim(CStr(Sheets("MergeData").Cells(Z, "T").Text)) '股票代號
+        strCode = Cells(Z, "T").Text '股票代號變數
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(Z, "U").Text) '股票名
+        cRow = Code2Row(strCode, "Close")
+        If Cells(Z, "Y").Value = "--" Then
+            If cRow > 0 Then
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+            ElseIf cRow = 0 Then
+                Call GetLastClose(Cells(Z, "T").Text)
+                If Sheets("TradingDay").Cells(2, "AC").Value <> 0 Then
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("TradingDay").Cells(2, "AC").ClearContents
+                Else
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = 0
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = 0
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = 0
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = 0
+                    Sheets("TradingDay").Cells(2, "AC").ClearContents
+                End If
+            End If
+        Else
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Cells(Z, "Y").Value * 100
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Cells(Z, "Z").Value * 100
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Cells(Z, "AA").Value * 100
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Cells(Z, "AB").Value * 100
+        End If
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Value = Cells(Z, "V").Value
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 8).Value = Cells(Z, "X").Value
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 9).Value = Cells(Z, "W").Value
+    Next
+End Sub
+
+'上櫃收盤
+Sub CloseOTCMerge()
+    StartRow = Evaluate("MATCH(""代號"",T:T,0)+1")
+    EndRow = [X1048576].End(xlUp).Row
+    Call CheckCsvTitle("CloseOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    For Z = StartRow To EndRow
+        If Sheets("MergeData").Cells(Z, "U") <> "" And Sheets("MergeData").Cells(Z, "U") <> "名稱" Then '去掉管理股票及空欄
+            If Mid(Sheets("MergeData").Cells(Z, "T"), 1, 1) = "7" And Len(Sheets("MergeData").Cells(Z, "T")) > 4 Then  '找出權證以外的標的
+'                Debug.Print Sheets("MergeData").Cells(Z, "T")
+            Else
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+                strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(Z, "T").Text)) '股票代號變數
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(Z, "U").Text) '股票名
+                cRow = Code2Row(strCode, "Close")
+                If Cells(Z, "Z") = 0 Or Cells(Z, "Z") = "----" Or Cells(Z, "Z") = "---" Then '如果沒交易或沒數據
+                    If cRow > 0 Then '如果昨日有資料，取得昨日資料
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                    ElseIf cRow = 0 Then '如果昨日沒資料
+                        Call GetLastClose(Cells(Z, "T").Text) '呼叫資料庫取得個股最後交易日資料
+                        If Sheets("TradingDay").Cells(2, "AC").Value <> 0 Then '如果之前有資料
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("TradingDay").Cells(2, "AC").ClearContents
+                        Else '如果沒資料=0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = 0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = 0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = 0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = 0
+                            Sheets("TradingDay").Cells(2, "AC").ClearContents
+                        End If
+                    End If
+                Else
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("MergeData").Cells(Z, "X").Value * 100
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("MergeData").Cells(Z, "Y").Value * 100
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("MergeData").Cells(Z, "Z").Value * 100
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("MergeData").Cells(Z, "V").Value * 100
+                End If
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Resize(1, 3).Value = Sheets("MergeData").Cells(Z, "AB").Resize(1, 3).Value
+            End If
+        End If
+    Next
+End Sub
+
+'上櫃資券
+Sub MarginOTCMerge()
+    StartRow = Evaluate("MATCH(""代號"",T:T,0)+1")
+    '取得列號 strC = Evaluate("MATCH("" 資限額"",T3:AM3,0)")
+    EndRow = [AK1048576].End(xlUp).Row
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    Call CheckCsvTitle("MarginOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '代號股名
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+    Next
+    Range("D" & m & ":F" & e).Value = Range("W" & StartRow & ":Y" & EndRow).Value '融資買進, 融資賣出, 融資現償
+    Range("G" & m & ":G" & e).Value = Range("V" & StartRow & ":V" & EndRow).Value '前資餘額
+    Range("H" & m & ":H" & e).Value = Range("Z" & StartRow & ":Z" & EndRow).Value '融資餘額
+    Range("I" & m & ":I" & e).Value = Range("AC" & StartRow & ":AC" & EndRow).Value '融資限額
+    Range("J" & m & ":J" & e).Value = Range("AF" & StartRow & ":AF" & EndRow).Value '融券買進
+    Range("K" & m & ":K" & e).Value = Range("AE" & StartRow & ":AE" & EndRow).Value '融券賣出
+    Range("L" & m & ":L" & e).Value = Range("AG" & StartRow & ":AG" & EndRow).Value '融券現償
+    Range("M" & m & ":M" & e).Value = Range("AD" & StartRow & ":AD" & EndRow).Value '前券餘額
+    Range("N" & m & ":N" & e).Value = Range("AH" & StartRow & ":AH" & EndRow).Value '融券餘額
+    Range("O" & m & ":Q" & e).Value = Range("AK" & StartRow & ":AM" & EndRow).Value '融券限額,資券互抵
+    If DateValue(Cells(1, "S")) < DateValue("2008/09/30") Then Range("P" & m & ":P" & e).Value = 0           '資券互抵
+End Sub
+
+'上市資券
+Sub MarginSIIMerge()
+    StartRow = Evaluate("MATCH(""股票代號"",T:T,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("MarginSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    '找出起始例及最後例
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":Q" & e).Value = Range("T" & StartRow & ":AI" & EndRow).Value '所有資料
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = Trim(Sheets("MergeData").Cells(i, "B").Text) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+    Next
+End Sub
+
+'上櫃法人
+Sub LegalOTCMerge()
+    StartRow = Evaluate("MATCH(""代號"",T:T,0)+1")
+    '取得列號 strC = Evaluate("MATCH("" 資限額"",T3:AM3,0)")
+    EndRow = [X1048576].End(xlUp).Row
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    Call CheckCsvTitle("LegalOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '代號股名
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股名空格
+    Next
+'    Range("D" & m & ":R" & e).Value = 0 '先把欄位全部填0
+    If DateValue(Cells(1, "S")) <= DateValue("2014/11/28") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":O" & e).Value = Range("AB" & StartRow & ":AD" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2014/12/01") And DateValue(Cells(1, "S")) <= DateValue("2018/01/12") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":R" & e).Value = Range("AC" & StartRow & ":AH" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2018/01/15") Then
+        Range("D" & m & ":I" & e).Value = Range("V" & StartRow & ":AA" & EndRow).Value '外資買賣超
+        Range("J" & m & ":R" & e).Value = Range("AE" & StartRow & ":AM" & EndRow).Value '投信自營買賣超
+    End If
+End Sub
+
+'上市法人
+Sub LegalSIIMerge()
+    StartRow = Evaluate("MATCH(""證券代號"",T:T,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("LegalSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    '找出起始例及最後例
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '代號股名
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股名空格
+    Next
+'    Range("D" & m & ":R" & e).Value = 0 '先把欄位全部填0
+    If DateValue(Cells(1, "S")) <= DateValue("2014/11/28") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":O" & e).Value = Range("AB" & StartRow & ":AD" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2014/12/01") And DateValue(Cells(1, "S")) <= DateValue("2017/12/15") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":R" & e).Value = Range("AC" & StartRow & ":AH" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2017/12/18") Then
+        Range("D" & m & ":L" & e).Value = Range("V" & StartRow & ":AD" & EndRow).Value '外資投信買賣超
+        Range("M" & m & ":R" & e).Value = Range("AF" & StartRow & ":AK" & EndRow).Value '自營買賣超
+    End If
+End Sub
+
+'上市注意股
+Sub NoticeSIIMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    Dim dateStr As String
+    StartRow = Evaluate("MATCH(""證券代號"",U:U,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("NoticeSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(10, "C"))
+    For i = StartRow To EndRow
+        dateStr = Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/")
+        If IsDate(dateStr) Then
+            tDay = Year(CDate(dateStr)) + 1911 & "/" & Month(CDate(dateStr)) & "/" & Day(CDate(dateStr))
+        Else
+            If Sheets("MergeData").Cells(i, "AC") = "" Then
+                Sheets("MergeData").Cells(i, "X").Value = Replace(Sheets("MergeData").Cells(i, "X").Value, "=""", "")
+                Sheets("MergeData").Cells(i, "Y").Value = Replace(Sheets("MergeData").Cells(i, "Y").Value, """", "")
+                Sheets("MergeData").Cells(i, "X").Value = Sheets("MergeData").Cells(i, "X").Value & Sheets("MergeData").Cells(i, "Y").Value
+                Sheets("MergeData").Cells(i, "Y").Delete Shift:=xlShiftToLeft
+            Else
+                Sheets("MergeData").Cells(i, "X").Value = Replace(Sheets("MergeData").Cells(i, "X").Value, "=""", "")
+                Sheets("MergeData").Cells(i, "Z").Value = Replace(Sheets("MergeData").Cells(i, "Z").Value, """", "")
+                Sheets("MergeData").Cells(i, "X").Value = Sheets("MergeData").Cells(i, "X").Value & Sheets("MergeData").Cells(i, "Y").Value & Sheets("MergeData").Cells(i, "Z").Value
+                Sheets("MergeData").Cells(i, "Y").Delete Shift:=xlShiftToLeft
+                Sheets("MergeData").Cells(i, "Y").Delete Shift:=xlShiftToLeft
+            End If
+        ' 處理日期格式錯誤的情況，例如顯示錯誤訊息或者呼叫另外一個子程式
+            
+            ' ...
+'            GoTo NextIteration
+        End If
+        'tDay = Year(CDate(Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/"))) + 1911 & "/" & Month(CDate(Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/"))) & "/" & Day(CDate(Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "U").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "U").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "V").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上市"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("MergeData").Cells(i, "X").Text '注意資訊
+'            NoticeArrers = Split(Replace(Replace(Replace(Sheets("MergeData").Cells(i, "X"), "﹞。", "-"), "﹞", "-"), "-", ")-"), "-")
+'            strNotice = ""
+'            For Each NoticeArrer In NoticeArrers
+'                Select Case Right(NoticeArrer, 4)
+'                    Case "第一款)"
+'                        If InStr(NoticeArrer, "價差達") > 0 Then '如果有達到價差條件
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 3, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        End If
+'                    Case "第二款)"
+'                        strNotice = strNotice & "<第二款>" & Replace(Replace(Replace(Replace(Replace(Replace(NoticeArrer, "最近", ""), "個營業日起迄兩個營業", ""), "之收盤價", ""), "。", ""), "﹝第二款)", ""), "%", "%，")
+'                        strNotice = Mid(strNotice, 1, Len(strNotice) - 1)
+'                    Case "第三款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第三款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量之") + 2, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量之") + 1)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第三款>當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量之") + 2, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量之") + 1)) & "，"
+'                        End If
+'                    Case "第四款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第四款>" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率為") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率為") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第四款>週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率為") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率為") + 2)) & "，"
+'                        End If
+'                    Case "第五款)"
+'                        strNotice = strNotice & "<第五款>，"
+'                    Case "第六款)"
+'                        strNotice = strNotice & "<第六款>，"
+'                    Case "第七款)"
+'                        strNotice = strNotice & "<第七款>，"
+'                    Case "第八款)"
+'                        strNotice = strNotice & "<第八款>，"
+'                    Case "第九款)"
+'                        strNotice = strNotice & "<第九款>均量" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "倍") - InStr(NoticeArrer, "為")) & "，日量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "第十款)"
+'                        strNotice = strNotice & "<第十款>6日週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "為")) & "，當日週轉率" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "十一款)"
+'                        strNotice = strNotice & "<第十一款>價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 6, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 5)) & "，"
+'                    Case "十二款)"
+'                        strNotice = strNotice & "<第十二款>六日借券佔" & Mid(NoticeArrer, InStr(NoticeArrer, "率") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "率")) & "，當日借券量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "十三款)"
+'                        strNotice = strNotice & "<第十三款>六日當沖佔" & Mid(NoticeArrer, InStr(NoticeArrer, "率") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "率")) & "，當日當沖量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "率") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "率")) & "，"
+'                End Select
+'            Next
+'            strNotice = Replace(strNotice, "達", "")
+'            strNotice = Mid(strNotice, 1, Len(strNotice) - 1)
+'            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = strNotice '注意條款
+        End If
+    Next
+
+End Sub
+'上櫃注意股
+Sub NoticeOTCMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    StartRow = Evaluate("MATCH(""證券代號"",U:U,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("NoticeOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(10, "C"))
+    For i = StartRow To EndRow
+        tDay = Year(CDate(Cells(i, "X"))) + 1911 & "/" & Month(CDate(Cells(i, "X"))) & "/" & Day(CDate(Cells(i, "X")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "U").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "U").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "V").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上櫃"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("MergeData").Cells(i, "W").Text '注意資訊
+'            NoticeArrers = Split(Sheets("MergeData").Cells(i, "W"), "<br>") '用<br>切割到陣列
+'            fS = 0 '第二款計次
+'            strNotice = ""
+'            For Each NoticeArrer In NoticeArrers
+'                Select Case Right(NoticeArrer, 4)
+'                    Case "第一款)"
+'                        If InStr(NoticeArrer, "價差達") > 0 Then '如果有達到價差條件
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 6, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 5)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        End If
+'                    Case "第二款)"
+'                        notice2 = strNotice & (Len(Sheets("MergeData").Cells(i, "W")) - Len(Replace(Sheets("MergeData").Cells(i, "W"), "第二款", ""))) / 3 '計算次數
+'                        fS = fS + 1
+'                        If fS = 1 Then
+'                            strNotice = strNotice & "<第二款>" & Mid(NoticeArrer, 3, 2) & "日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        ElseIf fS < notice2 Then
+'                            strNotice = strNotice & Mid(NoticeArrer, 3, 2) & "日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        ElseIf fS = notice2 Then
+'                            strNotice = strNotice & Mid(NoticeArrer, 3, 2) & "日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        End If
+'                    Case "第三款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第三款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量放大") + 3, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量放大") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第三款>當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量放大") + 3, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量放大") + 2)) & "，"
+'                        End If
+'                    Case "第四款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第四款>" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率達") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率達") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第四款>週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率達") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率達") + 2)) & "，"
+'                        End If
+'                    Case "第五款)"
+'                        strNotice = strNotice & "<第五款>，"
+'                    Case "第六款)"
+'                        strNotice = strNotice & "<第六款>，"
+'                    Case "第七款)"
+'                        strNotice = strNotice & "<第七款>，"
+'                    Case "第八款)"
+'                        strNotice = strNotice & "<第八款>，"
+'                    Case "第九款)"
+'                        strNotice = strNotice & "<第九款>均量" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "倍") - InStr(NoticeArrer, "為")) & "，日量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "第十款)"
+'                        strNotice = strNotice & "<第十款>6日週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "為")) & "，當日週轉率" & Mid(NoticeArrer, InStrRev(NoticeArrer, "達") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "達")) & "，"
+'                    Case "十一款)"
+'                        strNotice = strNotice & "<第十一款>價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 6, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 5)) & "，"
+'                    Case "十二款)"
+'                        strNotice = strNotice & "<第十二款>六日借券佔" & Mid(NoticeArrer, InStr(NoticeArrer, "達") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "達")) & "，當日借券量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "十三款)"
+'                        strNotice = strNotice & "<第十三款>六日當沖佔" & Mid(NoticeArrer, InStr(NoticeArrer, "達") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "達")) & "，當日當沖量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "達") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "達")) & "，"
+'                End Select
+'            Next
+'            strNotice = Replace(strNotice, "達", "")
+'            strNotice = Mid(strNotice, 1, Len(strNotice) - 1)
+'            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = strNotice '注意條款
+        End If
+    Next
+End Sub
+
+'上市處置
+Sub DisposalSIIMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    StartRow = Evaluate("MATCH(""證券代號"",V:V,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("DisposalSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(11, "C"))
+    For i = StartRow To EndRow
+        tDay = Year(CDate(Cells(i, "U"))) + 1911 & "/" & Month(CDate(Cells(i, "U"))) & "/" & Day(CDate(Cells(i, "U")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "V").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "V").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "W").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上市"
+            '起始日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "Z").Text, 1, InStr(Sheets("MergeData").Cells(i, "Z").Text, "~") - 1)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = otcDate
+            '結束日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "Z").Text, InStr(Sheets("MergeData").Cells(i, "Z").Text, "~") + 1, 9)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = otcDate
+            '處置原因
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Trim(Sheets("MergeData").Cells(i, "Y").Text) '處置原因
+            '處置方式
+            strNotice = Mid(Sheets("MergeData").Cells(i + 3, "T").Text, InStr(Sheets("MergeData").Cells(i + 3, "T").Text, "撮合作業（約每") + 6, InStr(Sheets("MergeData").Cells(i + 3, "T").Text, "分鐘撮合一次") - InStr(Sheets("MergeData").Cells(i + 3, "T").Text, "撮合作業（約每"))
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Value = strNotice
+            '處置內容
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 8).Value = Sheets("MergeData").Cells(i, "AB").Text
+        End If
+    Next
+End Sub
+
+'上櫃處置
+Sub DisposalOTCMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    StartRow = Evaluate("MATCH(""證券代號"",V:V,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("DisposalOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(12, "C"))
+    For i = StartRow To EndRow
+        tDay = Year(CDate(Cells(i, "U"))) + 1911 & "/" & Month(CDate(Cells(i, "U"))) & "/" & Day(CDate(Cells(i, "U")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "V").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "V").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "W").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上櫃"
+            '起始日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "X").Text, 1, InStr(Sheets("MergeData").Cells(i, "X").Text, "~") - 1)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = otcDate
+            '結束日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "X").Text, InStr(Sheets("MergeData").Cells(i, "X").Text, "~") + 1, 9)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = otcDate
+            '處置原因
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Trim(Sheets("MergeData").Cells(i, "Y").Text) '處置原因
+            '處置方式
+            strNotice = Mid(Sheets("MergeData").Cells(i, "Z").Text, InStr(Sheets("MergeData").Cells(i, "Z").Text, "撮合作業(約每") + 6, InStr(Sheets("MergeData").Cells(i, "Z").Text, "分鐘撮合一次") - InStr(Sheets("MergeData").Cells(i, "Z").Text, "撮合作業(約每"))
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Value = strNotice
+            '處置內容
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 8).Value = Sheets("MergeData").Cells(i, "Z").Text
+        End If
+    Next
+End Sub
+
+
+
+
+模組-Spider
+Sub testnot()
+    Call AllMergeData("Disposal")
+End Sub
+'=====數據清理程式=====
+Sub AllMergeData(strSheets As String)
+    Dim myFileName As String  ' 設定檔案名稱變數
+    Dim strMarket As String '設定市場變數
+    Dim MyFile As Object '設定檔案物件變數
+    Sheets("MergeData").Select     '作用中的工作表轉移到MergeData
+    Columns("B:B").NumberFormatLocal = "@" 'b欄位為文字
+    myFileName = Dir(MyPath("csv") & "*") '取得檔案名稱
+    Do While myFileName <> "" '檔名不為空白
+        If strSheets = "Revenue" Then '如果是月營收
+            FileDay = Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & "01" '取得日期並改格式
+        Else '如果不是月營收
+            FileDay = Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & Mid(myFileName, 7, 2) '取得日期並改格式
+        End If
+        Select Case strSheets
+            Case "Close"
+                DBDay = DateValue(Sheets("SetUp").Cells(6, "C"))
+            Case "Legal"
+                DBDay = DateValue(Sheets("SetUp").Cells(7, "C"))
+            Case "Margin"
+                DBDay = DateValue(Sheets("SetUp").Cells(8, "C"))
+            Case "DayTrading"
+                DBDay = DateValue(Sheets("SetUp").Cells(9, "C"))
+            Case "Revenue"
+                DBDay = DateValue(Sheets("SetUp").Cells(18, "C"))
+            Case "Notice"
+                DBDay = DateValue(Sheets("SetUp").Cells(10, "C"))
+            Case "Disposal"
+                DBDay = DateValue(Sheets("SetUp").Cells(11, "C"))
+        End Select
+        Application.StatusBar = "目前進度:" & myFileName '顯示進度
+        DoEvents '回應使用者操作事件
+        If strSheets = "Revenue" And DateValue(FileDay) > DateValue(DBDay) And DateValue(FileDay) <= DateValue(Sheets("SetUp").Cells(17, "C")) Then GoTo startRevenue '跳到開始處理月營收資料
+        If Right(myFileName, 3) = "csv" And Mid(myFileName, 9, 5) = Mid(strSheets, 1, 5) And DateValue(FileDay) > DateValue(DBDay) And DateValue(FileDay) <= DateValue(Sheets("SetUp").Cells(5, "C")) Then ' 判斷檔案格式及日期
+startRevenue: '開始處理月營收資料
+            strMarket = Mid(Right(myFileName, 7), 1, 3) '取得市場別
+            With ActiveSheet.QueryTables.Add("TEXT;" & MyPath("csv") & myFileName, Sheets("MergeData").[$T$1])
+                .TextFileParseType = xlDelimited '文件解析類型為使用分隔符分割
+                If strSheets = "Revenue" Then .TextFilePlatform = 65001 'UTF-8
+                .TextFileTabDelimiter = False '取消tab鍵
+                .TextFileCommaDelimiter = True '使用","
+                .Refresh BackgroundQuery:=False '是否背景執行
+                Sheets("MergeData").Range("S1") = FileDay '輸入FileDay給處理資料的程式使用
+                Call SheetsMarket(strSheets & strMarket)
+                .ResultRange.Clear '把處理好的資料刪掉
+                .Delete '把連線及名稱刪掉
+                Sheets("MergeData").Range("S1").ClearContents '刪掉FileDay
+            End With
+            '移動處理好的csv
+            Set MyFile = CreateObject("Scripting.FileSystemObject")
+            MyFile.MoveFile MyPath("csv") & myFileName, MyPath("csv") & strSheets & "\"
+            Set MyFile = Nothing
+        End If
+        myFileName = Dir '取得下一個檔名
+        If strSheets = "Revenue" And myFileName <> "" Then '如果還有月營收檔案
+            FileDay = Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & "01" '取得日期並改格式
+            GoTo startRevenue '繼續處理資料
+        ElseIf strSheets = "Revenue" And myFileName = "" Then '如果是最後一個月營收檔案
+            GoTo RevenueUpDB '把處理好的資料上傳資料庫
+        End If
+        If FileDay <> Mid(myFileName, 1, 4) & "/" & Mid(myFileName, 5, 2) & "/" & Mid(myFileName, 7, 2) And DateValue(FileDay) > DateValue(DBDay) And DateValue(FileDay) <= DateValue(Sheets("SetUp").Cells(5, "C")) Then  '如果下一個檔名的日期<>FileDay，就開始處理整理好的資料
+RevenueUpDB: '把處理好的資料上傳資料庫
+            Call InputTitle(strSheets) '輸入Title
+            StartRow = Sheets("MergeData").[A1048576].End(xlUp).Row '取得最後一列
+            strColumn = Sheets("MergeData").[A1].End(xlToRight).Column  '取得最後一欄
+            EndRow = Sheets("MergeData").Cells(1, CInt(strColumn) - 1).End(xlDown).Row '取得最後一欄的最後一列，檢查用
+            If strSheets = "Disposal" And StartRow = 1 Then '如果當天沒資料
+                Sheets("SetUp").Select     '作用中的工作表轉移到SetUp
+                End '就結束程式
+            End If
+            If StartRow = EndRow Then
+                Sheets.Add After:=Sheets(Sheets.Count)  ' 新增最後1張工作表
+                Sheets(Sheets.Count).Select       ' 選取最後一張工作表
+                Sheets(Sheets.Count).Name = strSheets '工作表改名
+                Columns("B:B").NumberFormatLocal = "@" 'b欄位為文字
+                Columns("A:A").NumberFormatLocal = "yyyy-MM-dd" '設定為這個格式，日期才能正確排序
+                Sheets(strSheets).[A1].Resize(StartRow, strColumn).Value = Sheets("MergeData").[A1].Resize(StartRow, strColumn).Value '把整理好的資料移到新的工作表
+                Sheets(strSheets).Move '移動工作表至新的活頁簿
+                '另存為csv_UTF8格式，但副檔名要改成txt，這樣子股票代號才會完整，而且中文股名才會顯示出來
+                ActiveWorkbook.SaveAs Filename:="" & MyPath("SQLite") & "All" & strSheets & ".txt", _
+                    FileFormat:=xlCSVUTF8, CreateBackup:=False
+                ActiveWindow.Close '關掉作用中的活頁簿
+                Sheets("MergeData").Select '作用中的工作表轉移到MergeData
+                Cells.Select '全選工作表
+                Selection.Delete Shift:=xlUp '刪除(不能用ClearContents，有時會留下""資料欄位)
+                '上傳資料庫
+                fS = FileLen(MyPath("Data") & "Stock.db")  '取得db的容量
+                Script = Shell(MyPath("SQLite") & "SQLite.bat " & MyPath("Data") & "stock.db " & strSheets, 0)  '上傳資料庫
+                ss = 1
+                If strSheets <> "Disposal" Then '因處置資料量少，所以跳過不檢查(或是改成檢查日期，這部份再想想)
+                    Do While FileLen(MyPath("Data") & "Stock.db") = fS
+                        '如果容量沒改變，代表還沒上傳完成，所以等待1秒再判斷容量是否改變了
+                        Application.Wait (Now + TimeValue("0:00:01"))  '設定等待秒數
+                        ss = ss + 1
+                        If ss = 5 Then MsgBox "ERROR"
+                        DoEvents '回應使用者操作事件
+                    Loop
+                End If
+                If strSheets = "Close" Then Sheets("SetUp").Cells(6, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Legal" Then Sheets("SetUp").Cells(7, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Margin" Then Sheets("SetUp").Cells(8, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "DayTrading" Then Sheets("SetUp").Cells(9, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Notice" Then Sheets("SetUp").Cells(10, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                If strSheets = "Disposal" Then
+                    Sheets("SetUp").Cells(11, "C") = FileDay '更新資料庫日期(這邊到時要修改)
+                    Application.Wait (Now + TimeValue("0:00:01"))  '設定等待秒數，如果是處置資料，這邊要等一秒，資料才會完整
+                End If
+                If strSheets = "Close" Then Sheets("TradingDay").[A1048576].End(xlUp).Offset(1, 0).Value = FileDay '更新交易日日期(改成只有close要做)
+                Kill MyPath("SQLite") & "All" & strSheets & ".txt" '如果a15的值等於空白就刪掉剛剛的檔案"
+                If strSheets = "Close" Then Call GetYesterDayData '取得最新資料庫日期的資料
+            Else
+                MsgBox ("資料有缺，請檢查原始資料")
+                End
+            End If
+        End If
+    Loop
+    Sheets("SetUp").Select     '作用中的工作表轉移到SetUp
+End Sub
+
+'=====判斷資料及市場、檢查標題=====
+
+'判斷資料及市場並呼叫資料清理程式
+Sub SheetsMarket(strSheetsMarket As String)
+    Select Case strSheetsMarket
+        Case "CloseSII"
+            CloseSIIMerge
+        Case "CloseOTC"
+            CloseOTCMerge
+        Case "MarginSII"
+            MarginSIIMerge
+        Case "MarginOTC"
+            MarginOTCMerge
+        Case "LegalSII"
+            LegalSIIMerge
+        Case "LegalOTC"
+            LegalOTCMerge
+        Case "DayTradingSII", "DayTradingOTC"
+            DayTradingMerge
+        Case "RevenueSII", "RevenueOTC"
+            RevenueMerge
+        Case "NoticeSII"
+            NoticeSIIMerge
+        Case "NoticeOTC"
+            NoticeOTCMerge
+        Case "DisposalSII"
+            DisposalSIIMerge
+        Case "DisposalOTC"
+            DisposalOTCMerge
+    End Select
+End Sub
+
+'檢查Csv的標題是否正確
+Sub CheckCsvTitle(strSheetsMarket As String, StartRow As Integer, FileDay As Date)
+    Dim Ref
+    Dim strRef As String
+    Select Case strSheetsMarket
+        Case "CloseSII"
+            Ref = Array("證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價", "最高價", "最低價", "收盤價")
+        Case "CloseOTC"
+            Ref = Array("代號", "名稱", "收盤", "漲跌", "開盤", "最高", "最低", "均價", "成交股數", "成交金額(元)", "成交筆數")
+        Case "LegalSII"
+            If FileDay >= DateValue("2017/12/18") Then
+                Ref = Array("證券代號", "證券名稱", "外陸資買進股數(不含外資自營商)", "外陸資賣出股數(不含外資自營商)", "外陸資買賣超股數(不含外資自營商)", "外資自營商買進股數", "外資自營商賣出股數", "外資自營商買賣超股數", "投信買進股數", "投信賣出股數", "投信買賣超股數", "自營商買賣超股數", "自營商買進股數(自行買賣)", "自營商賣出股數(自行買賣)", "自營商買賣超股數(自行買賣)", "自營商買進股數(避險)", "自營商賣出股數(避險)", "自營商買賣超股數(避險)", "三大法人買賣超股數")
+            ElseIf FileDay >= DateValue("2014/12/01") Then
+                Ref = Array("證券代號", "證券名稱", "外資買進股數", "外資賣出股數", "外資買賣超股數", "投信買進股數", "投信賣出股數", "投信買賣超股數", "自營商買賣超股數", "自營商買進股數(自行買賣)", "自營商賣出股數(自行買賣)", "自營商買賣超股數(自行買賣)", "自營商買進股數(避險)", "自營商賣出股數(避險)", "自營商買賣超股數(避險)", "三大法人買賣超股數")
+            ElseIf FileDay < DateValue("2014/12/01") Then
+                Ref = Array("證券代號", "證券名稱", "外資買進股數", "外資賣出股數", "外資買賣超股數", "投信買進股數", "投信賣出股數", "投信買賣超股數", "自營商買賣超股數", "自營商買進股數", "自營商賣出股數", "三大法人買賣超股數")
+            End If
+        Case "LegalOTC"
+            If FileDay >= DateValue("2018/01/15") Then
+                Ref = Array("代號", "名稱", "外資及陸資(不含外資自營商)-買進股數", "外資及陸資(不含外資自營商)-賣出股數", "外資及陸資(不含外資自營商)-買賣超股數", "外資自營商-買進股數", "外資自營商-賣出股數", "外資自營商-買賣超股數", "外資及陸資-買進股數", "外資及陸資-賣出股數", "外資及陸資-買賣超股數", "投信-買進股數", "投信-賣出股數", "投信-買賣超股數", "自營商(自行買賣)-買進股數", "自營商(自行買賣)-賣出股數", "自營商(自行買賣)-買賣超股數", "自營商(避險)-買進股數", "自營商(避險)-賣出股數", "自營商(避險)-買賣超股數", "自營商-買進股數", "自營商-賣出股數", "自營商-買賣超股數", "三大法人買賣超股數合計")
+            ElseIf FileDay >= DateValue("2014/12/01") Then
+                Ref = Array("代號", "名稱", "外資及陸資買股數", "外資及陸資賣股數", "外資及陸資淨買股數", "投信買進股數", "投信賣股數", "投信淨買股數", "自營淨買股數", "自營商(自行買賣)買股數", "自營商(自行買賣)賣股數", "自營商(自行買賣)淨買股數", "自營商(避險)買股數", "自營商(避險)賣股數", "自營商(避險)淨買股數", "三大法人買賣超股數")
+            ElseIf FileDay < DateValue("2014/12/01") Then
+                Ref = Array("代號", "名稱", "外資及陸資買股數", "外資及陸資賣股數", "外資及陸資淨買股數", "投信買進股數", "投信賣股數", "投信淨買股數", "自營商買股數", "自營商賣股數", "自營淨買股數", "三大法人買賣超股數")
+            End If
+        Case "MarginOTC"
+            Ref = Array("代號", "名稱", "前資餘額(張)", "資買", "資賣", "現償", "資餘額", "資屬證金", "資使用率(%)", "資限額", "前券餘額(張)", "券賣", "券買", "券償", "券餘額", "券屬證金", "券使用率(%)", "券限額", "資券相抵(張)", "備註")
+        Case "MarginSII"
+            Ref = Array("股票代號", "股票名稱", "買進", "賣出", "現金償還", "前日餘額", "今日餘額", "限額", "買進", "賣出", "現券償還", "前日餘額", "今日餘額", "限額", "資券互抵", "註記")
+        Case "DayTrading"
+            Ref = Array("證券代號", "證券名稱", "暫停現股賣出後現款買進當沖註記", "當日沖銷交易成交股數", "當日沖銷交易買進成交金額", "當日沖銷交易賣出成交金額")
+        Case "Revenue"
+            Ref = Array("出表日期", "資料年月", "公司代號", "公司名稱", "產業別", "營業收入-當月營收", "營業收入-上月營收", "營業收入-去年當月營收", "營業收入-上月比較增減(%)", "營業收入-去年同月增減(%)", "累計營業收入-當月累計營收", "累計營業收入-去年累計營收", "累計營業收入-前期比較增減(%)", "備註")
+        Case "NoticeSII"
+            Ref = Array("編號", "證券代號", "證券名稱", "累計次數", "注意交易資訊", "日期", "收盤價", "本益比")
+        Case "NoticeOTC"
+            Ref = Array("編號", "證券代號", "證券名稱", "注意交易資訊", "公告日期", "收盤價", "本益比")
+        Case "DisposalSII"
+            Ref = Array("編號", "公布日期", "證券代號", "證券名稱", "累計", "處置條件", "處置起迄時間", "處置措施", "處置內容")
+        Case "DisposalOTC"
+            Ref = Array("編號", "公布日期", "證券代號", "證券名稱", "處置起訖時間", "處置原因", "處置內容")
+    End Select
+    For T = 0 To UBound(Ref) '用For迴圈去跑陣列中字串
+        strRef = Ref(T) '取出當下迴圈的字串
+        If Trim(Sheets("MergeData").Cells(StartRow, T + 20)) <> strRef Then
+            MsgBox ("'" & Sheets("MergeData").Cells(StartRow, T + 20) & "' 欄位有誤，請檢查欄位格式是否改版")
+            End
+        End If
+    Next
+End Sub
+
+'輸入標題
+Sub InputTitle(strSheets As String)
+    Dim Ref
+    Dim strRef As String
+        Select Case strSheets
+        Case "Close"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "開盤價", "最高價", "最低價", "收盤價", "成交股數", "成交金額", "成交筆數")
+        Case "Legal"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "外陸資買進", "外陸資賣出", "外陸資買賣超", "外資自營商買進", "外資自營商賣出", "外資自營商買賣超", "投信買進", "投信賣出", "投信買賣超", "自營商買進", "自營商賣出", "自營商買賣超", "自營商避險買進", "自營商避險賣出", "自營商避險買賣超")
+        Case "Margin"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "融資買進", "融資賣出", "融資現償", "前資餘額", "融資餘額", "融資限額", "融券買進", "融券賣出", "融券現償", "前券餘額", "融券餘額", "融券限額", "資券互抵", "註記")
+        Case "DayTrading"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "當沖註記", "當沖股數", "當沖買進", "當沖賣出")
+        Case "Revenue"
+            Ref = Array("交易日期", "證券代號", "證券名稱", "產業別", "當月營收", "備註")
+        Case "Notice"
+            Ref = Array("公告日期", "證券代號", "證券名稱", "市場別", "注意資訊")
+        Case "Disposal"
+            Ref = Array("公告日期", "證券代號", "證券名稱", "市場別", "起始日", "結束日", "處置原因", "處置方式", "處置內容")
+    End Select
+    For T = 0 To UBound(Ref) '用For迴圈去跑陣列中字串
+        strRef = Ref(T) '取出當下迴圈的字串
+        Sheets("MergeData").Cells(1, T + 1) = strRef
+    Next
+End Sub
+
+'=====資料清理格式=====
+'月營收
+Sub RevenueMerge()
+        '選取範圍並復制到B欄
+        StartRow = Evaluate("MATCH(""出表日期"",T:T,0)+1")
+        EndRow = [W1048576].End(xlUp).Row
+        strColumn = Sheets("MergeData").Cells(StartRow - 1, "T").End(xlToRight).Column - 2 '取得最後一欄
+        Call CheckCsvTitle("Revenue", StartRow - 1, CDate(Sheets("MergeData").[S1].Value)) '檢查Title
+        C = EndRow - StartRow
+        m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+        e = m + C
+        Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+        Range("B" & m & ":E" & e).Value = Range("V" & StartRow & ":Y" & EndRow).Value '代號、名稱、產業別、當月營收
+        Range("F" & m & ":F" & e).Value = Range("AG" & StartRow & ":AG" & EndRow).Value '備註
+        For i = m To e
+            Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+            Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+        Next
+End Sub
+
+'日當沖
+Sub DayTradingMerge()
+        '選取範圍並復制到B欄
+        StartRow = Evaluate("MATCH(""證券代號"",T:T,0)+1")
+        EndRow = [W1048576].End(xlUp).Row
+        strColumn = Sheets("MergeData").Cells(StartRow - 1, "T").End(xlToRight).Column - 19 '取得最後一欄
+        Call CheckCsvTitle("DayTrading", StartRow - 1, CDate(Sheets("MergeData").[S1].Value)) '檢查Title
+        C = EndRow - StartRow
+        m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+        e = m + C
+        Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+        '<= 2014/06/27 otc少一欄，>=2014/06/30都一樣，要處理一下
+        If strColumn = 6 Then
+            Range("B" & m & ":G" & e).Value = Range("T" & StartRow & ":Y" & EndRow).Value '所有資料
+        Else
+            Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '所有資料
+            Range("E" & m & ":G" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '所有資料
+        End If
+        For i = m To e
+            Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+            Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+        Next
+End Sub
+
+'上市收盤
+Sub CloseSIIMerge()
+    StartRow = Evaluate("MATCH(""證券代號"",T:T,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("CloseSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    For Z = StartRow To EndRow
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = Trim(CStr(Sheets("MergeData").Cells(Z, "T").Text)) '股票代號
+        strCode = Cells(Z, "T").Text '股票代號變數
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(Z, "U").Text) '股票名
+        cRow = Code2Row(strCode, "Close")
+        If Cells(Z, "Y").Value = "--" Then
+            If cRow > 0 Then
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+            ElseIf cRow = 0 Then
+                Call GetLastClose(Cells(Z, "T").Text)
+                If Sheets("TradingDay").Cells(2, "AC").Value <> 0 Then
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                    Sheets("TradingDay").Cells(2, "AC").ClearContents
+                Else
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = 0
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = 0
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = 0
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = 0
+                    Sheets("TradingDay").Cells(2, "AC").ClearContents
+                End If
+            End If
+        Else
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Cells(Z, "Y").Value * 100
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Cells(Z, "Z").Value * 100
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Cells(Z, "AA").Value * 100
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Cells(Z, "AB").Value * 100
+        End If
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Value = Cells(Z, "V").Value
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 8).Value = Cells(Z, "X").Value
+        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 9).Value = Cells(Z, "W").Value
+    Next
+End Sub
+
+'上櫃收盤
+Sub CloseOTCMerge()
+    StartRow = Evaluate("MATCH(""代號"",T:T,0)+1")
+    EndRow = [X1048576].End(xlUp).Row
+    Call CheckCsvTitle("CloseOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    For Z = StartRow To EndRow
+        If Sheets("MergeData").Cells(Z, "U") <> "" And Sheets("MergeData").Cells(Z, "U") <> "名稱" Then '去掉管理股票及空欄
+            If Mid(Sheets("MergeData").Cells(Z, "T"), 1, 1) = "7" And Len(Sheets("MergeData").Cells(Z, "T")) > 4 Then  '找出權證以外的標的
+'                Debug.Print Sheets("MergeData").Cells(Z, "T")
+            Else
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+                strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(Z, "T").Text)) '股票代號變數
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(Z, "U").Text) '股票名
+                cRow = Code2Row(strCode, "Close")
+                If Cells(Z, "Z") = 0 Or Cells(Z, "Z") = "----" Or Cells(Z, "Z") = "---" Then '如果沒交易或沒數據
+                    If cRow > 0 Then '如果昨日有資料，取得昨日資料
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                        Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(cRow, "H").Value '改h才對
+                    ElseIf cRow = 0 Then '如果昨日沒資料
+                        Call GetLastClose(Cells(Z, "T").Text) '呼叫資料庫取得個股最後交易日資料
+                        If Sheets("TradingDay").Cells(2, "AC").Value <> 0 Then '如果之前有資料
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("TradingDay").Cells(2, "AC").Value
+                            Sheets("TradingDay").Cells(2, "AC").ClearContents
+                        Else '如果沒資料=0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = 0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = 0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = 0
+                            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = 0
+                            Sheets("TradingDay").Cells(2, "AC").ClearContents
+                        End If
+                    End If
+                Else
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = Sheets("MergeData").Cells(Z, "X").Value * 100
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("MergeData").Cells(Z, "Y").Value * 100
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = Sheets("MergeData").Cells(Z, "Z").Value * 100
+                    Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Sheets("MergeData").Cells(Z, "V").Value * 100
+                End If
+                Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Resize(1, 3).Value = Sheets("MergeData").Cells(Z, "AB").Resize(1, 3).Value
+            End If
+        End If
+    Next
+End Sub
+
+'上櫃資券
+Sub MarginOTCMerge()
+    StartRow = Evaluate("MATCH(""代號"",T:T,0)+1")
+    '取得列號 strC = Evaluate("MATCH("" 資限額"",T3:AM3,0)")
+    EndRow = [AK1048576].End(xlUp).Row
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    Call CheckCsvTitle("MarginOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '代號股名
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+    Next
+    Range("D" & m & ":F" & e).Value = Range("W" & StartRow & ":Y" & EndRow).Value '融資買進, 融資賣出, 融資現償
+    Range("G" & m & ":G" & e).Value = Range("V" & StartRow & ":V" & EndRow).Value '前資餘額
+    Range("H" & m & ":H" & e).Value = Range("Z" & StartRow & ":Z" & EndRow).Value '融資餘額
+    Range("I" & m & ":I" & e).Value = Range("AC" & StartRow & ":AC" & EndRow).Value '融資限額
+    Range("J" & m & ":J" & e).Value = Range("AF" & StartRow & ":AF" & EndRow).Value '融券買進
+    Range("K" & m & ":K" & e).Value = Range("AE" & StartRow & ":AE" & EndRow).Value '融券賣出
+    Range("L" & m & ":L" & e).Value = Range("AG" & StartRow & ":AG" & EndRow).Value '融券現償
+    Range("M" & m & ":M" & e).Value = Range("AD" & StartRow & ":AD" & EndRow).Value '前券餘額
+    Range("N" & m & ":N" & e).Value = Range("AH" & StartRow & ":AH" & EndRow).Value '融券餘額
+    Range("O" & m & ":Q" & e).Value = Range("AK" & StartRow & ":AM" & EndRow).Value '融券限額,資券互抵
+    If DateValue(Cells(1, "S")) < DateValue("2008/09/30") Then Range("P" & m & ":P" & e).Value = 0           '資券互抵
+End Sub
+
+'上市資券
+Sub MarginSIIMerge()
+    StartRow = Evaluate("MATCH(""股票代號"",T:T,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("MarginSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    '找出起始例及最後例
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":Q" & e).Value = Range("T" & StartRow & ":AI" & EndRow).Value '所有資料
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = Trim(Sheets("MergeData").Cells(i, "B").Text) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股票名
+    Next
+End Sub
+
+'上櫃法人
+Sub LegalOTCMerge()
+    StartRow = Evaluate("MATCH(""代號"",T:T,0)+1")
+    '取得列號 strC = Evaluate("MATCH("" 資限額"",T3:AM3,0)")
+    EndRow = [X1048576].End(xlUp).Row
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    Call CheckCsvTitle("LegalOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '代號股名
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股名空格
+    Next
+'    Range("D" & m & ":R" & e).Value = 0 '先把欄位全部填0
+    If DateValue(Cells(1, "S")) <= DateValue("2014/11/28") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":O" & e).Value = Range("AB" & StartRow & ":AD" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2014/12/01") And DateValue(Cells(1, "S")) <= DateValue("2018/01/12") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":R" & e).Value = Range("AC" & StartRow & ":AH" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2018/01/15") Then
+        Range("D" & m & ":I" & e).Value = Range("V" & StartRow & ":AA" & EndRow).Value '外資買賣超
+        Range("J" & m & ":R" & e).Value = Range("AE" & StartRow & ":AM" & EndRow).Value '投信自營買賣超
+    End If
+End Sub
+
+'上市法人
+Sub LegalSIIMerge()
+    StartRow = Evaluate("MATCH(""證券代號"",T:T,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("LegalSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    '找出起始例及最後例
+    Range("A" & m & ":A" & e).Value = CDate(Sheets("MergeData").[S1].Value) '日期
+    Range("B" & m & ":C" & e).Value = Range("T" & StartRow & ":U" & EndRow).Value '代號股名
+    For i = m To e
+        Sheets("MergeData").Cells(i, "B").Value = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "B").Text)) '處理股票代號
+        Sheets("MergeData").Cells(i, "C").Value = Trim(Sheets("MergeData").Cells(i, "C").Text) '處理股名空格
+    Next
+'    Range("D" & m & ":R" & e).Value = 0 '先把欄位全部填0
+    If DateValue(Cells(1, "S")) <= DateValue("2014/11/28") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":O" & e).Value = Range("AB" & StartRow & ":AD" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2014/12/01") And DateValue(Cells(1, "S")) <= DateValue("2017/12/15") Then
+        Range("D" & m & ":F" & e).Value = Range("V" & StartRow & ":X" & EndRow).Value '外資買賣超
+        Range("J" & m & ":L" & e).Value = Range("Y" & StartRow & ":AA" & EndRow).Value '投信買賣超
+        Range("M" & m & ":R" & e).Value = Range("AC" & StartRow & ":AH" & EndRow).Value '自營買賣超
+    ElseIf DateValue(Cells(1, "S")) >= DateValue("2017/12/18") Then
+        Range("D" & m & ":L" & e).Value = Range("V" & StartRow & ":AD" & EndRow).Value '外資投信買賣超
+        Range("M" & m & ":R" & e).Value = Range("AF" & StartRow & ":AK" & EndRow).Value '自營買賣超
+    End If
+End Sub
+
+'上市注意股
+Sub NoticeSIIMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    Dim dateStr As String
+    StartRow = Evaluate("MATCH(""證券代號"",U:U,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("NoticeSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(10, "C"))
+    For i = StartRow To EndRow
+        dateStr = Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/")
+        If IsDate(dateStr) Then
+            tDay = Year(CDate(dateStr)) + 1911 & "/" & Month(CDate(dateStr)) & "/" & Day(CDate(dateStr))
+        Else
+            If Sheets("MergeData").Cells(i, "AC") = "" Then
+                Sheets("MergeData").Cells(i, "X").Value = Replace(Sheets("MergeData").Cells(i, "X").Value, "=""", "")
+                Sheets("MergeData").Cells(i, "Y").Value = Replace(Sheets("MergeData").Cells(i, "Y").Value, """", "")
+                Sheets("MergeData").Cells(i, "X").Value = Sheets("MergeData").Cells(i, "X").Value & Sheets("MergeData").Cells(i, "Y").Value
+                Sheets("MergeData").Cells(i, "Y").Delete Shift:=xlShiftToLeft
+            Else
+                Sheets("MergeData").Cells(i, "X").Value = Replace(Sheets("MergeData").Cells(i, "X").Value, "=""", "")
+                Sheets("MergeData").Cells(i, "Z").Value = Replace(Sheets("MergeData").Cells(i, "Z").Value, """", "")
+                Sheets("MergeData").Cells(i, "X").Value = Sheets("MergeData").Cells(i, "X").Value & Sheets("MergeData").Cells(i, "Y").Value & Sheets("MergeData").Cells(i, "Z").Value
+                Sheets("MergeData").Cells(i, "Y").Delete Shift:=xlShiftToLeft
+                Sheets("MergeData").Cells(i, "Y").Delete Shift:=xlShiftToLeft
+            End If
+        ' 處理日期格式錯誤的情況，例如顯示錯誤訊息或者呼叫另外一個子程式
+            
+            ' ...
+'            GoTo NextIteration
+        End If
+        'tDay = Year(CDate(Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/"))) + 1911 & "/" & Month(CDate(Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/"))) & "/" & Day(CDate(Replace(Sheets("MergeData").Cells(i, "Y"), ".", "/")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "U").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "U").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "V").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上市"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("MergeData").Cells(i, "X").Text '注意資訊
+'            NoticeArrers = Split(Replace(Replace(Replace(Sheets("MergeData").Cells(i, "X"), "﹞。", "-"), "﹞", "-"), "-", ")-"), "-")
+'            strNotice = ""
+'            For Each NoticeArrer In NoticeArrers
+'                Select Case Right(NoticeArrer, 4)
+'                    Case "第一款)"
+'                        If InStr(NoticeArrer, "價差達") > 0 Then '如果有達到價差條件
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 3, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        End If
+'                    Case "第二款)"
+'                        strNotice = strNotice & "<第二款>" & Replace(Replace(Replace(Replace(Replace(Replace(NoticeArrer, "最近", ""), "個營業日起迄兩個營業", ""), "之收盤價", ""), "。", ""), "﹝第二款)", ""), "%", "%，")
+'                        strNotice = Mid(strNotice, 1, Len(strNotice) - 1)
+'                    Case "第三款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第三款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量之") + 2, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量之") + 1)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第三款>當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量之") + 2, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量之") + 1)) & "，"
+'                        End If
+'                    Case "第四款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第四款>" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率為") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率為") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第四款>週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率為") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率為") + 2)) & "，"
+'                        End If
+'                    Case "第五款)"
+'                        strNotice = strNotice & "<第五款>，"
+'                    Case "第六款)"
+'                        strNotice = strNotice & "<第六款>，"
+'                    Case "第七款)"
+'                        strNotice = strNotice & "<第七款>，"
+'                    Case "第八款)"
+'                        strNotice = strNotice & "<第八款>，"
+'                    Case "第九款)"
+'                        strNotice = strNotice & "<第九款>均量" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "倍") - InStr(NoticeArrer, "為")) & "，日量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "第十款)"
+'                        strNotice = strNotice & "<第十款>6日週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "為")) & "，當日週轉率" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "十一款)"
+'                        strNotice = strNotice & "<第十一款>價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 6, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 5)) & "，"
+'                    Case "十二款)"
+'                        strNotice = strNotice & "<第十二款>六日借券佔" & Mid(NoticeArrer, InStr(NoticeArrer, "率") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "率")) & "，當日借券量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "十三款)"
+'                        strNotice = strNotice & "<第十三款>六日當沖佔" & Mid(NoticeArrer, InStr(NoticeArrer, "率") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "率")) & "，當日當沖量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "率") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "率")) & "，"
+'                End Select
+'            Next
+'            strNotice = Replace(strNotice, "達", "")
+'            strNotice = Mid(strNotice, 1, Len(strNotice) - 1)
+'            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = strNotice '注意條款
+        End If
+    Next
+
+End Sub
+'上櫃注意股
+Sub NoticeOTCMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    StartRow = Evaluate("MATCH(""證券代號"",U:U,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("NoticeOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(10, "C"))
+    For i = StartRow To EndRow
+        tDay = Year(CDate(Cells(i, "X"))) + 1911 & "/" & Month(CDate(Cells(i, "X"))) & "/" & Day(CDate(Cells(i, "X")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "U").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "U").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "V").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上櫃"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = Sheets("MergeData").Cells(i, "W").Text '注意資訊
+'            NoticeArrers = Split(Sheets("MergeData").Cells(i, "W"), "<br>") '用<br>切割到陣列
+'            fS = 0 '第二款計次
+'            strNotice = ""
+'            For Each NoticeArrer In NoticeArrers
+'                Select Case Right(NoticeArrer, 4)
+'                    Case "第一款)"
+'                        If InStr(NoticeArrer, "價差達") > 0 Then '如果有達到價差條件
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 6, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 5)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第一款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        End If
+'                    Case "第二款)"
+'                        notice2 = strNotice & (Len(Sheets("MergeData").Cells(i, "W")) - Len(Replace(Sheets("MergeData").Cells(i, "W"), "第二款", ""))) / 3 '計算次數
+'                        fS = fS + 1
+'                        If fS = 1 Then
+'                            strNotice = strNotice & "<第二款>" & Mid(NoticeArrer, 3, 2) & "日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        ElseIf fS < notice2 Then
+'                            strNotice = strNotice & Mid(NoticeArrer, 3, 2) & "日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        ElseIf fS = notice2 Then
+'                            strNotice = strNotice & Mid(NoticeArrer, 3, 2) & "日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，"
+'                        End If
+'                    Case "第三款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第三款>六日" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStrRev(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量放大") + 3, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量放大") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第三款>當日量放大" & Mid(NoticeArrer, InStr(NoticeArrer, "量放大") + 3, InStrRev(NoticeArrer, "倍") - (InStr(NoticeArrer, "量放大") + 2)) & "，"
+'                        End If
+'                    Case "第四款)"
+'                        If InStr(NoticeArrer, "幅達") > 0 Then '如果有達到漲跌幅條件
+'                            strNotice = strNotice & "<第四款>" & Mid(NoticeArrer, InStr(NoticeArrer, "幅達") - 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "幅達") + 2) & "，" & "週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率達") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率達") + 2)) & "，"
+'                        Else
+'                            strNotice = strNotice & "<第四款>週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "轉率達") + 3, InStrRev(NoticeArrer, "%") - (InStr(NoticeArrer, "轉率達") + 2)) & "，"
+'                        End If
+'                    Case "第五款)"
+'                        strNotice = strNotice & "<第五款>，"
+'                    Case "第六款)"
+'                        strNotice = strNotice & "<第六款>，"
+'                    Case "第七款)"
+'                        strNotice = strNotice & "<第七款>，"
+'                    Case "第八款)"
+'                        strNotice = strNotice & "<第八款>，"
+'                    Case "第九款)"
+'                        strNotice = strNotice & "<第九款>均量" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "倍") - InStr(NoticeArrer, "為")) & "，日量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "第十款)"
+'                        strNotice = strNotice & "<第十款>6日週轉率" & Mid(NoticeArrer, InStr(NoticeArrer, "為") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "為")) & "，當日週轉率" & Mid(NoticeArrer, InStrRev(NoticeArrer, "達") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "達")) & "，"
+'                    Case "十一款)"
+'                        strNotice = strNotice & "<第十一款>價差達" & Mid(NoticeArrer, InStr(NoticeArrer, "價差達") + 6, InStrRev(NoticeArrer, "元") - (InStr(NoticeArrer, "價差達") + 5)) & "，"
+'                    Case "十二款)"
+'                        strNotice = strNotice & "<第十二款>六日借券佔" & Mid(NoticeArrer, InStr(NoticeArrer, "達") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "達")) & "，當日借券量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "為") + 1, InStrRev(NoticeArrer, "倍") - InStrRev(NoticeArrer, "為")) & "，"
+'                    Case "十三款)"
+'                        strNotice = strNotice & "<第十三款>六日當沖佔" & Mid(NoticeArrer, InStr(NoticeArrer, "達") + 1, InStr(NoticeArrer, "%") - InStr(NoticeArrer, "達")) & "，當日當沖量" & Mid(NoticeArrer, InStrRev(NoticeArrer, "達") + 1, InStrRev(NoticeArrer, "%") - InStrRev(NoticeArrer, "達")) & "，"
+'                End Select
+'            Next
+'            strNotice = Replace(strNotice, "達", "")
+'            strNotice = Mid(strNotice, 1, Len(strNotice) - 1)
+'            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = strNotice '注意條款
+        End If
+    Next
+End Sub
+
+'上市處置
+Sub DisposalSIIMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    StartRow = Evaluate("MATCH(""證券代號"",V:V,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("DisposalSII", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(11, "C"))
+    For i = StartRow To EndRow
+        tDay = Year(CDate(Cells(i, "U"))) + 1911 & "/" & Month(CDate(Cells(i, "U"))) & "/" & Day(CDate(Cells(i, "U")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "V").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "V").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "W").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上市"
+            '起始日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "Z").Text, 1, InStr(Sheets("MergeData").Cells(i, "Z").Text, "~") - 1)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = otcDate
+            '結束日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "Z").Text, InStr(Sheets("MergeData").Cells(i, "Z").Text, "~") + 1, 9)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = otcDate
+            '處置原因
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Trim(Sheets("MergeData").Cells(i, "Y").Text) '處置原因
+            '處置方式
+            strNotice = Mid(Sheets("MergeData").Cells(i + 3, "T").Text, InStr(Sheets("MergeData").Cells(i + 3, "T").Text, "撮合作業（約每") + 6, InStr(Sheets("MergeData").Cells(i + 3, "T").Text, "分鐘撮合一次") - InStr(Sheets("MergeData").Cells(i + 3, "T").Text, "撮合作業（約每"))
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Value = strNotice
+            '處置內容
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 8).Value = Sheets("MergeData").Cells(i, "AB").Text
+        End If
+    Next
+End Sub
+
+'上櫃處置
+Sub DisposalOTCMerge()
+    Dim strNotice As String
+    Dim NoticeArrers() As String
+    Dim tDay As Date
+    StartRow = Evaluate("MATCH(""證券代號"",V:V,0)+1")
+    EndRow = [U1048576].End(xlUp).Row
+    Call CheckCsvTitle("DisposalOTC", StartRow - 1, CDate(Sheets("MergeData").[S1].Value))
+    C = EndRow - StartRow
+    m = Range("A1048576").End(xlUp).Offset(1, 0).Row
+    e = m + C
+    DBDay = DateValue(Sheets("SetUp").Cells(12, "C"))
+    For i = StartRow To EndRow
+        tDay = Year(CDate(Cells(i, "U"))) + 1911 & "/" & Month(CDate(Cells(i, "U"))) & "/" & Day(CDate(Cells(i, "U")))
+        If tDay > DBDay And Len(Trim(Sheets("MergeData").Cells(i, "V").Text)) = 4 Then
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(1, 0).Value = tDay '日期
+            strCode = CorrectionCode(Trim(Sheets("MergeData").Cells(i, "V").Text)) '股票代號變數
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 1).Value = strCode '股票代號"
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 2).Value = Trim(Sheets("MergeData").Cells(i, "W").Text) '股票名
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 3).Value = "上櫃"
+            '起始日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "X").Text, 1, InStr(Sheets("MergeData").Cells(i, "X").Text, "~") - 1)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 4).Value = otcDate
+            '結束日
+            siiDate = Mid(Sheets("MergeData").Cells(i, "X").Text, InStr(Sheets("MergeData").Cells(i, "X").Text, "~") + 1, 9)
+            otcDate = Mid(siiDate, 1, InStr(siiDate, "/") - 1) + 1911 & Mid(siiDate, InStr(siiDate, "/"), 6)
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 5).Value = otcDate
+            '處置原因
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 6).Value = Trim(Sheets("MergeData").Cells(i, "Y").Text) '處置原因
+            '處置方式
+            strNotice = Mid(Sheets("MergeData").Cells(i, "Z").Text, InStr(Sheets("MergeData").Cells(i, "Z").Text, "撮合作業(約每") + 6, InStr(Sheets("MergeData").Cells(i, "Z").Text, "分鐘撮合一次") - InStr(Sheets("MergeData").Cells(i, "Z").Text, "撮合作業(約每"))
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 7).Value = strNotice
+            '處置內容
+            Sheets("MergeData").[A1048576].End(xlUp).Offset(0, 8).Value = Sheets("MergeData").Cells(i, "Z").Text
+        End If
+    Next
+End Sub
+
+
+模組-SQLite
+Sub SQLiteDB(strSelect As String, strSheets As String, StartRow As Long, strColumn As String)
+    Dim myConn As ADODB.Connection
+    Dim myRS As ADODB.Recordset
+    Dim i As Long
+    Set myConn = New ADODB.Connection
+    myConn.Open "driver=SQLite3 ODBC Driver;Database=" & ThisWorkbook.Path & "\Data\stock.db;"
+    Set myRS = New ADODB.Recordset
+    With myRS
+        .CursorLocation = adUseClient
+        .Open Source:=strSelect, ActiveConnection:=myConn
+    End With
+    With ThisWorkbook.Worksheets(strSheets)
+'        .Cells.ClearContents'全選刪除
+'        .Cells(1, "B").Resize(3000, 11).ClearContents'欄位範圍刪除
+        .Cells(StartRow, strColumn).CopyFromRecordset myRS
+        '匯入標題例
+'        For I = 0 To myRS.Fields.Count - 1
+'            .Cells(1, I + 1) = myRS.Fields(I).Name
+'        Next I
+    End With
+    myRS.Close
+    myConn.Close
+    Set myRS = Nothing
+    Set myConn = Nothing
+End Sub
+
+Sub GetYesterDayData()
+    '取得最新交易日資料
+    Dim YDay As String
+    Sheets("TradingDay").Cells(2, "B").Resize(50000, 30).ClearContents
+    YDay = Format(Sheets("SetUp").[C6].Value, "yyyy-MM-dd")
+    TableName = "Close"
+    strSelect = "SELECT * FROM " & TableName & " WHERE 交易日期 = '" & YDay & "' order by 交易日期 asc"
+    strSheets = "TradingDay"
+    StartRow = 2
+    strColumn = "B"
+    If YDay <> "" Then Call SQLiteDB(strSelect, strSheets, StartRow, strColumn)
+End Sub
+
+Sub GetLastClose(strCode As String)
+    Sheets("TradingDay").Cells(2, "AC").Resize(1, 3).ClearContents
+    TableName = "Close"
+    strSelect = "SELECT 收盤價 FROM (SELECT 交易日期,收盤價 FROM " & TableName & "  WHERE 證券代號 = '" & strCode & "' order by 交易日期 desc LIMIT 1)"
+    strSheets = "TradingDay"
+    StartRow = 2
+    strColumn = "AC"
+    Call SQLiteDB(strSelect, strSheets, StartRow, strColumn)
+End Sub
+
+Sub GetYesterDay()
+    '取得最新交易日資料
+    Dim YDay As String
+    Sheets("TradingDay").Cells(2, "B").Resize(50000, 30).ClearContents
+    YDay = Format(Sheets("SetUp").[C6].Value, "yyyy-MM-dd")
+    TableName = "Close"
+'    strSelect = "SELECT * FROM " & TableName & " WHERE 交易日期 = '" & YDay & "' and (證券代號 LIKE '5%' or 證券代號 LIKE '3%') order by 交易日期 asc"'取得不同開頭的股票代號
+    strSelect = "SELECT * FROM " & TableName & " WHERE 證券代號 = '0050' order by 交易日期 asc"
+    strSheets = "TradingDay"
+    StartRow = 2
+    strColumn = "B"
+    If YDay <> "" Then Call SQLiteDB(strSelect, strSheets, StartRow, strColumn)
+End Sub
+
+
+'1先建立一個資料庫
+Sub CreateDB()
+    Dim conn As New ADODB.Connection '引用ADO
+    Dim Connstr As String
+    Connstr = "Driver={SQLite3 ODBC Driver};Database=" & ThisWorkbook.Path & "\Data\Stock.db"
+    conn.Open Connstr
+    conn.Close
+End Sub
+
+'2建立資料表及索引
+Sub CreateTable()
+    Dim conn As New ADODB.Connection '引用ADO
+    Dim Connstr As String
+    Dim strCreate As String
+    Dim intDB As Integer
+    Connstr = "Driver={SQLite3 ODBC Driver};Database=" & ThisWorkbook.Path & "\Data\Stock.db"
+    '=====輸入資料表代號
+    intDB = 8
+    '2建立資料表及索引
+        conn.Open Connstr
+        If intDB = 1 Then strCreate = "Create table Close(交易日期 TIMESTAMP NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,開盤價 INTEGER,最高價 INTEGER,最低價 INTEGER,收盤價 INTEGER,成交股數 INTEGER,成交金額 INTEGER,成交筆數 INTEGER)"
+        If intDB = 2 Then strCreate = "Create table Legal(交易日期 DATE NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,外陸資買進 INTEGER,外陸資賣出 INTEGER,外陸資買賣超 INTEGER,外資自營商買進 INTEGER,外資自營商賣出 INTEGER,外資自營商買賣超 INTEGER,投信買進 INTEGER,投信賣出 INTEGER,投信買賣超 INTEGER,自營商買進 INTEGER,自營商賣出 INTEGER,自營商買賣超 INTEGER,自營商避險買進 INTEGER,自營商避險賣出 INTEGER,自營商避險買賣超 INTEGER)"
+        If intDB = 3 Then strCreate = "Create table Margin(交易日期 DATE NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,融資買進 INTEGER,融資賣出 INTEGER,融資現償 INTEGER,前資餘額 INTEGER,融資餘額 INTEGER,融資限額 INTEGER,融券買進 INTEGER,融券賣出 INTEGER,融券現償 INTEGER,前券餘額 INTEGER,融券餘額 INTEGER,融券限額 INTEGER,資券互抵 INTEGER,註記 TEXT)"
+        If intDB = 4 Then strCreate = "Create table DayTrading(交易日期 DATE NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,當沖註記 TEXT ,當沖股數 INTEGER,當沖買進 INTEGER,當沖賣出 INTEGER)"
+        If intDB = 5 Then strCreate = "Create table Revenue(交易日期 DATE NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,產業別 TEXT ,當月營收 INTEGER,備註 TEXT)"
+        If intDB = 6 Then strCreate = "Create table Notice(公告日期 DATE NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,市場別 TEXT NOT NULL,注意資訊 TEXT)"
+        If intDB = 7 Then strCreate = "Create table Disposal(公告日期 DATE NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,市場別 TEXT NOT NULL,起始日 DATE,結束日 DATE,處置原因 TEXT,處置方式 TEXT,處置內容 TEXT)"
+        If intDB = 8 Then strCreate = "Create table Gakong(公告日期 DATE NOT NULL,證券代號 TEXT NOT NULL,證券名稱 TEXT NOT NULL,市場別 TEXT NOT NULL,起始日 DATE,結束日 DATE,處置原因 TEXT,處置方式 TEXT,處置內容 TEXT)"
+        'Gakong
+        conn.Execute strCreate
+        If intDB = 1 Then strCreate = "Create Index Close_日期代號_index ON Close(交易日期 ASC,證券代號 ASC);"
+        If intDB = 2 Then strCreate = "Create Index Legal_日期代號_index ON Legal(交易日期 ASC,證券代號 ASC);"
+        If intDB = 3 Then strCreate = "Create Index Margin_日期代號_index ON Margin(交易日期 ASC,證券代號 ASC);"
+        If intDB = 4 Then strCreate = "Create Index DayTrading_日期代號_index ON DayTrading(交易日期 ASC,證券代號 ASC);"
+        If intDB = 5 Then strCreate = "Create Index Revenue_日期代號_index ON Revenue(交易日期 ASC,證券代號 ASC);"
+        If intDB = 6 Then strCreate = "Create Index Notice_日期代號_index ON Notice(公告日期 ASC,證券代號 ASC);"
+        If intDB = 7 Then strCreate = "Create Index Disposal_日期代號_index ON Disposal(公告日期 ASC,證券代號 ASC);"
+        If intDB = 8 Then strCreate = "Create Index Gakong_日期代號_index ON Disposal(公告日期 ASC,證券代號 ASC);"
+        conn.Execute strCreate
+        conn.Close
+End Sub
+
+模組-更新
+'=====更新紀錄=====
+'2022/04/01 開始設計股市資料庫 V2.0
+'2022/04/05 更新資料庫由Access改為SQLite，並重新驗證檔案正確性
+'2022/04/07 重新設定日收盤資料格式，修復錯誤欄位及開頭缺0的股票代號處理
+'2022/04/08 補上1987/01/06~2004/02/10上市收盤及1995/01/05~2007/07/20上櫃收盤資料
+'2022/04/11 優化AllMergeData程式，使其模組化
+'2022/04/12 重新設定日法人資料格式，修復錯誤欄位
+'2022/04/13 補上2004/12/17~2012/05/02上市三大法人資料
+'2022/04/14 重新設定日資券資料格式，修復錯誤欄位
+'2022/04/15 優化爬蟲程式，加上檔案判斷是否正確，以及券商爬蟲分流，並使其模組化
+'2022/04/22 優化爬蟲程式，加上券商爬蟲網路塞車錯誤處理
+'2022/04/23 修復下載日期超過最新交易日還會下載的問題
+'2022/04/25 新增日當沖爬蟲及資料庫，優化上傳資料庫代碼，資料庫路徑改為變動位置
+'2022/04/26 新增月營收爬蟲及資料庫，優化檢查檔案容量程式並做成子程式
+'2022/04/29 新增注意股票資訊爬蟲及資料庫，爬蟲不用驗證但未完成跳過的部份，整理舊資料格式一直有問題暫時還沒上傳到資料庫
+'2022/04/30 修復注意股票資訊BUG
+'2022/05/03 新增注意股票欄位"市場別"，新增上市櫃處置資料庫
+'2022/05/04 新增是否下載檔案判斷，避免非假日休市又要多等待10秒，修正處置資訊上市櫃日期不同步造成漏資料的問題，並把上市櫃處置資料庫日期分開，新增功能鍵-資料庫管理，備份及刪除資料庫使用
+'2022/05/09 修復假日後下載會報錯的BUG，新增WEB下載功能，避免設備問題造成下載錯誤
+'2022/05/10 上傳處置資料庫後刪檔延時1秒，修復處置資料庫跑太快會照成資料短少的問題
+'2022/05/13 修復處置資料庫日期少1天的問題
+'2022/05/26 修復處置資料庫當天沒資料會卡在 MergeData 分頁
+'
+'
+'
+
+Sub VersionUpdate()
+    Dim strUpdate As String
+    i = 1
+    Do While Sheets("VersionUpdate").Cells(i, "B") <> "" '檔名不為空白
+    If Sheets("VersionUpdate").Cells(i, "A") <> "" Then
+        strUpdate = strUpdate & Sheets("VersionUpdate").Cells(i, "A") & vbTab & Sheets("VersionUpdate").Cells(i, "B") & vbCrLf
+    Else
+        strUpdate = strUpdate & vbTab & Sheets("VersionUpdate").Cells(i, "B") & vbCrLf
+    End If
+    i = i + 1
+    Loop
+    Debug.Print strUpdate
+    MsgBox strUpdate, vbInformation, "=====更新紀錄====="
+End Sub
+
+
+
+

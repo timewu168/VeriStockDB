@@ -1,0 +1,320 @@
+{
+  "project_name": "VeriStockDB",
+  "current_phase": "v0.3.3.1 released; trading-calendar TPEx fallback is in progress and uncommitted; next planned dataset phase is v0.3.4 institutional investors",
+  "goal": "Maintain a local human-first Taiwan stock truth database with auditable official-data ingestion, CLI operations, Local Truth API access, server scheduling, backups, and notifications.",
+  "frozen_decisions": [
+    "Use local SQLite as the core truth database.",
+    "Do not redesign the architecture away from the existing human-first spec and Local Truth API spec.",
+    "PWA must use structured API/Core results and must not parse CLI stdout.",
+    "Cloud Edge API/PWA is a separate non-open-source project; this repo only owns the Local Truth DB and local API/export boundary.",
+    "Official missing numeric data must not be invented or filled with 0.",
+    "Close dash placeholders are dataset-specific and must be filled from previous close only when proven, or excluded/rechecked according to the documented rule.",
+    "Batch state is managed through import_batches; special data handling is recorded through data_events.",
+    "Telegram notification failures are non-fatal.",
+    "Secrets, DB files, data files, logs, tmp files, historical CSV, and tokens must not be uploaded to GitHub.",
+    "Close monthly reconciliation stays separate from audit-month and is deferred."
+  ],
+  "completed": [
+    {
+      "name": "CLI human-readable no-args quickstart",
+      "evidence": [
+        "tests.test_cli.CliTests.test_no_args_prints_help_and_quickstart_without_error passed on 2026-06-06"
+      ]
+    },
+    {
+      "name": "Close import/update/rollback/archive/backup baseline",
+      "evidence": [
+        "CLI tests and importer/monthly service tests passed on 2026-06-06",
+        "Server restore smoke test previously returned daily_close OK 10140 batches"
+      ]
+    },
+    {
+      "name": "Ubuntu path configuration and ops-check",
+      "evidence": [
+        "tag v0.2.7 commit ac3a72c Add deployment ops check",
+        "tests.test_ops_check passed on 2026-06-06",
+        "User provided server output ops-check OK"
+      ]
+    },
+    {
+      "name": "Local Truth API v0.3.0",
+      "evidence": [
+        "tag v0.3.0 commit fd944c3 Add Local Truth API",
+        "api directory contains app, schemas, and routes",
+        "User provided curl response for 3090 daily-close with ok true",
+        "API-related tests passed on 2026-06-06"
+      ]
+    },
+    {
+      "name": "Attention notice dataset v0.3.1",
+      "evidence": [
+        "tag v0.3.1 commit 3374294 Add attention notice dataset",
+        "User import output TWSE rows=53041 and TPEX rows=48206",
+        "User status output attention_notice OK 2 batches",
+        "Attention parser/import/API tests passed on 2026-06-06"
+      ]
+    },
+    {
+      "name": "Disposal notice dataset v0.3.2",
+      "evidence": [
+        "tag v0.3.2 commit 733d121 Add disposal notice dataset",
+        "Server import output TWSE rows=3436 and TPEX rows=4107",
+        "Server update-disposal output reached 2026-06-05",
+        "Server status output disposal_notice OK 4 batches",
+        "Disposal parser/import/API tests passed on 2026-06-06"
+      ]
+    },
+    {
+      "name": "Telegram notifications v0.3.3 and v0.3.3.1",
+      "evidence": [
+        "tag v0.3.3 commit 6819fb3 Add Telegram task notifications",
+        "commit 2242cba Localize Telegram notifications",
+        "tag v0.3.3.1 commit 201bf41 Finalize Telegram notification patch release",
+        "User reported Telegram test completed",
+        "tests.test_telegram_notifier passed on 2026-06-06"
+      ]
+    }
+  ],
+  "in_progress": [
+    {
+      "name": "Trading calendar TPEx fallback",
+      "status": "uncommitted local changes",
+      "files": [
+        "CHANGELOG.md",
+        "README.md",
+        "config.py",
+        "docs/URL.txt",
+        "ingest/downloader.py",
+        "ingest/trading_calendar.py",
+        "tests/test_downloader.py",
+        "tests/test_trading_calendar.py",
+        "tests/test_importer.py"
+      ],
+      "evidence": [
+        "git diff --stat shows 151 insertions and 15 deletions across 6 tracked files",
+        "2026-06-06 unittest discover passed: Ran 95 tests OK"
+      ],
+      "remaining": [
+        "Review diff",
+        "Decide version number",
+        "Commit/tag/push",
+        "Deploy to server",
+        "Run server update-close validation"
+      ]
+    }
+  ],
+  "todo": [
+    {
+      "name": "v0.3.4 institutional investors dataset",
+      "acceptance": "Official URLs and fields confirmed, parser/import/update/query/API/tests/docs completed, status has no problem batches."
+    },
+    {
+      "name": "v0.3.5 margin trading dataset",
+      "acceptance": "Schema/import/update/query/API/tests/docs completed with unit and period rules documented."
+    },
+    {
+      "name": "v0.3.6 day trading dataset",
+      "acceptance": "Schema/import/update/query/API/tests/docs completed and stock/date queries are efficient."
+    },
+    {
+      "name": "v0.3.7 monthly revenue dataset",
+      "acceptance": "YYYY-MM period handling, import/update/query/API/tests/docs completed."
+    },
+    {
+      "name": "v0.3.8 close monthly reconciliation",
+      "acceptance": "Separate reconcile command compares close and volume with selectable stock samples and marks mismatches RECHECK."
+    },
+    {
+      "name": "v0.4.0 public preview",
+      "acceptance": "Repo contains no private data/secrets, docs are complete, license and sample-data policy are decided."
+    },
+    {
+      "name": "v0.5.0 local management PWA",
+      "acceptance": "PWA uses Local Truth API, does not parse CLI stdout, and can manage DB/dataset/batch/error/event/ops views."
+    }
+  ],
+  "blocked": [
+    {
+      "name": "tests tracking policy",
+      "reason": "tests/ exists and is used for validation, but .gitignore excludes it from GitHub.",
+      "needed_decision": "PM decides whether tests remain local-only or become tracked before public preview."
+    },
+    {
+      "name": "Claude implementation plan path",
+      "reason": "No explicit file with this name was found during current repo inspection.",
+      "needed_decision": "PM points to the exact file or confirms current docs are authoritative."
+    },
+    {
+      "name": "untracked legacy and large files",
+      "reason": "Working tree includes untracked legacy files, web directory, scratch/csv directories, and xlsb files.",
+      "needed_decision": "PM decides whether to move, ignore, archive, or review each item."
+    }
+  ],
+  "risks": [
+    "Uncommitted trading-calendar fallback could be mistaken for released work.",
+    "tests/ is ignored, so passing test changes are not preserved in GitHub unless policy changes.",
+    "PowerShell encoding can display some UTF-8 docs as garbled text; do not rewrite docs based on garbled terminal output.",
+    "TWSE and TPEx official APIs may change shape or respond slowly under load.",
+    "Server schedule timing may need adjustment when official endpoints are slow after market close.",
+    "Untracked large/private files may accidentally be staged if release review is careless.",
+    "Cloud backup/offsite implementation is user-reported and outside this repo."
+  ],
+  "decisions": [
+    {
+      "decision": "Attention and disposal notice primary keys include market.",
+      "reason": "Avoid ambiguity and align with existing dataset patterns; add date+stock index for backtesting queries."
+    },
+    {
+      "decision": "Attention and disposal store original text instead of parsing clauses immediately.",
+      "reason": "The text volume is small and downstream projects can extract clauses later."
+    },
+    {
+      "decision": "Rollback-close is an independent command.",
+      "reason": "User experience is better when daily update and cross-day correction are separate."
+    },
+    {
+      "decision": "Local API and cloud API are separate.",
+      "reason": "Local server owns crawling, DB, strategy, and management; cloud receives lightweight JSON for public-facing PWA only."
+    }
+  ],
+  "important_files": [
+    "main.py",
+    "config.py",
+    "db/schema.sql",
+    "ingest/close_importer.py",
+    "ingest/attention_notice.py",
+    "ingest/disposal_notice.py",
+    "ingest/downloader.py",
+    "ingest/trading_calendar.py",
+    "api/app.py",
+    "api/run.py",
+    "api/routes/daily_close.py",
+    "api/routes/attention_notices.py",
+    "api/routes/disposal_notices.py",
+    "docs/human_first_rebuild_plan.md",
+    "docs/data_ingestion_global_policy.md",
+    "docs/local_truth_api_spec.md",
+    "docs/pwa_cli_i18n_boundary_note.md",
+    "docs/close_monthly_reconciliation_backlog.md",
+    "docs/telegram_notification_spec.md",
+    "docs/ubuntu_private_deployment.md",
+    "docs/ubuntu_private_deployment_status.md",
+    "docs/URL.txt",
+    "docs/version_roadmap_checklist.md",
+    "README.md",
+    "CHANGELOG.md",
+    ".gitignore",
+    "requirements.txt"
+  ],
+  "commands_run": [
+    {
+      "command": "git status --short --branch",
+      "result": "main is at origin/main with modified CHANGELOG.md, README.md, config.py, docs/URL.txt, ingest/downloader.py, ingest/trading_calendar.py and multiple untracked files."
+    },
+    {
+      "command": "git log --oneline --decorate -12",
+      "result": "HEAD is 201bf41 tag v0.3.3.1; previous tags include v0.3.3, v0.3.2, v0.3.1, v0.3.0."
+    },
+    {
+      "command": "rg --files docs db api ingest tasks tests | Sort-Object",
+      "result": "Listed docs, db, api, ingest, tests; tasks path not found."
+    },
+    {
+      "command": "git diff --stat",
+      "result": "6 tracked files changed, 151 insertions, 15 deletions."
+    },
+    {
+      "command": "Get-Content .gitignore",
+      "result": "Confirmed data/, tests/, tmp/, logs/, db/archive formats and office/archive files are ignored."
+    },
+    {
+      "command": "Select-String -Path db/schema.sql -Pattern \"CREATE TABLE|CREATE INDEX|UNIQUE|PRIMARY KEY\"",
+      "result": "Confirmed daily_close, attention_notices, disposal_notices, import_batches, import_errors, data_events, settings, trading_days and indexes."
+    },
+    {
+      "command": "python -m unittest discover -v",
+      "result": "Failed in current Codex shell because python command is not found."
+    },
+    {
+      "command": "C:\\Users\\time7\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe -m unittest discover -v",
+      "result": "Ran 95 tests in 4.284s OK."
+    }
+  ],
+  "tests_run": [
+    {
+      "command": "C:\\Users\\time7\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe -m unittest discover -v",
+      "date": "2026-06-06",
+      "result": "Ran 95 tests in 4.284s OK"
+    }
+  ],
+  "references": [
+    {
+      "path": "README.md",
+      "purpose": "Project quickstart and user-facing command/API summary."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "purpose": "Release history and unreleased changes."
+    },
+    {
+      "path": "docs/human_first_rebuild_plan.md",
+      "purpose": "Human-first rebuild direction."
+    },
+    {
+      "path": "docs/data_ingestion_global_policy.md",
+      "purpose": "Non-negotiable ingestion rules."
+    },
+    {
+      "path": "docs/local_truth_api_spec.md",
+      "purpose": "Local API contract and PWA/CLI boundary."
+    },
+    {
+      "path": "docs/pwa_cli_i18n_boundary_note.md",
+      "purpose": "Chinese display and structured result boundary."
+    },
+    {
+      "path": "docs/close_monthly_reconciliation_backlog.md",
+      "purpose": "Deferred Close monthly reconciliation design."
+    },
+    {
+      "path": "docs/telegram_notification_spec.md",
+      "purpose": "Telegram notification contract."
+    },
+    {
+      "path": "docs/ubuntu_private_deployment.md",
+      "purpose": "Ubuntu private deployment instructions."
+    },
+    {
+      "path": "docs/ubuntu_private_deployment_status.md",
+      "purpose": "Deployment validation record."
+    },
+    {
+      "path": "docs/URL.txt",
+      "purpose": "Official source URLs."
+    },
+    {
+      "path": "docs/version_roadmap_checklist.md",
+      "purpose": "Version roadmap and next-step checklist."
+    },
+    {
+      "path": "db/schema.sql",
+      "purpose": "Database schema contract."
+    },
+    {
+      "url": "https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date=YYYYMMDD&response=json",
+      "purpose": "TWSE trading calendar source."
+    },
+    {
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex?date=YYYY%2FMM%2FDD&id=&response=json",
+      "purpose": "TPEx trading calendar fallback source."
+    }
+  ],
+  "open_questions": [
+    "Should the uncommitted TPEx trading-calendar fallback be released as v0.3.3.2 or another version?",
+    "Should tests/ remain ignored, or should selected tests be tracked before public preview?",
+    "Where is the exact Claude implementation plan file, if separate from current docs?",
+    "What should be done with untracked legacy files and large files in the working tree?",
+    "When should cloud export contract work begin, and should it live outside this repo entirely?"
+  ],
+  "next_recommended_task": "Review, commit, tag, push, and server-validate the TPEx trading-calendar fallback patch before starting v0.3.4 institutional investors."
+}
