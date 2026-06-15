@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.4.0 - 2026-06-16
+
+### Added
+
+- Added canonical SQLite `legal_investors` schema and indexes.
+- Added legal investor CSV parsing, validation, reporting, dry-run, formal import, and manual single-day update workflows.
+- Added historical TWSE/TPEX legal investor backfill support with legacy format normalization.
+- Added `update-legal` idempotency safeguards for existing rows, closed days, and missing `daily_close` rows.
+- Added legal investor unit coverage for parser formats, validation blockers, formal imports, and update behavior.
+
+### Notes
+
+- Historical legal investor SQLite coverage is accepted through 2026-06-15 after post-import integrity, duplicate-key, coverage, and idempotency checks.
+- `legal_investors` stores foreign, investment trust, dealer self-trading, and dealer hedge columns; foreign dealer and total columns are intentionally not stored.
+- Formal systemd schedule target is `Mon..Fri 18:00` via `veristockdb-update-legal.timer`.
+
 ## v0.3.3.1 - 2026-06-05
 
 ### Changed

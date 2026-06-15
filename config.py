@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.3.3.1"
-SCHEMA_VERSION = "0.2-human-first"
+APP_VERSION = "0.3.4.0"
+SCHEMA_VERSION = "0.3-legal-investors"
 
 
 def _path_from_env(name: str, default: Path) -> Path:

@@ -122,8 +122,8 @@
 - Main SQLite DB contains populated `legal_investors` table.
 - `legal_investors` row count is verified `5807251`.
 - Accepted legal investor historical backfill has been run for TWSE/TPEX source coverage.
-- No formal schema migration version bump has been accepted in this state file.
-- `APP_VERSION` remains previously accepted value; do not assume version bump unless verified separately.
+- Formal release version accepted: `APP_VERSION=0.3.4.0`, `SCHEMA_VERSION=0.3-legal-investors`.
+- Release tag target: `v0.3.4.0`.
 
 ## Modified Files
 
