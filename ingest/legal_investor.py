@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
+import re
 from pathlib import Path
 import sqlite3
 
@@ -139,11 +140,45 @@ def validate_legal_csv_bytes(raw: bytes, market: str, trade_date: str) -> None:
     if market not in config.MARKETS:
         raise ValueError(f'unknown market: {market}')
     text, _encoding = _decode_legal_text(raw, f'{market} {trade_date}')
+    content_trade_date = _find_content_trade_date(text)
+    if content_trade_date != trade_date:
+        raise ValueError(
+            f'legal investor CSV date mismatch: expected {trade_date} {market}, got {content_trade_date}'
+        )
     rows = list(csv.reader(text.splitlines()))
     header_index = _find_header_index(rows)
     data_rows = [row for row in rows[header_index + 1 :] if _is_data_row(row)]
     if not data_rows:
         raise ValueError(f'legal investor CSV has no data rows: {trade_date} {market}')
+
+
+def _find_content_trade_date(text: str) -> str:
+    for line in text.splitlines()[:8]:
+        trade_date = _parse_trade_date_text(line)
+        if trade_date:
+            return trade_date
+    raise ValueError('legal investor CSV content date not found')
+
+
+def _parse_trade_date_text(text: str) -> str | None:
+    roc_match = re.search(r'(?<!\d)(\d{2,3})\s*[年/.\-]\s*(\d{1,2})\s*[月/.\-]\s*(\d{1,2})\s*日?', text)
+    if roc_match:
+        year = int(roc_match.group(1))
+        month = int(roc_match.group(2))
+        day = int(roc_match.group(3))
+        if year < 1911:
+            year += 1911
+        if 2000 <= year <= 2099 and 1 <= month <= 12 and 1 <= day <= 31:
+            return f'{year:04d}-{month:02d}-{day:02d}'
+
+    gregorian_match = re.search(r'(?<!\d)(20\d{2})\s*[年/.\-]?\s*(\d{1,2})\s*[月/.\-]?\s*(\d{1,2})\s*日?', text)
+    if gregorian_match:
+        year = int(gregorian_match.group(1))
+        month = int(gregorian_match.group(2))
+        day = int(gregorian_match.group(3))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f'{year:04d}-{month:02d}-{day:02d}'
+    return None
 
 
 def _read_text(path: Path) -> tuple[str, str]:

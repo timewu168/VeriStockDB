@@ -23,7 +23,7 @@ CREATE TABLE trading_days(
 def sample_legal_csv(market: str, trade_date: str) -> bytes:
     return '\n'.join(
         [
-            f'{trade_date} {market} 三大法人日交易資訊',
+            f'{trade_date.replace('-', '')} {market} 三大法人日交易資訊',
             '證券代號,證券名稱,外資買進股數,投信買進股數,自營商買進股數',
             '2330,台積電,1000,200,300',
         ]
@@ -125,8 +125,54 @@ class LegalInvestorTests(unittest.TestCase):
                 legal_investor.ensure_trading_days_current = original_calendar
 
             self.assertEqual(results[0].status, 'MISSING')
-            self.assertIn('header not found', results[0].error or '')
+            self.assertIn('content date not found', results[0].error or '')
             self.assertEqual(existing_path.read_bytes(), original_bytes)
+
+    def test_download_legal_range_rejects_wrong_content_date_without_overwriting_existing_file(self) -> None:
+        conn = sqlite3.connect(':memory:')
+        conn.row_factory = sqlite3.Row
+        conn.executescript(SCHEMA)
+        conn.execute(
+            'INSERT INTO trading_days VALUES (?, ?, ?, ?)',
+            ('2026-06-12', 1, 'seed', ''),
+        )
+        original_csv_dir = config.CSV_DIR
+        original_calendar = legal_investor.ensure_trading_days_current
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.CSV_DIR = Path(temp_dir)
+            legal_investor.ensure_trading_days_current = lambda *args, **kwargs: 0
+            existing_path = legal_investor.legal_csv_path('TWSE', '2026-06-12')
+            existing_path.parent.mkdir(parents=True, exist_ok=True)
+            existing_path.write_bytes(sample_legal_csv('TWSE', '2026-06-12'))
+            original_bytes = existing_path.read_bytes()
+            try:
+                results = legal_investor.download_legal_range(
+                    conn,
+                    start='2026-06-12',
+                    end='2026-06-12',
+                    markets=('TWSE',),
+                    fetcher=lambda market, trade_date: sample_legal_csv(market, '2026-06-11'),
+                    cooldown=CooldownController(enabled=False),
+                )
+            finally:
+                config.CSV_DIR = original_csv_dir
+                legal_investor.ensure_trading_days_current = original_calendar
+
+            self.assertEqual(results[0].status, 'MISSING')
+            self.assertIn('date mismatch', results[0].error or '')
+            self.assertEqual(existing_path.read_bytes(), original_bytes)
+
+    def test_validate_legal_csv_bytes_accepts_roc_content_date(self) -> None:
+        content = '\n'.join(
+            [
+                '115年06月12日 三大法人日交易資訊',
+                '證券代號,證券名稱,外資買進股數,投信買進股數,自營商買進股數',
+                '2330,台積電,1000,200,300',
+            ]
+        ).encode('cp950')
+
+        legal_investor.validate_legal_csv_bytes(content, 'TWSE', '2026-06-12')
 
     def test_inspect_legal_file_reports_header_fields_and_samples(self) -> None:
         content = '\n'.join(
