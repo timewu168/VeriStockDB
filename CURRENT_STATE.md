@@ -12,7 +12,7 @@
 
 ## Accepted Baseline
 
-- Git HEAD: `c8853db`.
+- Git HEAD: verify with `git rev-parse HEAD`; this state file was updated after the legal investor workflow was pushed to `origin/main`.
 - SQLite DB path: `/srv/veristockdb/app/data/db/veristock.db`.
 - SQLite DB size verified after 2026-06-15 legal update: `2379722752` bytes.
 - SQLite `PRAGMA integrity_check`: `ok`.
