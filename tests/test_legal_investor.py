@@ -174,6 +174,18 @@ class LegalInvestorTests(unittest.TestCase):
 
         legal_investor.validate_legal_csv_bytes(content, 'TWSE', '2026-06-12')
 
+    def test_validate_legal_csv_bytes_rejects_short_data_rows(self) -> None:
+        content = '\n'.join(
+            [
+                '115年06月12日 三大法人日交易資訊',
+                '證券代號,證券名稱,外陸資買進股數(不含外資自營商),外陸資賣出股數(不含外資自營商),外陸資買賣超股數(不含外資自營商),外資自營商買進股數,外資自營商賣出股數,外資自營商買賣超股數,投信買進股數,投信賣出股數,投信買賣超股數',
+                '2330,台積電,1,2,3,4,5,6',
+            ]
+        ).encode('cp950')
+
+        with self.assertRaisesRegex(ValueError, 'too few columns'):
+            legal_investor.validate_legal_csv_bytes(content, 'TWSE', '2026-06-12')
+
     def test_inspect_legal_file_reports_header_fields_and_samples(self) -> None:
         content = '\n'.join(
             [
@@ -194,6 +206,23 @@ class LegalInvestorTests(unittest.TestCase):
         self.assertEqual(summary.row_count, 2)
         self.assertEqual(summary.fields[:2], ['證券代號', '證券名稱'])
         self.assertEqual(summary.sample_rows, [['2330', '台積電', '1,000', '200', '300']])
+
+    def test_inspect_legal_file_accepts_formula_style_security_codes_and_skips_notes(self) -> None:
+        content = '\n'.join(
+            [
+                '115年06月12日 三大法人日交易資訊',
+                '證券代號,證券名稱,外資買進股數,投信買進股數,自營商買進股數',
+                '="00637L",元大滬深300正2,1000,200,300',
+                '自營商表示證券自營商專戶。',
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / 'legal.csv'
+            path.write_text(content, encoding='utf-8-sig')
+            summary = legal_investor.inspect_legal_file(path, 'TWSE', sample_size=1)
+
+        self.assertEqual(summary.row_count, 1)
+        self.assertEqual(summary.sample_rows[0][0], '="00637L"')
 
 
 if __name__ == '__main__':

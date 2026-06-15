@@ -120,6 +120,7 @@ def inspect_legal_file(path: Path | str, market: str, *, sample_size: int = 3) -
     header_index = _find_header_index(rows)
     fields = [_clean_cell(cell) for cell in rows[header_index]]
     data_rows = [row for row in rows[header_index + 1 :] if _is_data_row(row)]
+    _validate_data_row_widths(data_rows, len(fields), market, source.name)
     sample_rows = [_trim_row(row, len(fields)) for row in data_rows[:sample_size]]
     return LegalInspectSummary(
         market=market,
@@ -147,9 +148,21 @@ def validate_legal_csv_bytes(raw: bytes, market: str, trade_date: str) -> None:
         )
     rows = list(csv.reader(text.splitlines()))
     header_index = _find_header_index(rows)
+    fields = [_clean_cell(cell) for cell in rows[header_index]]
     data_rows = [row for row in rows[header_index + 1 :] if _is_data_row(row)]
     if not data_rows:
         raise ValueError(f'legal investor CSV has no data rows: {trade_date} {market}')
+    _validate_data_row_widths(data_rows, len(fields), market, trade_date)
+
+
+def _validate_data_row_widths(data_rows: list[list[str]], field_count: int, market: str, source: str) -> None:
+    for row in data_rows:
+        if len(row) < field_count:
+            code = _clean_cell(row[0]) if row else ''
+            raise ValueError(
+                f'legal investor CSV row has too few columns: {source} {market} '
+                f'code={code} columns={len(row)} expected={field_count}'
+            )
 
 
 def _find_content_trade_date(text: str) -> str:
@@ -214,8 +227,12 @@ def _find_header_index(rows: list[list[str]]) -> int:
 def _is_data_row(row: list[str]) -> bool:
     if not row:
         return False
-    first = _clean_cell(row[0])
-    return bool(first and not first.startswith('=') and not first.startswith('說明') and first != '證券代號')
+    first = _clean_security_code(row[0])
+    return bool(re.match(r'^\d[0-9A-Z]*$', first))
+
+
+def _clean_security_code(value: str) -> str:
+    return _clean_cell(value).strip('=').strip('\"').strip()
 
 
 def _trim_row(row: list[str], size: int) -> list[str]:
