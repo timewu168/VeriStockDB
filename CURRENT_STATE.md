@@ -12,7 +12,7 @@
 
 ## Accepted Baseline
 
-- Git HEAD: `b45eb07`.
+- Git HEAD: `c8853db`.
 - SQLite DB path: `/srv/veristockdb/app/data/db/veristock.db`.
 - SQLite DB size verified after 2026-06-15 legal update: `2379722752` bytes.
 - SQLite `PRAGMA integrity_check`: `ok`.
