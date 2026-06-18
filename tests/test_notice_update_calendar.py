@@ -123,23 +123,31 @@ class NoticeUpdateCalendarTests(unittest.TestCase):
             {'OK': 0, 'FIXED': 0, 'BLOCKED': 0, 'RECHECK': 0, 'MISSING': 0, 'SKIPPED': 1},
         )
 
-    def test_disposal_update_skips_closed_target_without_official_download(self) -> None:
-        original = disposal.ensure_trading_days_current
+    def test_disposal_update_uses_announcement_horizon_even_when_target_is_closed(self) -> None:
+        calls: list[tuple[str, str, str]] = []
+
+        def fake_import(conn, *, market, start, end, fetcher, cooldown, log):
+            calls.append((market, start, end))
+            return DisposalNoticeImportResult(
+                'new', market, f'{start}..{end}', 'OK', 1, 0, 0, 0, 0, 0, 0, 0, 0, 'fake'
+            )
+
+        original_calendar = disposal.ensure_trading_days_current
+        original_import = disposal.import_disposal_notice_official
         disposal.ensure_trading_days_current = lambda *args, **kwargs: 0
+        disposal.import_disposal_notice_official = fake_import
         try:
             stats = disposal.import_disposal_notice_update(
                 self.conn,
                 through_date='2026-06-07',
                 markets=('TWSE',),
-                fetcher=_raising_fetcher,
             )
         finally:
-            disposal.ensure_trading_days_current = original
+            disposal.ensure_trading_days_current = original_calendar
+            disposal.import_disposal_notice_official = original_import
 
-        self.assertEqual(
-            stats,
-            {'OK': 0, 'FIXED': 0, 'BLOCKED': 0, 'RECHECK': 0, 'MISSING': 0, 'SKIPPED': 1},
-        )
+        self.assertEqual(stats['OK'], 1)
+        self.assertEqual(calls, [('TWSE', '2026-06-05', '2026-06-22')])
 
     def test_closed_day_ok_batch_does_not_advance_disposal_latest(self) -> None:
         self.conn.execute(
@@ -170,7 +178,50 @@ class NoticeUpdateCalendarTests(unittest.TestCase):
             disposal.import_disposal_notice_official = original_import
 
         self.assertEqual(stats['OK'], 1)
-        self.assertEqual(calls, [('TWSE', '2026-06-08', '2026-06-08')])
+        self.assertEqual(calls, [('TWSE', '2026-06-05', '2026-06-23')])
+
+    def test_disposal_update_queries_requested_target_plus_15_days(self) -> None:
+        self.conn.execute(
+            'INSERT INTO trading_days VALUES (?, ?, ?, ?)',
+            ('2026-06-16', 1, 'seed', ''),
+        )
+        self.conn.execute(
+            'INSERT INTO trading_days VALUES (?, ?, ?, ?)',
+            ('2026-06-17', 1, 'seed', ''),
+        )
+        self.conn.execute(
+            'INSERT INTO trading_days VALUES (?, ?, ?, ?)',
+            ('2026-06-18', 1, 'seed', ''),
+        )
+        self.conn.execute(
+            "INSERT INTO disposal_notices VALUES "
+            "('2026-06-16','TWSE','3167','大量',"
+            "'2026-06-17','2026-07-01','x','y')"
+        )
+        calls: list[tuple[str, str, str]] = []
+
+        def fake_import(conn, *, market, start, end, fetcher, cooldown, log):
+            calls.append((market, start, end))
+            return DisposalNoticeImportResult(
+                'new', market, f'{start}..{end}', 'OK', 1, 0, 0, 0, 0, 0, 0, 0, 0, 'fake'
+            )
+
+        original_calendar = disposal.ensure_trading_days_current
+        original_import = disposal.import_disposal_notice_official
+        disposal.ensure_trading_days_current = lambda *args, **kwargs: 0
+        disposal.import_disposal_notice_official = fake_import
+        try:
+            stats = disposal.import_disposal_notice_update(
+                self.conn,
+                through_date='2026-06-18',
+                markets=('TWSE',),
+            )
+        finally:
+            disposal.ensure_trading_days_current = original_calendar
+            disposal.import_disposal_notice_official = original_import
+
+        self.assertEqual(stats['OK'], 1)
+        self.assertEqual(calls, [('TWSE', '2026-06-16', '2026-07-03')])
 
 
 def _raising_fetcher(*args):

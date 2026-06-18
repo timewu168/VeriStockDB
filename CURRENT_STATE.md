@@ -4,12 +4,14 @@
 
 - Legal investor (`legal_investors`) historical import, manual update, idempotency checks, release, GitHub push, and weekday 18:00 systemd timer are complete.
 - Margin (`margin_trading`) raw CSV download, validation, parser dry-run, schema creation, formal SQLite import, and post-import validation are complete.
-- Formal code release in progress: `APP_VERSION=0.3.5.0`, `SCHEMA_VERSION=0.3-margin-trading`, target tag `v0.3.5.0`.
+- Formal code release in progress: `APP_VERSION=0.3.5.1`, `SCHEMA_VERSION=0.3-margin-trading`, latest patch target tag `v0.3.5.1`.
 - Margin incremental update command `update-margin` is implemented and verified with existing-date idempotency.
 - Margin production systemd timer is not yet enabled because this Codex session cannot provide sudo password interactively; requested schedule is after legal investor, planned `Mon..Fri 18:30`.
 
 ## Accepted Baseline
 
+- Disposal notice update horizon fix (`v0.3.5.1` pending/published): `update-disposal` now uses the latest canonical announcement date as start and `requested_target + 15 days` as official query end, because official disposal endpoints filter by active disposal period rather than only announcement date.
+- Disposal notice 2026-06-17 announcements were backfilled after the fix: TWSE `3` rows, TPEX `11` rows; problem batches `0`.
 - Previous Git release baseline: `6dad12e` / tag `v0.3.4.0` / `origin/main`.
 - SQLite DB path: `/srv/veristockdb/app/data/db/veristock.db`.
 - SQLite `PRAGMA integrity_check` after margin import: `ok`.
@@ -80,7 +82,7 @@
 
 - `db/schema.sql` includes `legal_investors` and `margin_trading` tables and indexes.
 - Main SQLite DB contains populated `legal_investors` and `margin_trading` tables.
-- Current code version: `APP_VERSION=0.3.5.0`, `SCHEMA_VERSION=0.3-margin-trading`.
+- Current code version: `APP_VERSION=0.3.5.1`, `SCHEMA_VERSION=0.3-margin-trading`.
 - Margin canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - Margin canonical table columns: `trade_date`, `market`, `stock_id`, `stock_name`, `margin_buy`, `margin_sell`, `margin_cash_repay`, `previous_margin_balance`, `margin_balance`, `margin_limit`, `short_buy`, `short_sell`, `short_stock_repay`, `previous_short_balance`, `short_balance`, `short_limit`, `offsetting`, `note`.
 

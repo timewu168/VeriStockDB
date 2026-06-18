@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 import csv
 import hashlib
@@ -291,11 +291,7 @@ def import_disposal_notice_update(
         cooldown=cooldown,
         log=log,
     )
-    target = latest_open_trading_day_on_or_before(conn, requested_target)
-    if target is None:
-        raise ValueError(
-            f"no open trading day found on or before disposal_notice target {requested_target}"
-        )
+    official_end = (date.fromisoformat(requested_target) + timedelta(days=15)).isoformat()
 
     for market in selected_markets:
         latest = latest_disposal_notice_date(conn, market)
@@ -303,38 +299,24 @@ def import_disposal_notice_update(
             raise ValueError(
                 f"no existing disposal_notice coverage for {market}; seed with import-disposal first"
             )
-        latest_open = latest_open_trading_day_on_or_before(conn, latest)
-        if latest_open is None:
-            raise ValueError(
-                f"no open trading day found on or before disposal_notice latest {latest} for {market}"
-            )
-        if latest_open >= target:
+        if latest >= requested_target:
             if log:
                 log(
                     f"INFO disposal_notice {market} already current: "
-                    f"latest_open={latest_open} target_open={target} requested_target={requested_target}"
-                )
-            stats["SKIPPED"] += 1
-            continue
-        first_open = next_open_trading_day_after(conn, latest_open, target)
-        if first_open is None:
-            if log:
-                log(
-                    f"INFO disposal_notice {market} no open trading days to update: "
-                    f"latest_open={latest_open} target_open={target} requested_target={requested_target}"
+                    f"latest={latest} requested_target={requested_target}"
                 )
             stats["SKIPPED"] += 1
             continue
         if log:
             log(
-                f"Update Disposal: {market} latest={latest} latest_open={latest_open} "
-                f"range={first_open} -> {target} requested_target={requested_target}"
+                f"Update Disposal: {market} latest={latest} "
+                f"range={latest} -> {official_end} requested_target={requested_target}"
             )
         result = import_disposal_notice_official(
             conn,
             market=market,
-            start=first_open,
-            end=target,
+            start=latest,
+            end=official_end,
             fetcher=fetcher,
             cooldown=cooldown,
             log=log,
@@ -349,7 +331,6 @@ def import_disposal_notice_update(
 
 
 def latest_disposal_notice_date(conn: sqlite3.Connection, market: str | None = None) -> str | None:
-    dates: list[str] = []
     if market:
         row = conn.execute(
             "SELECT MAX(trade_date) AS trade_date FROM disposal_notices WHERE market = ?",
@@ -358,27 +339,8 @@ def latest_disposal_notice_date(conn: sqlite3.Connection, market: str | None = N
     else:
         row = conn.execute("SELECT MAX(trade_date) AS trade_date FROM disposal_notices").fetchone()
     if row and row["trade_date"]:
-        dates.append(row["trade_date"])
-
-    params: list[str] = [DATASET_DISPOSAL_NOTICE]
-    where = "dataset = ? AND status IN ('OK', 'FIXED')"
-    if market:
-        where += " AND market = ?"
-        params.append(market)
-    rows = conn.execute(
-        f"""
-        SELECT period
-        FROM import_batches
-        WHERE {where}
-        """,
-        params,
-    ).fetchall()
-    dates.extend(
-        period_end
-        for row in rows
-        if (period_end := _period_end(row["period"])) is not None
-    )
-    return max(dates) if dates else None
+        return row["trade_date"]
+    return None
 
 
 def _record_disposal_import(
