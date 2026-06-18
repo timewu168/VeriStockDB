@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.3.8.1
+Version: v0.3.8.2
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 

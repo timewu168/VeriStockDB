@@ -48,6 +48,7 @@ def download_margin_range(
     cooldown: CooldownController | None = None,
     overwrite: bool = False,
     log: LogFunc | None = None,
+    max_attempts: int = 3,
 ) -> list[MarginDownloadResult]:
     start = validate_iso_date(start)
     end = validate_iso_date(end)
@@ -66,6 +67,7 @@ def download_margin_range(
         overwrite=overwrite,
         parallel_markets=False,
         log=log,
+        max_attempts=max_attempts,
     )
 
 
@@ -80,6 +82,7 @@ def download_margin_dates(
     overwrite: bool = False,
     parallel_markets: bool = True,
     log: LogFunc | None = None,
+    max_attempts: int = 3,
 ) -> list[MarginDownloadResult]:
     if log:
         mode = 'parallel' if parallel_markets and len(markets) > 1 else 'serial'
@@ -106,6 +109,7 @@ def download_margin_dates(
                     (cooldowns or {}).get(market) or CooldownController(),
                     overwrite,
                     locked_log,
+                    max_attempts,
                 )
                 for market in markets
             ]
@@ -123,6 +127,7 @@ def download_margin_dates(
                 (cooldowns or {}).get(market) or CooldownController(),
                 overwrite,
                 locked_log,
+                max_attempts,
             )
         )
     return results
@@ -135,6 +140,7 @@ def _download_margin_market(
     cooldown: CooldownController,
     overwrite: bool,
     log: LogFunc | None,
+    max_attempts: int = 3,
 ) -> list[MarginDownloadResult]:
     results: list[MarginDownloadResult] = []
     for trade_date in open_dates:
@@ -155,21 +161,6 @@ def _download_margin_market(
                 if log:
                     log(f'INFO {trade_date} {market} margin file exists {path} bytes={size}')
                 continue
-            cooldown.before_request(log)
-            raw = fetcher(market, trade_date)
-            _validate_margin_response(raw, market, trade_date)
-            path = save_official_margin_file(raw, market, trade_date)
-            results.append(
-                MarginDownloadResult(
-                    market=market,
-                    trade_date=trade_date,
-                    status='OK',
-                    path=str(path),
-                    bytes_written=len(raw),
-                )
-            )
-            if log:
-                log(f'INFO {trade_date} {market} margin file saved {path} bytes={len(raw)}')
         except Exception as exc:
             results.append(
                 MarginDownloadResult(
@@ -182,7 +173,47 @@ def _download_margin_market(
                 )
             )
             if log:
-                log(f'ERROR {trade_date} {market} margin download failed: {exc}')
+                log(f'ERROR {trade_date} {market} margin download unsupported: {exc}')
+            continue
+
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                cooldown.before_request(log)
+                raw = fetcher(market, trade_date)
+                _validate_margin_response(raw, market, trade_date)
+                path = save_official_margin_file(raw, market, trade_date)
+                results.append(
+                    MarginDownloadResult(
+                        market=market,
+                        trade_date=trade_date,
+                        status='OK',
+                        path=str(path),
+                        bytes_written=len(raw),
+                    )
+                )
+                if log:
+                    log(
+                        f'INFO {trade_date} {market} margin file saved {path} '
+                        f'bytes={len(raw)} attempt={attempt}'
+                    )
+                break
+            except Exception as exc:
+                last_error = exc
+                if log:
+                    message = f'ERROR {trade_date} {market} margin attempt {attempt} failed: {exc}'
+                    log(f'{message}; retrying' if attempt < max_attempts else message)
+        else:
+            results.append(
+                MarginDownloadResult(
+                    market=market,
+                    trade_date=trade_date,
+                    status='MISSING',
+                    path=None,
+                    bytes_written=0,
+                    error=str(last_error) if last_error else 'margin download failed',
+                )
+            )
     return results
 
 
@@ -545,6 +576,7 @@ def update_margin_day(
     fetcher: FetchMarginFile = download_margin_file,
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
+    max_attempts: int = 3,
 ) -> list[MarginUpdateResult]:
     trade_date = validate_iso_date(trade_date)
     selected_markets = markets or config.MARKETS
@@ -607,24 +639,46 @@ def update_margin_day(
                     )
                 )
                 continue
-            cooldown.before_request(log)
-            raw = fetcher(market, trade_date)
-            _validate_margin_response(raw, market, trade_date)
-            path = save_official_margin_file(raw, market, trade_date)
-            records, problems = parse_margin_file(path, market, trade_date)
-            if problems:
-                first = problems[0]
-                raise ValueError(f'{first.problem} {first.detail}'.strip())
-            _insert_margin_rows(conn, records)
-            results.append(
-                MarginUpdateResult(
-                    market=market,
-                    trade_date=trade_date,
-                    status='OK',
-                    row_count=len(records),
-                    source_file=str(path),
+            last_error: Exception | None = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    cooldown.before_request(log)
+                    raw = fetcher(market, trade_date)
+                    _validate_margin_response(raw, market, trade_date)
+                    path = save_official_margin_file(raw, market, trade_date)
+                    records, problems = parse_margin_file(path, market, trade_date)
+                    if problems:
+                        first = problems[0]
+                        raise ValueError(f'{first.problem} {first.detail}'.strip())
+                    _insert_margin_rows(conn, records)
+                    results.append(
+                        MarginUpdateResult(
+                            market=market,
+                            trade_date=trade_date,
+                            status='OK',
+                            row_count=len(records),
+                            source_file=str(path),
+                        )
+                    )
+                    if log:
+                        log(f'INFO {trade_date} {market} margin update attempt {attempt} OK')
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    if log:
+                        message = f'ERROR {trade_date} {market} margin update attempt {attempt} failed: {exc}'
+                        log(f'{message}; retrying' if attempt < max_attempts else message)
+            else:
+                results.append(
+                    MarginUpdateResult(
+                        market=market,
+                        trade_date=trade_date,
+                        status='BLOCKED',
+                        row_count=0,
+                        source_file=None,
+                        error=str(last_error) if last_error else 'margin update failed',
+                    )
                 )
-            )
         except Exception as exc:
             results.append(
                 MarginUpdateResult(

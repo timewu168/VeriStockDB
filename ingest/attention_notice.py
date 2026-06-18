@@ -154,6 +154,7 @@ def import_attention_notice_file(
     *,
     path: Path | str,
     market: str,
+    retry_count: int = 0,
 ) -> AttentionNoticeImportResult:
     source_path = Path(path)
     raw = source_path.read_bytes()
@@ -175,7 +176,7 @@ def import_attention_notice_file(
             errors=errors,
             source_file=str(source_path),
             source_sha256=source_sha256,
-            retry_count=0,
+            retry_count=retry_count,
             note=_summary_note(summary),
         )
         return AttentionNoticeImportResult(
@@ -205,7 +206,7 @@ def import_attention_notice_file(
         errors=[],
         source_file=str(source_path),
         source_sha256=source_sha256,
-        retry_count=0,
+        retry_count=retry_count,
         note=_summary_note(summary),
         clear_manual_approval=True,
     )
@@ -232,29 +233,52 @@ def import_attention_notice_official(
     fetcher: FetchAttentionCsv = download_attention_csv,
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
+    max_attempts: int = 3,
 ) -> AttentionNoticeImportResult:
     start = validate_iso_date(start)
     end = validate_iso_date(end)
     if start > end:
         raise ValueError(f"attention notice start date is after end date: {start} > {end}")
     cooldown = cooldown or CooldownController()
-    raw: bytes | None = None
-    source_path: Path | None = None
-    try:
-        cooldown.before_request(log)
-        raw = fetcher(market, start, end)
-        source_path = save_official_attention_csv(raw, market, start, end)
-        return import_attention_notice_file(conn, path=source_path, market=market)
-    except Exception as exc:
-        return _record_official_failure(
-            conn,
-            market=market,
-            start=start,
-            end=end,
-            exc=exc,
-            raw=raw,
-            source_path=source_path,
-        )
+    last_result: AttentionNoticeImportResult | None = None
+    for attempt in range(1, max_attempts + 1):
+        raw: bytes | None = None
+        source_path: Path | None = None
+        try:
+            cooldown.before_request(log)
+            raw = fetcher(market, start, end)
+            source_path = save_official_attention_csv(raw, market, start, end)
+            result = import_attention_notice_file(
+                conn, path=source_path, market=market, retry_count=attempt - 1
+            )
+            last_result = result
+            if result.status in {"OK", "FIXED"}:
+                if log:
+                    log(f"INFO {result.period} {market} attention attempt {attempt} {result.status}")
+                return result
+            if log:
+                message = f"INFO {result.period} {market} attention attempt {attempt} {result.status}"
+                log(f"{message}; retrying" if attempt < max_attempts else message)
+        except Exception as exc:
+            last_result = _record_official_failure(
+                conn,
+                market=market,
+                start=start,
+                end=end,
+                exc=exc,
+                raw=raw,
+                source_path=source_path,
+                retry_count=attempt - 1,
+            )
+            if log:
+                message = (
+                    f"ERROR {_period_from_dates(start, end)} {market} "
+                    f"attention attempt {attempt} failed: {exc}"
+                )
+                log(f"{message}; retrying" if attempt < max_attempts else message)
+    if last_result is None:
+        raise RuntimeError("attention notice official import did not run")
+    return last_result
 
 
 def import_attention_notice_update(
@@ -578,6 +602,7 @@ def _record_official_failure(
     exc: Exception,
     raw: bytes | None,
     source_path: Path | None,
+    retry_count: int = 0,
 ) -> AttentionNoticeImportResult:
     status = "MISSING" if raw is None else "BLOCKED"
     code = "DOWNLOAD_FAILED" if raw is None else "ATTENTION_IMPORT_FAILED"
@@ -593,7 +618,7 @@ def _record_official_failure(
         errors=[ValidationError("BLOCK", code, str(exc))],
         source_file=str(source_path) if source_path else None,
         source_sha256=source_sha256,
-        retry_count=0,
+        retry_count=retry_count,
         note="official_download",
     )
     return AttentionNoticeImportResult(

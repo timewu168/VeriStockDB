@@ -207,6 +207,7 @@ def import_disposal_notice_file(
     *,
     path: Path | str,
     market: str,
+    retry_count: int = 0,
 ) -> DisposalNoticeImportResult:
     source_path = Path(path)
     raw = source_path.read_bytes()
@@ -222,6 +223,7 @@ def import_disposal_notice_file(
         summary=summary,
         period=period,
         replace_existing=True,
+        retry_count=retry_count,
     )
 
 
@@ -234,40 +236,68 @@ def import_disposal_notice_official(
     fetcher: FetchDisposalCsv = download_disposal_csv,
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
+    max_attempts: int = 3,
 ) -> DisposalNoticeImportResult:
     start = validate_iso_date(start)
     end = validate_iso_date(end)
     if start > end:
         raise ValueError(f"disposal notice start date is after end date: {start} > {end}")
     cooldown = cooldown or CooldownController()
-    raw: bytes | None = None
-    source_path: Path | None = None
-    try:
-        cooldown.before_request(log)
-        raw = fetcher(market, start, end)
-        source_path = save_official_disposal_csv(raw, market, start, end)
-        source_sha256 = hashlib.sha256(raw).hexdigest()
-        result = parse_disposal_notice_file(source_path, market)
-        summary = summarize_disposal_notice(result)
-        return _record_disposal_import(
-            conn,
-            source_path=source_path,
-            source_sha256=source_sha256,
-            result=result,
-            summary=summary,
-            period=_period_from_dates(start, end),
-            replace_existing=False,
-        )
-    except Exception as exc:
-        return _record_official_failure(
-            conn,
-            market=market,
-            start=start,
-            end=end,
-            exc=exc,
-            raw=raw,
-            source_path=source_path,
-        )
+    last_result: DisposalNoticeImportResult | None = None
+    for attempt in range(1, max_attempts + 1):
+        raw: bytes | None = None
+        source_path: Path | None = None
+        try:
+            cooldown.before_request(log)
+            raw = fetcher(market, start, end)
+            source_path = save_official_disposal_csv(raw, market, start, end)
+            source_sha256 = hashlib.sha256(raw).hexdigest()
+            result = parse_disposal_notice_file(source_path, market)
+            summary = summarize_disposal_notice(result)
+            import_result = _record_disposal_import(
+                conn,
+                source_path=source_path,
+                source_sha256=source_sha256,
+                result=result,
+                summary=summary,
+                period=_period_from_dates(start, end),
+                replace_existing=False,
+                retry_count=attempt - 1,
+            )
+            last_result = import_result
+            if import_result.status in {"OK", "FIXED"}:
+                if log:
+                    log(
+                        f"INFO {import_result.period} {market} disposal "
+                        f"attempt {attempt} {import_result.status}"
+                    )
+                return import_result
+            if log:
+                message = (
+                    f"INFO {import_result.period} {market} disposal "
+                    f"attempt {attempt} {import_result.status}"
+                )
+                log(f"{message}; retrying" if attempt < max_attempts else message)
+        except Exception as exc:
+            last_result = _record_official_failure(
+                conn,
+                market=market,
+                start=start,
+                end=end,
+                exc=exc,
+                raw=raw,
+                source_path=source_path,
+                retry_count=attempt - 1,
+            )
+            if log:
+                message = (
+                    f"ERROR {_period_from_dates(start, end)} {market} "
+                    f"disposal attempt {attempt} failed: {exc}"
+                )
+                log(f"{message}; retrying" if attempt < max_attempts else message)
+    if last_result is None:
+        raise RuntimeError("disposal notice official import did not run")
+    return last_result
 
 
 def import_disposal_notice_update(
@@ -352,6 +382,7 @@ def _record_disposal_import(
     summary: DisposalNoticeSummary,
     period: str,
     replace_existing: bool,
+    retry_count: int = 0,
 ) -> DisposalNoticeImportResult:
     existing = batch_status.get_batch(conn, DATASET_DISPOSAL_NOTICE, summary.market, period)
     errors = _summary_errors(summary)
@@ -367,7 +398,7 @@ def _record_disposal_import(
             errors=errors,
             source_file=str(source_path),
             source_sha256=source_sha256,
-            retry_count=0,
+            retry_count=retry_count,
             note=_summary_note(summary),
         )
         return _import_result(
@@ -395,7 +426,7 @@ def _record_disposal_import(
         errors=[],
         source_file=str(source_path),
         source_sha256=source_sha256,
-        retry_count=0,
+        retry_count=retry_count,
         note=_summary_note(summary),
         clear_manual_approval=True,
     )
@@ -721,6 +752,7 @@ def _record_official_failure(
     exc: Exception,
     raw: bytes | None,
     source_path: Path | None,
+    retry_count: int = 0,
 ) -> DisposalNoticeImportResult:
     status = "MISSING" if raw is None else "BLOCKED"
     code = "DOWNLOAD_FAILED" if raw is None else "DISPOSAL_IMPORT_FAILED"
@@ -736,7 +768,7 @@ def _record_official_failure(
         errors=[ValidationError("BLOCK", code, str(exc))],
         source_file=str(source_path) if source_path else None,
         source_sha256=source_sha256,
-        retry_count=0,
+        retry_count=retry_count,
         note="official_download",
     )
     summary = DisposalNoticeSummary(

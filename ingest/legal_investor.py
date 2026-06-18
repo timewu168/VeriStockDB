@@ -136,6 +136,7 @@ def download_legal_range(
     fetcher: FetchLegalCsv = download_legal_csv,
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
+    max_attempts: int = 3,
 ) -> list[LegalDownloadResult]:
     start = validate_iso_date(start)
     end = validate_iso_date(end)
@@ -158,28 +159,41 @@ def download_legal_range(
         )
     for trade_date in open_dates:
         for market in selected_markets:
-            try:
-                cooldown.before_request(log)
-                raw = fetcher(market, trade_date)
-                validate_legal_csv_bytes(
-                    raw,
-                    market,
-                    trade_date,
-                    daily_close_row_count=daily_close_row_count(conn, market, trade_date),
-                )
-                path = save_official_legal_csv(raw, market, trade_date)
-                results.append(
-                    LegalDownloadResult(
-                        market=market,
-                        trade_date=trade_date,
-                        status='OK',
-                        path=str(path),
-                        bytes_written=len(raw),
+            last_error: Exception | None = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    cooldown.before_request(log)
+                    raw = fetcher(market, trade_date)
+                    validate_legal_csv_bytes(
+                        raw,
+                        market,
+                        trade_date,
+                        daily_close_row_count=daily_close_row_count(conn, market, trade_date),
                     )
-                )
-                if log:
-                    log(f'INFO {trade_date} {market} legal CSV saved {path} bytes={len(raw)}')
-            except Exception as exc:
+                    path = save_official_legal_csv(raw, market, trade_date)
+                    results.append(
+                        LegalDownloadResult(
+                            market=market,
+                            trade_date=trade_date,
+                            status='OK',
+                            path=str(path),
+                            bytes_written=len(raw),
+                        )
+                    )
+                    if log:
+                        log(
+                            f'INFO {trade_date} {market} legal CSV saved {path} '
+                            f'bytes={len(raw)} attempt={attempt}'
+                        )
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    if log:
+                        message = (
+                            f'ERROR {trade_date} {market} legal CSV attempt {attempt} failed: {exc}'
+                        )
+                        log(f'{message}; retrying' if attempt < max_attempts else message)
+            else:
                 results.append(
                     LegalDownloadResult(
                         market=market,
@@ -187,11 +201,9 @@ def download_legal_range(
                         status='MISSING',
                         path=None,
                         bytes_written=0,
-                        error=str(exc),
+                        error=str(last_error) if last_error else 'legal CSV download failed',
                     )
                 )
-                if log:
-                    log(f'ERROR {trade_date} {market} legal CSV download failed: {exc}')
     return results
 
 
@@ -320,6 +332,7 @@ def update_legal_day(
     fetcher: FetchLegalCsv = download_legal_csv,
     cooldown: CooldownController | None = None,
     log: LogFunc | None = None,
+    max_attempts: int = 3,
 ) -> list[LegalUpdateResult]:
     trade_date = validate_iso_date(trade_date)
     selected_markets = markets or config.MARKETS
@@ -369,27 +382,37 @@ def update_legal_day(
                 )
             )
             continue
-        try:
-            cooldown.before_request(log)
-            raw = fetcher(market, trade_date)
-            validate_legal_csv_bytes(
-                raw,
-                market,
-                trade_date,
-                daily_close_row_count=close_rows,
-            )
-            path = save_official_legal_csv(raw, market, trade_date)
-            imported = import_legal_range(conn, start=trade_date, end=trade_date, markets=(market,))
-            results.append(
-                LegalUpdateResult(
-                    market=market,
-                    trade_date=trade_date,
-                    status='OK',
-                    row_count=imported[0].row_count,
-                    source_file=str(path),
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                cooldown.before_request(log)
+                raw = fetcher(market, trade_date)
+                validate_legal_csv_bytes(
+                    raw,
+                    market,
+                    trade_date,
+                    daily_close_row_count=close_rows,
                 )
-            )
-        except Exception as exc:
+                path = save_official_legal_csv(raw, market, trade_date)
+                imported = import_legal_range(conn, start=trade_date, end=trade_date, markets=(market,))
+                results.append(
+                    LegalUpdateResult(
+                        market=market,
+                        trade_date=trade_date,
+                        status='OK',
+                        row_count=imported[0].row_count,
+                        source_file=str(path),
+                    )
+                )
+                if log:
+                    log(f'INFO {trade_date} {market} legal update attempt {attempt} OK')
+                break
+            except Exception as exc:
+                last_error = exc
+                if log:
+                    message = f'ERROR {trade_date} {market} legal update attempt {attempt} failed: {exc}'
+                    log(f'{message}; retrying' if attempt < max_attempts else message)
+        else:
             results.append(
                 LegalUpdateResult(
                     market=market,
@@ -397,7 +420,7 @@ def update_legal_day(
                     status='BLOCKED',
                     row_count=0,
                     source_file=None,
-                    error=str(exc),
+                    error=str(last_error) if last_error else 'legal update failed',
                 )
             )
     return results

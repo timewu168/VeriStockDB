@@ -123,6 +123,39 @@ class MarginDownloadTests(unittest.TestCase):
             ('TPEX', '2026-06-12'),
         })
 
+
+    def test_download_margin_range_retries_failed_official_attempts(self) -> None:
+        conn = sqlite3.connect(':memory:')
+        conn.row_factory = sqlite3.Row
+        conn.executescript(SCHEMA)
+        conn.execute('INSERT INTO trading_days VALUES (?, ?, ?, ?)', ('2026-06-12', 1, 'seed', ''))
+        original_csv_dir = config.CSV_DIR
+        calls: list[tuple[str, str]] = []
+
+        def flaky_fetcher(market: str, trade_date: str) -> bytes:
+            calls.append((market, trade_date))
+            if len(calls) < 3:
+                return b''
+            return b'fresh-margin-csv'
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.CSV_DIR = Path(temp_dir)
+            try:
+                results = margin.download_margin_range(
+                    conn,
+                    start='2026-06-12',
+                    end='2026-06-12',
+                    markets=('TWSE',),
+                    fetcher=flaky_fetcher,
+                    cooldown=CooldownController(enabled=False),
+                )
+            finally:
+                config.CSV_DIR = original_csv_dir
+
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(results[0].status, 'OK')
+        self.assertEqual(results[0].bytes_written, len(b'fresh-margin-csv'))
+
     def test_download_margin_range_skips_existing_files_by_default(self) -> None:
         conn = sqlite3.connect(':memory:')
         conn.row_factory = sqlite3.Row

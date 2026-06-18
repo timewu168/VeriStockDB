@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.8.2 - 2026-06-18
+
+### Changed
+
+- Added up to three official attempts for legal investor, margin trading, attention notice, and disposal notice downloads/imports, including parser/validation failures.
+- Notice import batches now record the final official attempt in `retry_count` when retrying attention/disposal updates.
+
 ## v0.3.8.1 - 2026-06-18
 
 ### Changed

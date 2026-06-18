@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import sqlite3
+import tempfile
+from pathlib import Path
 import unittest
 
+import config
 import ingest.attention_notice as attention
 import ingest.disposal_notice as disposal
+from ingest.downloader import CooldownController
 from ingest.disposal_notice import DisposalNoticeImportResult
 
 
@@ -123,6 +127,75 @@ class NoticeUpdateCalendarTests(unittest.TestCase):
             {'OK': 0, 'FIXED': 0, 'BLOCKED': 0, 'RECHECK': 0, 'MISSING': 0, 'SKIPPED': 1},
         )
 
+
+    def test_attention_official_retries_until_success_and_records_retry_count(self) -> None:
+        calls = 0
+
+        def flaky_fetcher(market: str, start: str, end: str) -> bytes:
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                raise RuntimeError(f'temporary attention failure {calls}')
+            return _attention_csv('2026-06-08')
+
+        original_csv_dir = config.CSV_DIR
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.CSV_DIR = Path(temp_dir)
+            try:
+                result = attention.import_attention_notice_official(
+                    self.conn,
+                    market='TWSE',
+                    start='2026-06-08',
+                    end='2026-06-08',
+                    fetcher=flaky_fetcher,
+                    cooldown=CooldownController(enabled=False),
+                )
+            finally:
+                config.CSV_DIR = original_csv_dir
+
+        batch = self.conn.execute(
+            "SELECT status, retry_count FROM import_batches "
+            "WHERE dataset = 'attention_notice' AND market = 'TWSE' AND period = '2026-06-08'"
+        ).fetchone()
+        self.assertEqual(calls, 3)
+        self.assertEqual(result.status, 'FIXED')
+        self.assertEqual(batch['status'], 'FIXED')
+        self.assertEqual(batch['retry_count'], 2)
+
+    def test_disposal_official_retries_until_success_and_records_retry_count(self) -> None:
+        calls = 0
+
+        def flaky_fetcher(market: str, start: str, end: str) -> bytes:
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                return b''
+            return _disposal_csv('2026-06-08')
+
+        original_csv_dir = config.CSV_DIR
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.CSV_DIR = Path(temp_dir)
+            try:
+                result = disposal.import_disposal_notice_official(
+                    self.conn,
+                    market='TWSE',
+                    start='2026-06-08',
+                    end='2026-06-08',
+                    fetcher=flaky_fetcher,
+                    cooldown=CooldownController(enabled=False),
+                )
+            finally:
+                config.CSV_DIR = original_csv_dir
+
+        batch = self.conn.execute(
+            "SELECT status, retry_count FROM import_batches "
+            "WHERE dataset = 'disposal_notice' AND market = 'TWSE' AND period = '2026-06-08'"
+        ).fetchone()
+        self.assertEqual(calls, 3)
+        self.assertEqual(result.status, 'FIXED')
+        self.assertEqual(batch['status'], 'FIXED')
+        self.assertEqual(batch['retry_count'], 2)
+
     def test_disposal_update_uses_announcement_horizon_even_when_target_is_closed(self) -> None:
         calls: list[tuple[str, str, str]] = []
 
@@ -222,6 +295,28 @@ class NoticeUpdateCalendarTests(unittest.TestCase):
 
         self.assertEqual(stats['OK'], 1)
         self.assertEqual(calls, [('TWSE', '2026-06-16', '2026-07-03')])
+
+
+def _attention_csv(trade_date: str) -> bytes:
+    roc_year = int(trade_date[:4]) - 1911
+    mmdd = trade_date[5:].replace('-', '/')
+    roc_date = f'{roc_year}/{mmdd}'
+    return (
+        f'期間:{roc_date}~{roc_date}\n'
+        '編號,日期,證券代號,證券名稱,注意交易資訊\n'
+        f'1,{roc_date},2330,台積電,測試注意\n'
+    ).encode('utf-8-sig')
+
+
+def _disposal_csv(trade_date: str) -> bytes:
+    roc_year = int(trade_date[:4]) - 1911
+    mmdd = trade_date[5:].replace('-', '/')
+    roc_date = f'{roc_year}/{mmdd}'
+    return (
+        f'期間:{roc_date}~{roc_date}\n'
+        '編號,公布日期,證券代號,證券名稱,處置起迄時間,處置條件,處置內容\n'
+        f'1,{roc_date},2330,台積電,{roc_date}~{roc_date},測試條件,測試處置\n'
+    ).encode('utf-8-sig')
 
 
 def _raising_fetcher(*args):

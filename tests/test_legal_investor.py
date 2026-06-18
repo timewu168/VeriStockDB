@@ -186,6 +186,45 @@ class LegalInvestorTests(unittest.TestCase):
             self.assertIn('date mismatch', results[0].error or '')
             self.assertEqual(existing_path.read_bytes(), original_bytes)
 
+
+    def test_download_legal_range_retries_failed_official_attempts(self) -> None:
+        conn = sqlite3.connect(':memory:')
+        conn.row_factory = sqlite3.Row
+        conn.executescript(SCHEMA)
+        conn.execute(
+            'INSERT INTO trading_days VALUES (?, ?, ?, ?)',
+            ('2026-06-12', 1, 'seed', ''),
+        )
+        original_csv_dir = config.CSV_DIR
+        original_calendar = legal_investor.ensure_trading_days_current
+        calls: list[tuple[str, str]] = []
+
+        def flaky_fetcher(market: str, trade_date: str) -> bytes:
+            calls.append((market, trade_date))
+            if len(calls) < 3:
+                raise RuntimeError(f'temporary failure {len(calls)}')
+            return sample_legal_csv(market, trade_date)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.CSV_DIR = Path(temp_dir)
+            legal_investor.ensure_trading_days_current = lambda *args, **kwargs: 0
+            try:
+                results = legal_investor.download_legal_range(
+                    conn,
+                    start='2026-06-12',
+                    end='2026-06-12',
+                    markets=('TWSE',),
+                    fetcher=flaky_fetcher,
+                    cooldown=CooldownController(enabled=False),
+                )
+            finally:
+                config.CSV_DIR = original_csv_dir
+                legal_investor.ensure_trading_days_current = original_calendar
+
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(results[0].status, 'OK')
+        self.assertTrue(results[0].path and results[0].path.endswith('20260612LegalSII.csv'))
+
     def test_validate_legal_csv_bytes_accepts_roc_content_date(self) -> None:
         content = '\n'.join(
             [
