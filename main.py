@@ -126,7 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     import_margin.add_argument("--report-dir", default=str(config.ROOT_DIR / "reports"))
 
     update_margin = subparsers.add_parser(
-        "update-margin", help="update one margin trading day without overwriting existing rows"
+        "update-margin", help="update missing margin trading open dates through the target date without overwriting existing rows"
     )
     update_margin.add_argument("--date", help="target date YYYY-MM-DD, default today")
     update_margin.add_argument("--market", choices=config.MARKETS)
@@ -159,7 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     report_legal.add_argument("--all", action="store_true", help="print OK rows too; default prints problems only")
 
     update_legal = subparsers.add_parser(
-        "update-legal", help="manually update one legal investor trading day without overwriting existing rows"
+        "update-legal", help="update missing legal investor open dates through the target date without overwriting existing rows"
     )
     update_legal.add_argument("--date", help="target date YYYY-MM-DD, default today")
     update_legal.add_argument("--market", choices=config.MARKETS)
@@ -942,9 +942,10 @@ def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
     target_date = validate_iso_date(args.date or date.today().isoformat())
     markets = (args.market,) if args.market else None
-    results = legal_investor.update_legal_day(
+    latest_before = _latest_table_dates_by_market(conn, "legal_investors", markets)
+    results = _update_legal_range_from_latest(
         conn,
-        trade_date=target_date,
+        target_date=target_date,
         markets=markets,
         cooldown=cooldown,
         log=print,
@@ -972,7 +973,12 @@ def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
     _emit_stats_notification(
         'update-legal',
         stats,
-        lines=_single_day_update_lines(target_date=target_date, markets=markets),
+        lines=_range_update_lines(
+            target_date=target_date,
+            markets=markets,
+            latest_before=latest_before,
+            latest_after=_latest_table_dates_by_market(conn, "legal_investors", markets),
+        ),
         errors=errors,
     )
     return 0 if blocked == 0 else 2
@@ -981,9 +987,10 @@ def _cmd_update_margin(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
     target_date = validate_iso_date(args.date or date.today().isoformat())
     markets = (args.market,) if args.market else None
-    results = margin.update_margin_day(
+    latest_before = _latest_table_dates_by_market(conn, "margin_trading", markets)
+    results = _update_margin_range_from_latest(
         conn,
-        trade_date=target_date,
+        target_date=target_date,
         markets=markets,
         cooldown=cooldown,
         log=print,
@@ -1009,11 +1016,134 @@ def _cmd_update_margin(conn, args: argparse.Namespace) -> int:
     _emit_stats_notification(
         'update-margin',
         stats,
-        lines=_single_day_update_lines(target_date=target_date, markets=markets),
+        lines=_range_update_lines(
+            target_date=target_date,
+            markets=markets,
+            latest_before=latest_before,
+            latest_after=_latest_table_dates_by_market(conn, "margin_trading", markets),
+        ),
         errors=errors,
     )
     return 0 if blocked == 0 else 2
 
+
+
+def _update_legal_range_from_latest(
+    conn,
+    *,
+    target_date: str,
+    markets: tuple[str, ...] | None,
+    cooldown: CooldownController,
+    log,
+) -> list[legal_investor.LegalUpdateResult]:
+    results: list[legal_investor.LegalUpdateResult] = []
+    for market in markets or config.MARKETS:
+        for trade_date in _missing_open_dates_through(
+            conn,
+            table="legal_investors",
+            market=market,
+            target_date=target_date,
+            cooldown=cooldown,
+        ):
+            results.extend(
+                legal_investor.update_legal_day(
+                    conn,
+                    trade_date=trade_date,
+                    markets=(market,),
+                    cooldown=cooldown,
+                    log=log,
+                )
+            )
+    return results
+
+
+def _update_margin_range_from_latest(
+    conn,
+    *,
+    target_date: str,
+    markets: tuple[str, ...] | None,
+    cooldown: CooldownController,
+    log,
+) -> list[margin.MarginUpdateResult]:
+    results: list[margin.MarginUpdateResult] = []
+    for market in markets or config.MARKETS:
+        for trade_date in _missing_open_dates_through(
+            conn,
+            table="margin_trading",
+            market=market,
+            target_date=target_date,
+            cooldown=cooldown,
+        ):
+            results.extend(
+                margin.update_margin_day(
+                    conn,
+                    trade_date=trade_date,
+                    markets=(market,),
+                    cooldown=cooldown,
+                    log=log,
+                )
+            )
+    return results
+
+
+def _missing_open_dates_through(
+    conn,
+    *,
+    table: str,
+    market: str,
+    target_date: str,
+    cooldown: CooldownController,
+) -> list[str]:
+    target_date = validate_iso_date(target_date)
+    trading_calendar.ensure_trading_days_current(
+        conn, through_date=target_date, cooldown=cooldown, log=print
+    )
+    latest = _latest_table_date(conn, table, market)
+    if latest is None:
+        return trading_calendar.trading_days_between(conn, target_date, target_date)
+    start = _earliest_table_date(conn, table, market) or target_date
+    row_dates = conn.execute(
+        f"""
+        SELECT td.trade_date
+        FROM trading_days td
+        WHERE td.is_open = 1
+          AND td.trade_date BETWEEN ? AND ?
+          AND NOT EXISTS (
+            SELECT 1 FROM {table} x
+            WHERE x.trade_date = td.trade_date AND x.market = ?
+            LIMIT 1
+          )
+        ORDER BY td.trade_date
+        """,
+        (start, target_date, market),
+    ).fetchall()
+    return [row["trade_date"] if hasattr(row, "keys") else row[0] for row in row_dates]
+
+
+def _latest_table_date(conn, table: str, market: str) -> str | None:
+    row = conn.execute(
+        f"SELECT MAX(trade_date) AS latest FROM {table} WHERE market = ?",
+        (market,),
+    ).fetchone()
+    value = row["latest"] if hasattr(row, "keys") else row[0]
+    return str(value) if value else None
+
+
+def _earliest_table_date(conn, table: str, market: str) -> str | None:
+    row = conn.execute(
+        f"SELECT MIN(trade_date) AS earliest FROM {table} WHERE market = ?",
+        (market,),
+    ).fetchone()
+    value = row["earliest"] if hasattr(row, "keys") else row[0]
+    return str(value) if value else None
+
+
+def _latest_table_dates_by_market(
+    conn,
+    table: str,
+    markets: tuple[str, ...] | None,
+) -> dict[str, str | None]:
+    return {market: _latest_table_date(conn, table, market) for market in markets or config.MARKETS}
 
 def _cmd_report_legal(conn, args: argparse.Namespace) -> int:
     markets = (args.market,) if args.market else None
@@ -1403,10 +1533,18 @@ def _single_day_update_stats(*, ok: int, exists: int, closed: int, blocked: int)
     }
 
 
-def _single_day_update_lines(*, target_date: str, markets: tuple[str, ...] | None) -> list[str]:
+def _range_update_lines(
+    *,
+    target_date: str,
+    markets: tuple[str, ...] | None,
+    latest_before: dict[str, str | None],
+    latest_after: dict[str, str | None],
+) -> list[str]:
     return [
         f"target: {target_date}",
         f"markets: {','.join(markets) if markets else 'TWSE,TPEX'}",
+        f"latest_before: {_format_market_latest(latest_before)}",
+        f"latest_after: {_format_market_latest(latest_after)}",
     ]
 
 

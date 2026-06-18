@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.4.0 - 2026-06-18
+
+### Added
+
+- Marked the current Close, attention, disposal, legal investor, margin trading, Local Truth API, and scheduler baseline as the public-preview release gate.
+
+### Changed
+
+- Updated `update-legal` and `update-margin` to recover internal open-trading-day gaps through the target date per market, even when `MAX(trade_date)` already reaches the target.
+- Aligned README, CURRENT_STATE, and Local Truth API documentation with the accepted production datasets, schedules, validation checks, locked actions, and deferred datasets.
+
+### Verified
+
+- SQLite health gate passed on 2026-06-18: integrity `ok`, schema validation OK, duplicate keys `0`, formal date coverage gaps `0` for Close/legal/margin, no non-open trade-date rows, no recent non-OK batches, and latest backup integrity checks OK.
+
 ## v0.3.8.4 - 2026-06-18
 
 ### Changed

@@ -1,135 +1,146 @@
 # VeriStockDB
 
-Version: v0.3.8.4
+Version: v0.4.0
 
-VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
+VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
-這不是交易建議系統，也不是大型資料治理平台。第一版只專注 Close 日收盤資料。
+VeriStockDB 不是交易建議系統，不連接券商，不下單，也不是公開雲端 API。
 
-## 規格優先順序
+## Current Scope
 
-1. `docs/human_first_rebuild_plan.md`
-2. `docs/data_ingestion_global_policy.md`
-3. `docs/URL.txt`
-4. `reference/股市資料庫代碼.txt` 只作舊系統參考，不可覆蓋新規格
+已完成並入 SQLite canonical truth 的資料表：
 
-## 第一版入口
+- `daily_close`
+- `attention_notices`
+- `disposal_notices`
+- `legal_investors`
+- `margin_trading`
+- `trading_days`
+- `import_batches`, `import_errors`, `data_events`, `settings`
 
-裸執行 `python main.py` 會顯示可用命令與 quickstart，不會初始化 DB 或啟動資料流程。
+ClickHouse 目前沒有被啟用為真理資料庫；若之後導入，只能先作為分析或高流量查詢層，不能取代 SQLite canonical data。
 
-```powershell
-# 初始化 SQLite 資料庫與必要資料表
-python main.py init-db
+## Core Rules
 
-# 日常更新：從 DB 目前最後一筆 Close 日期自動補到今天
-# 全新 DB 需先用 import-close 建立 Close 起點
-python main.py update-close
+- 主資料表只放已驗證、可查詢的正式資料。
+- 可疑官方資料一律擋下，不覆寫 canonical rows。
+- 價格以「元 * 100」整數分儲存。
+- 股票代號永遠當文字處理，保留前導零。
+- 日期格式統一使用 `YYYY-MM-DD`；API 拒絕 `20260615` 這類 compact date。
+- CSV 成功入庫後先留存，只有在月檢與 ZIP 驗證完成後才可封存 loose CSV。
 
-# 匯入指定日期的官方 Close 日收盤資料，不會執行三日回滾檢查
-# 若 trading_days 落後，會先用 TWSE FMTQIK 大盤 API 補齊交易日曆；TWSE 異常時改用 TPEx tradingIndex 備援
-python main.py import-close --date 2026-06-02
-python main.py import-close --from 2026-06-01 --to 2026-06-02
+## CLI Commands
 
-# 半夜或跨日執行三日回滾檢查
-python main.py rollback-close
-
-# 批次下載指定日期區間內的交易日官方 Close 資料
-python main.py import-close --from 2024-01-01 --to 2024-12-31
-
-# 匯入本地既有 CSV 檔案，需指定日期與市場
-python main.py import-close --file data/csv/daily_close/2024/20240603CloseSII.csv --date 2024-06-03 --market TWSE
-
-# 批次匯入本地歷史 Close CSV，依交易日曆檢查缺檔
-# 檔名需為 yyyyMMddCloseSII.csv / yyyyMMddCloseOTC.csv
-python main.py import-close-local --dir data/csv/Close --from 2004-02-11 --to 2004-12-31
-python main.py import-close-local --dir data/csv/Close --from 2004-02-11 --to 2004-12-31 --market TWSE
-
-# 查看各批次資料狀態與最新問題
-python main.py status
-
-# 檢查私有部署健康狀態：DB、backup、archive、log、systemd timer
-python main.py ops-check
-
-# 測試 Telegram 通知，需先設定 VERISTOCK_TELEGRAM_* 環境變數
-python main.py notify-telegram --test
-python main.py notify-telegram --message "VeriStockDB test message"
-
-# 第一階段三大法人：只下載/檢查官方 CSV，不入庫
-python main.py download-legal --from 2019-08-21 --to 2026-06-12
-python main.py inspect-legal --date 2026-06-12 --market TWSE
-python main.py inspect-legal --date 2026-06-12 --market TPEX
-
-# 列出所有被擋下、需複查或缺漏的批次與原因
-python main.py status --problems
-
-# 列出問題批次與錯誤樣本，適合追查被擋原因
-python main.py status --problems --details
-
-# 查詢特定股票在指定期間的 Close 資料
-python main.py query-close --stock-id 2330 --from 2024-01-01 --to 2024-12-31
-
-# 執行指定月份的零容忍月度檢查
-python main.py audit-month --dataset daily_close --month 2024-06
-
-# 使用官方個股月資料 JSON 對帳 daily_close 的 close 與 volume，不改寫主表
-python main.py reconcile-close-month --month 2026-06
-python main.py reconcile-close-month --month 2026-06 --market TWSE --stock-id 2330 --from 2026-06-01 --to 2026-06-17
-
-# 歷史起點或單市場資料可指定月檢範圍，避免把未匯入市場或起點前交易日列為缺漏
-python main.py audit-month --dataset daily_close --month 2004-02 --market TWSE --from 2004-02-11 --skip-rollback
-
-# 月檢通過後，將該月 CSV 打包成 ZIP 並驗證後刪除 loose CSV
-python main.py archive-month --dataset daily_close --month 2024-06
-
-# 歷史本地 CSV 使用與月檢相同的 scope 封存
-python main.py archive-month --dataset daily_close --month 2004-02 --market TWSE --from 2004-02-11 --dir data/csv/Close --skip-rollback
-
-# 一次對多個月份執行月檢與封存，遇到第一個失敗月份會停止
-python main.py finalize-close-months --from 2004-02 --to 2004-12 --market TWSE --start-date 2004-02-11 --dir data/csv/Close --skip-rollback
-
-# 建立最新 SQLite DB 備份，預設只保留一份
-python main.py backup
-```
-
-## 核心原則
-
-- 主資料表只放人想查的股票資料。
-- 任何可疑官方資料都先停止入庫，記錄狀態，等待人工檢驗。
-- 價格以「元 * 100」的整數分儲存。
-- 股票代號永遠當文字處理，保留官方原文與前導零。
-- CSV 入庫成功後先留存，月度零容忍檢查與 ZIP 驗證成功後才刪 loose CSV。
-
-## Ubuntu 私有部署路徑
-
-Ubuntu server 可用環境變數把熱資料與冷資料分到不同硬碟。主 DB 與未封存 CSV 建議放 M.2，封存 ZIP 與 DB backup 建議放冷資料 SSD。
+裸執行會顯示 help，不會初始化 DB 或啟動資料流程：
 
 ```bash
-export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
-export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
-export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
-export VERISTOCK_LOG_DIR=/srv/veristockdb/logs
+python3 main.py
 ```
 
-完整部署備忘見 `docs/ubuntu_private_deployment.md`。
-
-## Telegram 通知
-
-`v0.3.3` 起可透過 Telegram 接收排程完成通知。第一版只做通知，不做遠端控制。
+初始化與狀態：
 
 ```bash
-export VERISTOCK_TELEGRAM_ENABLED=1
-export VERISTOCK_TELEGRAM_BOT_TOKEN=your-bot-token
-export VERISTOCK_TELEGRAM_CHAT_ID=your-chat-id
+python3 main.py init-db
+python3 main.py status
+python3 main.py status --problems --details
+python3 main.py ops-check
+python3 main.py backup
 ```
 
-支援通知的任務包含 `update-close`、`rollback-close`、`update-attention`、`update-disposal`、`backup`；`ops-check` 只在 `WARN` 或 `ERROR` 時通知。通知失敗不會改變原本任務的 exit code。
+交易日：
+
+```bash
+python3 main.py backfill-trading-days --from 2001-01-02 --to 2026-06-18
+```
+
+日收盤 Close：
+
+```bash
+python3 main.py update-close
+python3 main.py import-close --date 2026-06-18
+python3 main.py import-close --from 2026-06-01 --to 2026-06-18
+python3 main.py import-close --file data/csv/daily_close/2024/20240603CloseSII.csv --date 2024-06-03 --market TWSE
+python3 main.py import-close-local --dir data/csv/Close --from 2004-02-11 --to 2004-12-31 --market TWSE
+python3 main.py rollback-close
+python3 main.py query-close --stock-id 2330 --from 2026-06-01 --to 2026-06-18
+```
+
+注意股公告：
+
+```bash
+python3 main.py inspect-attention --twse-file path/to/twse.csv --tpex-file path/to/tpex.csv
+python3 main.py import-attention --file path/to/attention.csv --market TWSE
+python3 main.py update-attention
+python3 main.py query-attention --stock-id 2330 --from 2026-06-01 --to 2026-06-18
+```
+
+處置股公告：
+
+```bash
+python3 main.py inspect-disposal --twse-file path/to/twse.csv --tpex-file path/to/tpex.csv
+python3 main.py import-disposal --file path/to/disposal.csv --market TWSE
+python3 main.py update-disposal
+python3 main.py query-disposal --stock-id 2330 --from 2026-06-01 --to 2026-06-18
+```
+
+三大法人：
+
+```bash
+python3 main.py download-legal --from 2019-08-21 --to 2026-06-18
+python3 main.py inspect-legal --date 2026-06-18 --market TWSE
+python3 main.py report-legal --from 2012-05-04 --to 2026-06-18
+python3 main.py import-legal --dry-run --from 2012-05-04 --to 2026-06-18
+python3 main.py import-legal --from 2012-05-04 --to 2026-06-18
+python3 main.py update-legal
+```
+
+`update-legal` 會掃描目標日前所有「交易日但該市場缺 row」的日期並補齊，不只看今天或 `MAX(trade_date)`。
+
+資券：
+
+```bash
+python3 main.py download-margin --from 2001-01-02 --to 2026-06-18 --market TWSE
+python3 main.py download-margin --from 2008-09-30 --to 2026-06-18 --market TPEX
+python3 main.py inspect-margin --from 2001-01-02 --to 2026-06-18
+python3 main.py import-margin --dry-run --from 2001-01-02 --to 2026-06-18
+python3 main.py import-margin --execute --from 2001-01-02 --to 2026-06-18
+python3 main.py update-margin
+```
+
+`update-margin` 會掃描目標日前所有「交易日但該市場缺 row」的日期並補齊，不只看今天或 `MAX(trade_date)`。
+
+Close 月資料對帳與封存：
+
+```bash
+python3 main.py reconcile-close-month --month 2026-06
+python3 main.py reconcile-close-month --month 2026-06 --market TWSE --stock-id 2330 --from 2026-06-01 --to 2026-06-18
+python3 main.py audit-month --dataset daily_close --month 2026-06
+python3 main.py archive-month --dataset daily_close --month 2026-06
+python3 main.py finalize-close-months --from 2024-01 --to 2024-12
+```
+
+Telegram：
+
+```bash
+python3 main.py notify-telegram --test
+python3 main.py notify-telegram --message "VeriStockDB test message"
+```
+
+## Production Timers
+
+目前私有部署排程：
+
+- Close：`Mon..Fri 17:10`
+- Legal investors：`Mon..Fri 18:00`
+- Attention notices：`Mon..Fri 19:00`
+- Disposal notices：`Mon..Fri 19:05`
+- Margin trading：`Mon..Fri 21:05`
+
+Timer 使用 `Persistent=true`。修改 production systemd timer 需要人工 sudo，不能未授權改動。
 
 ## Local Truth API
 
-`v0.3.0` 開始建立本地 Local Truth API。這套 API 只供本機、ZeroTier 或可信任內網使用，定位是 VeriStockDB 真理資料庫的管理與查詢入口，不是雲端公開 API。
-
-目前 `v0.3.0` read-only 第一版包含：
+Read-only API 已完成以下端點：
 
 - `GET /health`
 - `GET /api/v1/info`
@@ -147,25 +158,67 @@ export VERISTOCK_TELEGRAM_CHAT_ID=your-chat-id
 - `GET /api/v1/events`
 - `GET /api/v1/ops/summary`
 
-安裝 API 依賴：
+啟動：
 
-```powershell
+```bash
 pip install -r requirements.txt
+python3 -m api
 ```
 
-啟動本地 API：
+預設綁定 `127.0.0.1:8000`。完整 API 契約見 `docs/local_truth_api_spec.md`。
 
-```powershell
-python -m api
+## Data Sources
+
+- Close：TWSE/TPEX 官方日收盤 CSV。
+- Trading days：TWSE `FMTQIK` 月曆，TWSE 異常時使用 TPEX 備援。
+- Attention notices：TWSE/TPEX 官方注意股公告 CSV。
+- Disposal notices：TWSE/TPEX 官方處置公告 CSV；查詢區間會延伸到目標日後方以取得最新公告。
+- Legal investors：TWSE/TPEX 官方三大法人 CSV。
+- Margin trading：TWSE `MI_MARGN`，TPEX `margin/balance` CSV；TPEX canonical scope 從 `2008-09-30` 開始。
+- Close monthly reconciliation：TWSE/TPEX 官方個股月資料 JSON，只對帳 `close` 與 `volume`，不覆寫 `daily_close`。
+
+## Paths
+
+```bash
+/srv/veristockdb/app                         # repo
+/srv/veristockdb/app/data/db/veristock.db    # SQLite canonical DB
+/srv/veristockdb/app/data/csv                # hot CSV
+/srv/veristockdb/app/reports                 # reports
+/srv/veristockdb/logs                        # systemd logs
+/app/dirty_box/veristockdb/archive           # cold ZIP archive
+/app/dirty_box/veristockdb/backup            # DB backups
 ```
 
-預設綁定 `127.0.0.1:8000`。可用環境變數調整：
+## Required Health Checks
 
-```powershell
-$env:VERISTOCK_API_HOST = "127.0.0.1"
-$env:VERISTOCK_API_PORT = "8000"
-```
+接受任何 DB-changing work 前至少要完成：
 
-完整規格見 `docs/local_truth_api_spec.md`。
+- SQLite `PRAGMA integrity_check`
+- backup 可讀與 integrity check
+- row count before/after
+- duplicate key check
+- date coverage against `trading_days`
+- schema validation against `db/schema.sql`
+- source coverage/dry-run report
+- API route/date/field/pagination/quality checks if API touched
 
-API 日期查詢參數必須使用嚴格 `YYYY-MM-DD` 格式；列表型 endpoint 使用 `limit` / `offset` 分頁。
+如果之後碰 ClickHouse，還要做 table count、row count、sample aggregation、duplicate/sorting-key validation。
+
+## Locked Actions
+
+未經明確授權不得執行：
+
+- drop、truncate、delete、overwrite canonical SQLite data
+- destructive SQL
+- schema migration 或版本 bump
+- 啟用、停用或修改正式 systemd 排程
+- 將 SQLite canonical truth 移到 ClickHouse
+- 建立或覆寫 ClickHouse tables
+- 刪除 backup、archive、CSV、report、log
+- 改寫 git history
+
+## Deferred Work
+
+- `v0.3.6` day trading deferred。
+- `v0.3.7` monthly revenue deferred。
+- `v0.4.0 public-preview` release gate 已完成；後續新增資料集仍需重新通過 DB/API/docs/repo safety gate。

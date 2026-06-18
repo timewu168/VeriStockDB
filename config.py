@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.3.8.4"
+APP_VERSION = "0.4.0"
 SCHEMA_VERSION = "0.3-margin-trading"
 
 

@@ -1,6 +1,6 @@
 # Local Truth API 規格文件
 
-狀態：`v0.3.0` 收斂檢查完成，read-only 第一版已落地，待 commit / tag / push；後續端點保留規劃。
+狀態：read-only Local Truth API 已完成至 `v0.4.0 public-preview`，涵蓋 Close、注意、處置、法人、資券、交易日、批次、錯誤、事件與 ops summary；後續寫入型/admin endpoint 保留規劃。
 
 建立日期：2026-06-04
 
@@ -28,7 +28,7 @@ Local Truth API 是 VeriStockDB 的本地真理資料庫 API。
    - 每個 dataset 都應能追到 `import_batches`、`import_errors`、`data_events`。
 
 3. 讀取與管理分層。
-   - `v0.3.0` 先做 read-only API。
+   - 目前已完成 read-only API；寫入型/admin endpoint 仍保留規劃。
    - 更新、回滾、備份、策略運算等寫入或長任務，先保留設計，不在第一版開放。
 
 4. PWA 不解析 CLI stdout。
@@ -49,7 +49,7 @@ Local Truth API 是 VeriStockDB 的本地真理資料庫 API。
 
 ## 3. 非目標
 
-`v0.3.0` 不做以下功能：
+目前 read-only API 不做以下功能：
 
 - 不實作雲端 Edge API。
 - 不實作雲端多用戶 PWA。
@@ -74,7 +74,7 @@ Local Truth API 是 VeriStockDB 的本地真理資料庫 API。
 | `VERISTOCK_API_REQUIRE_AUTH` | `0` | 是否要求 token，私有部署可改成 `1` |
 | `VERISTOCK_API_READ_TOKEN` | 空 | read 權限 token |
 | `VERISTOCK_API_OPS_TOKEN` | 空 | ops 權限 token |
-| `VERISTOCK_API_ADMIN_TOKEN` | 空 | admin 權限 token，`v0.3.0` 僅預留 |
+| `VERISTOCK_API_ADMIN_TOKEN` | 空 | admin 權限 token，目前僅預留 |
 
 啟動限制：
 
@@ -93,7 +93,7 @@ Authorization: Bearer <token>
 
 權限分三層：
 
-| 權限 | 用途 | `v0.3.0` 狀態 |
+| 權限 | 用途 | 目前狀態 |
 | --- | --- | --- |
 | `read` | 查資料、查交易日、查 dataset 狀態 | 實作 |
 | `ops` | 查 ops-check、log 摘要、部署狀態 | 可先部分實作 |
@@ -278,7 +278,7 @@ require_quality=any
 
 ## 12. Endpoint 總覽
 
-`v0.3.0` 第一版已落地以下 endpoint。
+目前 read-only API 已落地以下 endpoint。
 
 | Method | Path | 權限 | 狀態 | 說明 |
 | --- | --- | --- | --- | --- |
@@ -298,7 +298,7 @@ require_quality=any
 | `GET` | `/api/v1/events` | read | 第一版實作 | data_events 查詢 |
 | `GET` | `/api/v1/ops/summary` | ops | 第一版實作 | ops-check 摘要 |
 
-以下 endpoint 僅預留，不在 `v0.3.0` 第一版實作：
+以下 endpoint 僅預留，不在目前 read-only API 實作：
 
 | Method | Path | 權限 | 說明 |
 | --- | --- | --- | --- |
@@ -819,7 +819,7 @@ Query：
 
 ## 14. DB 連線與併發
 
-`v0.3.0` 原則：
+目前 read-only API 原則：
 
 - API 以 read-only 查詢為主。
 - 讀取 DB 時優先使用 SQLite read-only URI。
@@ -908,9 +908,9 @@ api/
     exports.py
 ```
 
-## 18. `v0.3.0` 規格完成條件
+## 18. Read-only API 規格完成條件
 
-`v0.3.0` 收斂時應確認：
+Read-only API 收斂時應確認：
 
 - [x] 本地 API 與雲端私有專案邊界清楚。
 - [x] VeriStockDB PWA 定位為本地管理控制台。
