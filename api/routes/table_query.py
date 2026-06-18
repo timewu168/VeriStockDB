@@ -6,6 +6,7 @@ from datetime import date
 from fastapi import HTTPException, status
 
 import config
+from api.date_utils import validate_api_date
 
 MAX_LIMIT = 10000
 DEFAULT_LIMIT = 1000
@@ -225,7 +226,7 @@ def enforce_quality(require_quality: str, quality: dict) -> None:
 
 def _validate_date_filter(name: str, value: str) -> str:
     try:
-        return date.fromisoformat(value).isoformat()
+        return validate_api_date(value)
     except ValueError as exc:
         raise api_error(
             "INVALID_DATE",

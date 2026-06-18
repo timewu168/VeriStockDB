@@ -127,7 +127,7 @@ Authorization: Bearer <token>
 | dataset | snake_case，例如 `daily_close` |
 | status | `OK`、`FIXED`、`BLOCKED`、`RECHECK`、`MISSING`、`SKIPPED` |
 
-交易日期表示台股交易日，不含時間與時區。
+交易日期表示台股交易日，不含時間與時區。API date query 必須使用嚴格 `YYYY-MM-DD`，例如 `2026-06-15`；`20260615` 這類 compact date 不接受。
 
 ## 8. Response Envelope
 
@@ -563,9 +563,11 @@ Query：
 
 | 參數 | 必填 | 說明 |
 | --- | --- | --- |
-| `from` | 是 | 開始日期 |
-| `to` | 是 | 結束日期 |
+| `from` | 是 | 開始日期，`YYYY-MM-DD` |
+| `to` | 是 | 結束日期，`YYYY-MM-DD` |
 | `is_open` | 否 | `1` / `0` |
+| `limit` | 否 | 預設 `1000`，最大 `10000` |
+| `offset` | 否 | 預設 `0` |
 
 範例 data：
 

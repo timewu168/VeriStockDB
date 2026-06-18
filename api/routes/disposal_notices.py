@@ -6,6 +6,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 import config
+from api.date_utils import validate_api_date
 from api.deps import read_only_connection, require_permission
 from api.schemas import success_response
 from validate.close_rules import _clean_stock_id
@@ -160,7 +161,7 @@ def _validate_filters(
 
 def _validate_date_filter(name: str, value: str) -> str:
     try:
-        return date.fromisoformat(value).isoformat()
+        return validate_api_date(value)
     except ValueError as exc:
         raise _api_error(
             "INVALID_DATE",

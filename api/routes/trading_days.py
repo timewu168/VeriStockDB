@@ -5,11 +5,15 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from api.date_utils import validate_api_date
 from api.deps import read_only_connection, require_permission
 from api.schemas import success_response
 
 
 router = APIRouter(tags=["trading_days"])
+
+MAX_LIMIT = 10000
+DEFAULT_LIMIT = 1000
 
 
 @router.get("/trading-days")
@@ -17,10 +21,12 @@ def trading_days(
     start: str = Query(alias="from"),
     end: str = Query(alias="to"),
     is_open: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     _: None = Depends(require_permission("read")),
     conn: sqlite3.Connection = Depends(read_only_connection),
 ) -> dict:
-    filters = _validate_filters(start, end, is_open)
+    filters = _validate_filters(start, end, is_open, limit, offset)
     try:
         rows = _query_trading_days(conn, filters)
     except sqlite3.Error as exc:
@@ -31,21 +37,23 @@ def trading_days(
             {"reason": str(exc)},
         ) from exc
 
+    has_more = len(rows) > limit
+    returned_rows = rows[:limit]
     return success_response(
-        [_row_to_dict(row) for row in rows],
+        [_row_to_dict(row) for row in returned_rows],
         meta={
             "filters": filters,
             "pagination": {
-                "limit": None,
-                "offset": 0,
-                "returned": len(rows),
-                "has_more": False,
+                "limit": limit,
+                "offset": offset,
+                "returned": len(returned_rows),
+                "has_more": has_more,
             },
         },
     )
 
 
-def _validate_filters(start: str, end: str, is_open: str | None) -> dict:
+def _validate_filters(start: str, end: str, is_open: str | None, limit: int, offset: int) -> dict:
     parsed_start = _validate_date_filter("from", start)
     parsed_end = _validate_date_filter("to", end)
     if parsed_start > parsed_end:
@@ -56,16 +64,25 @@ def _validate_filters(start: str, end: str, is_open: str | None) -> dict:
             {"from": start, "to": end},
         )
     parsed_is_open = _parse_is_open(is_open)
+    if limit < 1 or limit > MAX_LIMIT or offset < 0:
+        raise _api_error(
+            "INVALID_PAGINATION",
+            status.HTTP_400_BAD_REQUEST,
+            f"limit must be 1..{MAX_LIMIT} and offset must be >= 0",
+            {"limit": limit, "offset": offset},
+        )
     return {
         "from": parsed_start,
         "to": parsed_end,
         "is_open": parsed_is_open,
+        "limit": limit,
+        "offset": offset,
     }
 
 
 def _validate_date_filter(name: str, value: str) -> str:
     try:
-        return date.fromisoformat(value).isoformat()
+        return validate_api_date(value)
     except ValueError as exc:
         raise _api_error(
             "INVALID_DATE",
@@ -97,12 +114,14 @@ def _query_trading_days(conn: sqlite3.Connection, filters: dict) -> list[sqlite3
     if filters["is_open"] is not None:
         clauses.append("is_open = ?")
         params.append(1 if filters["is_open"] else 0)
+    params.extend([int(filters["limit"]) + 1, int(filters["offset"])])
     return conn.execute(
         f"""
         SELECT trade_date, is_open, source, note
         FROM trading_days
         WHERE {" AND ".join(clauses)}
         ORDER BY trade_date
+        LIMIT ? OFFSET ?
         """,
         params,
     ).fetchall()

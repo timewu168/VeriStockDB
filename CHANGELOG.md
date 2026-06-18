@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.8.1 - 2026-06-18
+
+### Changed
+
+- Tightened API date validation so date query parameters must use strict `YYYY-MM-DD` format.
+- Added `limit` and `offset` pagination to `GET /api/v1/trading-days`.
+
+### Added
+
+- Added core API route tests for Close, attention notices, disposal notices, trading days, batches, errors, and events.
+
 ## v0.3.8.0 - 2026-06-18
 
 ### Added

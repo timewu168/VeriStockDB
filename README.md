@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.3.8.0
+Version: v0.3.8.1
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -165,3 +165,5 @@ $env:VERISTOCK_API_PORT = "8000"
 ```
 
 完整規格見 `docs/local_truth_api_spec.md`。
+
+API 日期查詢參數必須使用嚴格 `YYYY-MM-DD` 格式；列表型 endpoint 使用 `limit` / `offset` 分頁。

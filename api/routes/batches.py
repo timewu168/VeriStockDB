@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 import config
+from api.date_utils import validate_api_date
 from api.dataset_registry import get_dataset_definition
 from api.deps import read_only_connection, require_permission
 from api.schemas import success_response
@@ -133,7 +135,9 @@ def _validate_filters(
             "status must be OK, FIXED, BLOCKED, RECHECK, or MISSING",
             {"status": batch_status},
         )
-    if start and end and start > end:
+    parsed_start = _validate_date_filter("from", start)
+    parsed_end = _validate_date_filter("to", end)
+    if parsed_start and parsed_end and parsed_start > parsed_end:
         raise _api_error(
             "INVALID_DATE",
             status.HTTP_400_BAD_REQUEST,
@@ -150,12 +154,26 @@ def _validate_filters(
     return {
         "dataset": dataset,
         "market": market,
-        "from": start,
-        "to": end,
+        "from": parsed_start,
+        "to": parsed_end,
         "status": normalized_status,
         "limit": limit,
         "offset": offset,
     }
+
+
+def _validate_date_filter(name: str, value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        return validate_api_date(value)
+    except ValueError as exc:
+        raise _api_error(
+            "INVALID_DATE",
+            status.HTTP_400_BAD_REQUEST,
+            f"{name} must use YYYY-MM-DD",
+            {name: value},
+        ) from exc
 
 
 def _query_batches(conn: sqlite3.Connection, filters: dict) -> list[sqlite3.Row]:
