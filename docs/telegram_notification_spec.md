@@ -109,7 +109,7 @@ backup 成功：
 ```text
 VeriStockDB DB 備份 OK
 時間：2026-06-05 02:30:10 CST
-路徑：/app/dirty_box/veristockdb/backup/veristock_latest_backup.db
+路徑：/mnt/veristockdb-cold/veristockdb/backup/veristock_latest_backup.db
 大小：1.2GiB
 ```
 

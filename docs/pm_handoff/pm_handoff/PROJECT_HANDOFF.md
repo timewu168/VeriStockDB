@@ -128,8 +128,8 @@ VeriStockDB 是台股資料的「真理資料庫」。核心目標是把官方�
 
 - 支援環境變數設定 DB、CSV、archive、backup、log 路徑。
 - `ops-check` 可檢查 DB、backup、archive、log、systemd timer。
-- Ubuntu server 已有 `/srv/veristockdb/app` 與 `/srv/veristockdb/logs`。
-- 冷資料/backup 使用 `/app/dirty_box/veristockdb/...`。
+- Ubuntu server 已有 `/opt/veristockdb/app` 與 `/var/log/veristockdb`。
+- 冷資料/backup 使用 `/mnt/veristockdb-cold/veristockdb/...`。
 - backup restore smoke test 曾通過。
 
 證據：
@@ -477,8 +477,8 @@ VeriStockDB 是台股資料的「真理資料庫」。核心目標是把官方�
 - TPEX 權證/非普通股代號曾導致 `UNEXPECTED_SECURITY_ID`，後續規則改為只排除不該入庫者。
 - 2004 初期 Close `--` 無前收，不能補 `0`；應補前收或排除並記錄事件。
 - `update-close` 15:30 遇 TWSE FMTQIK 回應慢/空資料，曾把後續日期當成無交易日；TPEx 備援 patch 正在處理。
-- server 執行 `python main.py` 前要 `cd /srv/veristockdb/app`，否則會找不到 `main.py`。
-- Windows `ssh timewu@time-home-server` 可能因 hostname 無法解析，需要使用實際 IP、ZeroTier IP 或設定 hosts。
+- server 執行 `python main.py` 前要 `cd /opt/veristockdb/app`，否則會找不到 `main.py`。
+- Windows `ssh user@example-host` 可能因 hostname 無法解析，需要使用實際 IP、ZeroTier IP 或設定 hosts。
 - `python -m api.run` 若直接回到 prompt，代表 server 沒保持運行；API 測試需在另一個 terminal 保持 server。
 - `update-disposal --no-cooldowncurl` 是把兩個命令黏在一起，會被 argparse 視為錯誤參數。
 
@@ -495,10 +495,10 @@ VeriStockDB 是台股資料的「真理資料庫」。核心目標是把官方�
 ### 特別小心的路徑
 
 - 本機 DB：`data/db/veristock.db`，被 `.gitignore` 排除。
-- server DB：`/srv/veristockdb/app/data/db/veristock.db`。
-- server logs：`/srv/veristockdb/logs`。
-- server cold archive：`/app/dirty_box/veristockdb/archive`。
-- server backup：`/app/dirty_box/veristockdb/backup/veristock_latest_backup.db`。
+- server DB：`/opt/veristockdb/app/data/db/veristock.db`。
+- server logs：`/var/log/veristockdb`。
+- server cold archive：`/mnt/veristockdb-cold/veristockdb/archive`。
+- server backup：`/mnt/veristockdb-cold/veristockdb/backup/veristock_latest_backup.db`。
 - 歷史 CSV samples：`tmp/...`，不應上傳 GitHub。
 - 未追蹤 legacy/reference：`app.py`、`cleaner.py`、`db_manager.py`、`spider_engine.py` 等，待確認用途。
 
@@ -560,7 +560,7 @@ pip install -r requirements.txt
 Ubuntu / server：
 
 ```bash
-cd /srv/veristockdb/app
+cd /opt/veristockdb/app
 . .venv/bin/activate
 pip install -r requirements.txt
 set -a
@@ -633,16 +633,16 @@ systemctl list-timers 'veristockdb-*' --all
 systemctl is-enabled veristockdb-update-close.timer
 systemctl is-enabled veristockdb-rollback-close.timer
 systemctl is-enabled veristockdb-backup.timer
-tail -n 80 /srv/veristockdb/logs/update-close.log
-tail -n 80 /srv/veristockdb/logs/rollback-close.log
-tail -n 80 /srv/veristockdb/logs/backup.log
+tail -n 80 /var/log/veristockdb/update-close.log
+tail -n 80 /var/log/veristockdb/rollback-close.log
+tail -n 80 /var/log/veristockdb/backup.log
 ```
 
 ### 驗證 backup restore
 
 ```bash
-cd /srv/veristockdb/app
-cp /app/dirty_box/veristockdb/backup/veristock_latest_backup.db /tmp/veristock_restore_test.db
+cd /opt/veristockdb/app
+cp /mnt/veristockdb-cold/veristockdb/backup/veristock_latest_backup.db /tmp/veristock_restore_test.db
 VERISTOCK_DB_PATH=/tmp/veristock_restore_test.db python3 main.py status
 rm /tmp/veristock_restore_test.db
 ```
@@ -716,7 +716,7 @@ python3 main.py notify-telegram --message "VeriStockDB test message"
 
 ops worker：
 
-- server 路徑 `/srv/veristockdb/app`、`/srv/veristockdb/logs`、`/app/dirty_box/veristockdb/...`。
+- server 路徑 `/opt/veristockdb/app`、`/var/log/veristockdb`、`/mnt/veristockdb-cold/veristockdb/...`。
 - `docs/ubuntu_private_deployment.md`
 - `ops-check` output。
 - timers 與 logs。

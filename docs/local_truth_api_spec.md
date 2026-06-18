@@ -1,6 +1,6 @@
 # Local Truth API 規格文件
 
-狀態：read-only Local Truth API 已完成至 `v0.4.0 public-preview`，涵蓋 Close、注意、處置、法人、資券、交易日、批次、錯誤、事件與 ops summary；後續寫入型/admin endpoint 保留規劃。
+狀態：read-only Local Truth API 已完成至 `v0.4.1 public-preview`，涵蓋 Close、注意、處置、法人、資券、交易日、批次、錯誤、事件與 ops summary；後續寫入型/admin endpoint 保留規劃。
 
 建立日期：2026-06-04
 

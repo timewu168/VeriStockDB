@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.1 - 2026-06-18
+
+### Changed
+
+- Replaced private deployment paths in README, CURRENT_STATE, deployment templates, and public docs with example paths such as `/opt/veristockdb/app`, `/var/log/veristockdb`, and `/mnt/veristockdb-cold/veristockdb`.
+- Replaced private systemd user/group examples with the generic `veristock` service account.
+
+### Verified
+
+- Public path scan found no tracked private host paths or private service-account references.
+
 ## v0.4.0 - 2026-06-18
 
 ### Added

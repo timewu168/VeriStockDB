@@ -19,8 +19,8 @@ If ingestion is requested before resolution, explicitly warn that legal investor
 
 | Date | Market | Result | Note |
 | --- | --- | --- | --- |
-| 2014-02-19 | TWSE | Standard CSV replaced with validated re-download | HTML response returned a maintenance page, so no HTML cross-check was available. Previous standard file was backed up under `/app/dirty_box/veristockdb/backup/legal_csv_validated_replacement_20260615`. |
-| 2025-08-27 | TWSE | Standard CSV replaced with validated re-download and matched HTML after stock-code normalization | Formula-style CSV stock codes such as `="00940"` are equivalent to HTML stock code `00940`. Previous standard file was backed up under `/app/dirty_box/veristockdb/backup/legal_csv_validated_replacement_20260615`. |
+| 2014-02-19 | TWSE | Standard CSV replaced with validated re-download | HTML response returned a maintenance page, so no HTML cross-check was available. Previous standard file was backed up under `/mnt/veristockdb-cold/veristockdb/backup/legal_csv_validated_replacement_20260615`. |
+| 2025-08-27 | TWSE | Standard CSV replaced with validated re-download and matched HTML after stock-code normalization | Formula-style CSV stock codes such as `="00940"` are equivalent to HTML stock code `00940`. Previous standard file was backed up under `/mnt/veristockdb-cold/veristockdb/backup/legal_csv_validated_replacement_20260615`. |
 
 
 ## Latest Full Report

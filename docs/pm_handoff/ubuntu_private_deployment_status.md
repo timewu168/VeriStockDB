@@ -22,7 +22,7 @@
 驗證命令：
 
 ```bash
-cd /srv/veristockdb/app
+cd /opt/veristockdb/app
 git describe --tags --always
 python3 - <<'PY'
 import config
@@ -39,13 +39,13 @@ PY
 ```text
 v0.2.6
 0.2.6
-/srv/veristockdb/app/data/db/veristock.db
-/srv/veristockdb/app/data/csv
-/srv/veristockdb/app/data/csv/monthly_zip
-/srv/veristockdb/app/data/backup/veristock_latest_backup.db
+/opt/veristockdb/app/data/db/veristock.db
+/opt/veristockdb/app/data/csv
+/opt/veristockdb/app/data/csv/monthly_zip
+/opt/veristockdb/app/data/backup/veristock_latest_backup.db
 ```
 
-注意：上述 Python config 檢查是在互動 SSH shell 中執行，該 shell 沒有載入 `/etc/veristockdb/veristockdb.env`，所以 `ARCHIVE_DIR` 與 `DEFAULT_BACKUP_PATH` 顯示為 repo 預設值。systemd service 已透過 `EnvironmentFile=/etc/veristockdb/veristockdb.env` 使用冷資料 SSD 路徑，backup log 已驗證實際寫入 `/app/dirty_box/veristockdb/backup`。
+注意：上述 Python config 檢查是在互動 SSH shell 中執行，該 shell 沒有載入 `/etc/veristockdb/veristockdb.env`，所以 `ARCHIVE_DIR` 與 `DEFAULT_BACKUP_PATH` 顯示為 repo 預設值。systemd service 已透過 `EnvironmentFile=/etc/veristockdb/veristockdb.env` 使用冷資料 SSD 路徑，backup log 已驗證實際寫入 `/mnt/veristockdb-cold/veristockdb/backup`。
 
 若要在互動 SSH shell 使用與 systemd 相同的路徑，先執行：
 
@@ -61,21 +61,21 @@ set +a
 
 ```bash
 df -h /
-df -h /app/dirty_box
-ls -lh /app/dirty_box/veristockdb/backup
-ls -lh /app/dirty_box/veristockdb/archive
+df -h /mnt/veristockdb-cold
+ls -lh /mnt/veristockdb-cold/veristockdb/backup
+ls -lh /mnt/veristockdb-cold/veristockdb/archive
 ```
 
 觀察結果：
 
 ```text
 /dev/mapper/ubuntu--vg-ubuntu--lv  914G  8.8G  867G   1% /
-/dev/sda2                          1.9T  2.1G  1.8T   1% /app/dirty_box
+/dev/sda2                          1.9T  2.1G  1.8T   1% /mnt/veristockdb-cold
 
-/app/dirty_box/veristockdb/backup:
+/mnt/veristockdb-cold/veristockdb/backup:
 veristock_latest_backup.db  1.2G
 
-/app/dirty_box/veristockdb/archive:
+/mnt/veristockdb-cold/veristockdb/archive:
 Close_zip/
 ```
 
@@ -83,12 +83,12 @@ Close_zip/
 
 | 類型 | 路徑 | 驗證狀態 |
 | --- | --- | --- |
-| 主程式 | `/srv/veristockdb/app` | OK |
-| 主 DB | `/srv/veristockdb/app/data/db/veristock.db` | OK |
-| 熱 CSV | `/srv/veristockdb/app/data/csv` | OK |
-| 冷資料 SSD | `/app/dirty_box` | OK |
-| DB backup | `/app/dirty_box/veristockdb/backup/veristock_latest_backup.db` | OK |
-| 封存 ZIP | `/app/dirty_box/veristockdb/archive/Close_zip` | OK |
+| 主程式 | `/opt/veristockdb/app` | OK |
+| 主 DB | `/opt/veristockdb/app/data/db/veristock.db` | OK |
+| 熱 CSV | `/opt/veristockdb/app/data/csv` | OK |
+| 冷資料 SSD | `/mnt/veristockdb-cold` | OK |
+| DB backup | `/mnt/veristockdb-cold/veristockdb/backup/veristock_latest_backup.db` | OK |
+| 封存 ZIP | `/mnt/veristockdb-cold/veristockdb/archive/Close_zip` | OK |
 
 ## DB 狀態
 
@@ -115,7 +115,7 @@ No problem batches found.
 驗證命令：
 
 ```bash
-cp /app/dirty_box/veristockdb/backup/veristock_latest_backup.db /tmp/veristock_restore_test.db
+cp /mnt/veristockdb-cold/veristockdb/backup/veristock_latest_backup.db /tmp/veristock_restore_test.db
 VERISTOCK_DB_PATH=/tmp/veristock_restore_test.db python3 main.py status
 rm /tmp/veristock_restore_test.db
 ```
@@ -156,9 +156,9 @@ veristockdb-offsite-sync.timer    next 2026-06-05 03:30
 驗證命令：
 
 ```bash
-tail -n 50 /srv/veristockdb/logs/update-close.log
-tail -n 50 /srv/veristockdb/logs/rollback-close.log
-tail -n 50 /srv/veristockdb/logs/backup.log
+tail -n 50 /var/log/veristockdb/update-close.log
+tail -n 50 /var/log/veristockdb/rollback-close.log
+tail -n 50 /var/log/veristockdb/backup.log
 ```
 
 觀察結果摘要：
@@ -173,7 +173,7 @@ INFO rollback-close target latest daily_close date: 2026-06-02
 OK: 6 FIXED: 0 BLOCKED: 0 RECHECK: 0 MISSING: 0 SKIPPED: 0
 
 backup:
-backup written: /app/dirty_box/veristockdb/backup/veristock_latest_backup.db
+backup written: /mnt/veristockdb-cold/veristockdb/backup/veristock_latest_backup.db
 ```
 
 結論：日常更新、三日回滾、DB backup 都有正常 log。`rollback-close` 已能不帶 `--date` 自動使用最新 Close 日期。

@@ -3,10 +3,10 @@ Description=VeriStockDB SQLite backup
 
 [Service]
 Type=oneshot
-User=timewu
-Group=timewu
-WorkingDirectory=/srv/veristockdb/app
+User=veristock
+Group=veristock
+WorkingDirectory=/opt/veristockdb/app
 EnvironmentFile=/etc/veristockdb/veristockdb.env
-ExecStart=/usr/bin/python3 /srv/veristockdb/app/main.py backup
-StandardOutput=append:/srv/veristockdb/logs/backup.log
-StandardError=append:/srv/veristockdb/logs/backup.log
+ExecStart=/usr/bin/python3 /opt/veristockdb/app/main.py backup
+StandardOutput=append:/var/log/veristockdb/backup.log
+StandardError=append:/var/log/veristockdb/backup.log

@@ -133,15 +133,15 @@ python -m unittest discover -v
 
 ## Server / Scheduler 審核項目
 
-- 是否在 `/srv/veristockdb/app` 執行。
+- 是否在 `/opt/veristockdb/app` 執行。
 - 是否啟用 `.venv`。
 - 是否載入 `/etc/veristockdb/veristockdb.env`。
 - `config.DB_PATH`、`CSV_DIR`、`ARCHIVE_DIR`、`DEFAULT_BACKUP_PATH` 是否正確。
 - `ops-check` 是否 OK。
 - timers 是否 enabled。
-- logs 是否在 `/srv/veristockdb/logs`。
-- backup 是否在 `/app/dirty_box/veristockdb/backup`。
-- archive 是否在 `/app/dirty_box/veristockdb/archive`。
+- logs 是否在 `/var/log/veristockdb`。
+- backup 是否在 `/mnt/veristockdb-cold/veristockdb/backup`。
+- archive 是否在 `/mnt/veristockdb-cold/veristockdb/archive`。
 - restore test 是否可讀 DB。
 - update timers 是否時間符合使用者目前設定。
 - Telegram test 是否成功。

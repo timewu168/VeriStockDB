@@ -95,11 +95,11 @@ python main.py backup
 Ubuntu server 可用環境變數把熱資料與冷資料分到不同硬碟。主 DB 與未封存 CSV 建議放 M.2，封存 ZIP 與 DB backup 建議放冷資料 SSD。
 
 ```bash
-export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
-export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
-export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
-export VERISTOCK_LOG_DIR=/srv/veristockdb/logs
+export VERISTOCK_DB_PATH=/opt/veristockdb/app/data/db/veristock.db
+export VERISTOCK_CSV_DIR=/opt/veristockdb/app/data/csv
+export VERISTOCK_ARCHIVE_DIR=/mnt/veristockdb-cold/veristockdb/archive
+export VERISTOCK_BACKUP_DIR=/mnt/veristockdb-cold/veristockdb/backup
+export VERISTOCK_LOG_DIR=/var/log/veristockdb
 ```
 
 完整部署備忘見 `docs/ubuntu_private_deployment.md`。

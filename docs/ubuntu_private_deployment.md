@@ -13,12 +13,12 @@ Ubuntu server 目前有兩顆硬碟：
 
 | 類型 | 建議位置 | 說明 |
 | --- | --- | --- |
-| Git repo / CLI 程式 | `/srv/veristockdb/app` | 主程式、未來 API/PWA |
-| 主 SQLite DB | `/srv/veristockdb/app/data/db/veristock.db` | 熱資料，日常查詢與匯入會使用 |
-| 未封存 Close CSV | `/srv/veristockdb/app/data/csv/daily_close` | 月封存前暫存 |
-| 月封存 ZIP | `/app/dirty_box/veristockdb/archive` | 冷資料，ZIP 驗證通過後可刪 loose CSV |
-| DB backup | `/app/dirty_box/veristockdb/backup` | 備份不與主 DB 放同顆硬碟 |
-| log | `/srv/veristockdb/logs` | systemd 執行紀錄 |
+| Git repo / CLI 程式 | `/opt/veristockdb/app` | 主程式、未來 API/PWA |
+| 主 SQLite DB | `/opt/veristockdb/app/data/db/veristock.db` | 熱資料，日常查詢與匯入會使用 |
+| 未封存 Close CSV | `/opt/veristockdb/app/data/csv/daily_close` | 月封存前暫存 |
+| 月封存 ZIP | `/mnt/veristockdb-cold/veristockdb/archive` | 冷資料，ZIP 驗證通過後可刪 loose CSV |
+| DB backup | `/mnt/veristockdb-cold/veristockdb/backup` | 備份不與主 DB 放同顆硬碟 |
+| log | `/var/log/veristockdb` | systemd 執行紀錄 |
 
 長期歷史 CSV 散檔若已完成 ZIP 封存且驗證通過，不需要再保留另一份 loose CSV。保留封存 ZIP 即可。
 
@@ -45,27 +45,27 @@ v0.2.5 支援以下環境變數：
 Ubuntu 私有部署建議設定：
 
 ```bash
-export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
-export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
-export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
-export VERISTOCK_LOG_DIR=/srv/veristockdb/logs
+export VERISTOCK_DB_PATH=/opt/veristockdb/app/data/db/veristock.db
+export VERISTOCK_CSV_DIR=/opt/veristockdb/app/data/csv
+export VERISTOCK_ARCHIVE_DIR=/mnt/veristockdb-cold/veristockdb/archive
+export VERISTOCK_BACKUP_DIR=/mnt/veristockdb-cold/veristockdb/backup
+export VERISTOCK_LOG_DIR=/var/log/veristockdb
 ```
 
 若沒有設定，程式仍會使用 repo 內的 `data/` 預設路徑，維持 Windows 本機開發行為。
 
 ## Ubuntu 目錄建立
 
-先確認冷資料 SSD 已掛載到 `/app/dirty_box`。
+先確認冷資料 SSD 已掛載到 `/mnt/veristockdb-cold`。
 
 ```bash
-sudo mkdir -p /srv/veristockdb/app/data/db
-sudo mkdir -p /srv/veristockdb/app/data/csv/daily_close
-sudo mkdir -p /srv/veristockdb/logs
-sudo mkdir -p /app/dirty_box/veristockdb/archive
-sudo mkdir -p /app/dirty_box/veristockdb/backup
-sudo chown -R timewu:timewu /srv/veristockdb
-sudo chown -R timewu:timewu /app/dirty_box/veristockdb
+sudo mkdir -p /opt/veristockdb/app/data/db
+sudo mkdir -p /opt/veristockdb/app/data/csv/daily_close
+sudo mkdir -p /var/log/veristockdb
+sudo mkdir -p /mnt/veristockdb-cold/veristockdb/archive
+sudo mkdir -p /mnt/veristockdb-cold/veristockdb/backup
+sudo chown -R veristock:veristock /opt/veristockdb
+sudo chown -R veristock:veristock /mnt/veristockdb-cold/veristockdb
 ```
 
 ## 手動驗證
@@ -73,12 +73,12 @@ sudo chown -R timewu:timewu /app/dirty_box/veristockdb
 在 SSH 連線後：
 
 ```bash
-cd /srv/veristockdb/app
+cd /opt/veristockdb/app
 
-export VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
-export VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-export VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
-export VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
+export VERISTOCK_DB_PATH=/opt/veristockdb/app/data/db/veristock.db
+export VERISTOCK_CSV_DIR=/opt/veristockdb/app/data/csv
+export VERISTOCK_ARCHIVE_DIR=/mnt/veristockdb-cold/veristockdb/archive
+export VERISTOCK_BACKUP_DIR=/mnt/veristockdb-cold/veristockdb/backup
 
 python3 main.py status
 python3 main.py update-close
@@ -90,7 +90,7 @@ python3 main.py ops-check --skip-systemd
 確認 backup 寫入冷資料 SSD：
 
 ```bash
-ls -lh /app/dirty_box/veristockdb/backup
+ls -lh /mnt/veristockdb-cold/veristockdb/backup
 ```
 
 ## systemd 排程安裝
@@ -105,7 +105,7 @@ deploy/systemd/
 
 ```bash
 sudo mkdir -p /etc/veristockdb
-sudo cp /srv/veristockdb/app/deploy/systemd/veristockdb.env.example /etc/veristockdb/veristockdb.env
+sudo cp /opt/veristockdb/app/deploy/systemd/veristockdb.env.example /etc/veristockdb/veristockdb.env
 sudo chown root:root /etc/veristockdb/veristockdb.env
 sudo chmod 0644 /etc/veristockdb/veristockdb.env
 ```
@@ -119,11 +119,11 @@ cat /etc/veristockdb/veristockdb.env
 目前 private server 建議內容：
 
 ```text
-VERISTOCK_DB_PATH=/srv/veristockdb/app/data/db/veristock.db
-VERISTOCK_CSV_DIR=/srv/veristockdb/app/data/csv
-VERISTOCK_ARCHIVE_DIR=/app/dirty_box/veristockdb/archive
-VERISTOCK_BACKUP_DIR=/app/dirty_box/veristockdb/backup
-VERISTOCK_LOG_DIR=/srv/veristockdb/logs
+VERISTOCK_DB_PATH=/opt/veristockdb/app/data/db/veristock.db
+VERISTOCK_CSV_DIR=/opt/veristockdb/app/data/csv
+VERISTOCK_ARCHIVE_DIR=/mnt/veristockdb-cold/veristockdb/archive
+VERISTOCK_BACKUP_DIR=/mnt/veristockdb-cold/veristockdb/backup
+VERISTOCK_LOG_DIR=/var/log/veristockdb
 ```
 
 ## Telegram 通知
@@ -145,7 +145,7 @@ VERISTOCK_TELEGRAM_NOTIFY_FAILURE=1
 測試通知：
 
 ```bash
-cd /srv/veristockdb/app
+cd /opt/veristockdb/app
 set -a
 . /etc/veristockdb/veristockdb.env
 set +a
@@ -166,8 +166,8 @@ Telegram 發送失敗只會寫入 log warning，不會改變原本任務 exit co
 安裝 service 與 timer：
 
 ```bash
-sudo cp /srv/veristockdb/app/deploy/systemd/veristockdb-*.service /etc/systemd/system/
-sudo cp /srv/veristockdb/app/deploy/systemd/veristockdb-*.timer /etc/systemd/system/
+sudo cp /opt/veristockdb/app/deploy/systemd/veristockdb-*.service /etc/systemd/system/
+sudo cp /opt/veristockdb/app/deploy/systemd/veristockdb-*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
@@ -196,9 +196,9 @@ systemctl status veristockdb-backup.service --no-pager
 查看 log：
 
 ```bash
-tail -n 100 /srv/veristockdb/logs/update-close.log
-tail -n 100 /srv/veristockdb/logs/rollback-close.log
-tail -n 100 /srv/veristockdb/logs/backup.log
+tail -n 100 /var/log/veristockdb/update-close.log
+tail -n 100 /var/log/veristockdb/rollback-close.log
+tail -n 100 /var/log/veristockdb/backup.log
 ```
 
 執行正式部署健康檢查：

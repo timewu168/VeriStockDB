@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.4.0
+Version: v0.4.1
 
 VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
@@ -180,13 +180,13 @@ python3 -m api
 ## Paths
 
 ```bash
-/srv/veristockdb/app                         # repo
-/srv/veristockdb/app/data/db/veristock.db    # SQLite canonical DB
-/srv/veristockdb/app/data/csv                # hot CSV
-/srv/veristockdb/app/reports                 # reports
-/srv/veristockdb/logs                        # systemd logs
-/app/dirty_box/veristockdb/archive           # cold ZIP archive
-/app/dirty_box/veristockdb/backup            # DB backups
+/opt/veristockdb/app                         # repo
+/opt/veristockdb/app/data/db/veristock.db    # SQLite canonical DB
+/opt/veristockdb/app/data/csv                # hot CSV
+/opt/veristockdb/app/reports                 # reports
+/var/log/veristockdb                        # systemd logs
+/mnt/veristockdb-cold/veristockdb/archive           # cold ZIP archive
+/mnt/veristockdb-cold/veristockdb/backup            # DB backups
 ```
 
 ## Required Health Checks

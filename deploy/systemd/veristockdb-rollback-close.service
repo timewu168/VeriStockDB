@@ -5,10 +5,10 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-User=timewu
-Group=timewu
-WorkingDirectory=/srv/veristockdb/app
+User=veristock
+Group=veristock
+WorkingDirectory=/opt/veristockdb/app
 EnvironmentFile=/etc/veristockdb/veristockdb.env
-ExecStart=/usr/bin/python3 /srv/veristockdb/app/main.py rollback-close
-StandardOutput=append:/srv/veristockdb/logs/rollback-close.log
-StandardError=append:/srv/veristockdb/logs/rollback-close.log
+ExecStart=/usr/bin/python3 /opt/veristockdb/app/main.py rollback-close
+StandardOutput=append:/var/log/veristockdb/rollback-close.log
+StandardError=append:/var/log/veristockdb/rollback-close.log
