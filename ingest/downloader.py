@@ -17,6 +17,7 @@ FetchCloseCsv = Callable[[str, str], bytes]
 FetchAttentionCsv = Callable[[str, str, str], bytes]
 FetchDisposalCsv = Callable[[str, str, str], bytes]
 FetchLegalCsv = Callable[[str, str], bytes]
+FetchMarginFile = Callable[[str, str], bytes]
 FetchTradingDaysJson = Callable[[str], dict]
 LogFunc = Callable[[str], None]
 SleepFunc = Callable[[float], None]
@@ -101,6 +102,17 @@ def official_legal_url(market: str, trade_date: str) -> str:
     raise ValueError(f"unknown market: {market}")
 
 
+
+def official_margin_url(market: str, trade_date: str) -> str:
+    yyyymmdd = trade_date.replace("-", "")
+    date_url = quote(trade_date.replace("-", "/"), safe="")
+    if market == "TWSE":
+        return config.URL_TWSE_MARGIN.format(date_yyyymmdd=yyyymmdd)
+    if market == "TPEX":
+        return config.URL_TPEX_MARGIN_BALANCE.format(date_url=date_url)
+    raise ValueError(f"unknown market: {market}")
+
+
 def download_close_csv(market: str, trade_date: str) -> bytes:
     url = official_close_url(market, trade_date)
     request = Request(
@@ -139,6 +151,19 @@ def download_disposal_csv(market: str, start: str, end: str) -> bytes:
     with urlopen(request, timeout=30, context=official_ssl_context()) as response:
         return response.read()
 
+
+
+def download_margin_file(market: str, trade_date: str) -> bytes:
+    url = official_margin_url(market, trade_date)
+    request = Request(
+        url,
+        headers={
+            "User-Agent": f"VeriStockDB/{config.APP_VERSION} (+https://github.com/timewu168/VeriStockDB)",
+            "Accept": "text/csv,*/*",
+        },
+    )
+    with urlopen(request, timeout=60, context=official_ssl_context()) as response:
+        return response.read()
 
 def download_legal_csv(market: str, trade_date: str) -> bytes:
     url = official_legal_url(market, trade_date)
@@ -271,3 +296,26 @@ def save_official_legal_csv(raw: bytes, market: str, trade_date: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(raw)
     return path
+
+
+
+def official_margin_file_path(market: str, trade_date: str) -> Path:
+    year = trade_date[:4]
+    return config.CSV_DIR / "margin" / year / official_margin_file_name(market, trade_date)
+
+
+def official_margin_file_name(market: str, trade_date: str) -> str:
+    yyyymmdd = trade_date.replace("-", "")
+    if market == "TWSE":
+        return f"{yyyymmdd}MarginSII.csv"
+    if market == "TPEX":
+        return f"{yyyymmdd}MarginOTC.csv"
+    raise ValueError(f"unknown market: {market}")
+
+
+def save_official_margin_file(raw: bytes, market: str, trade_date: str) -> Path:
+    path = official_margin_file_path(market, trade_date)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(raw)
+    return path
+

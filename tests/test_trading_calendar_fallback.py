@@ -4,6 +4,7 @@ import sqlite3
 import unittest
 
 from ingest.trading_calendar import (
+    backfill_trading_days_from_twse,
     ensure_trading_days_current,
     parse_tpex_trading_index_open_dates,
 )
@@ -83,6 +84,45 @@ class TradingCalendarFallbackTests(unittest.TestCase):
                 fetcher=lambda month: {'stat': 'OK', 'fields': ['日期'], 'data': []},
                 fallback_fetcher=lambda month: (_ for _ in ()).throw(RuntimeError('boom')),
             )
+
+
+    def test_backfill_trading_days_from_twse_writes_open_and_closed_days(self) -> None:
+        conn = sqlite3.connect(':memory:')
+        conn.row_factory = sqlite3.Row
+        conn.execute(
+            'CREATE TABLE trading_days('
+            'trade_date TEXT PRIMARY KEY, is_open INTEGER NOT NULL, source TEXT NOT NULL, note TEXT)'
+        )
+        calls: list[str] = []
+
+        def fetcher(month_start: str) -> dict:
+            calls.append(month_start)
+            return {
+                'stat': 'OK',
+                'fields': ['日期'],
+                'data': [['090/01/02'], ['090/01/03']],
+            }
+
+        changed = backfill_trading_days_from_twse(
+            conn,
+            start='2001-01-02',
+            end='2001-01-04',
+            fetcher=fetcher,
+        )
+
+        self.assertEqual(calls, ['2001-01-01'])
+        self.assertEqual(changed, 3)
+        rows = conn.execute(
+            'SELECT trade_date, is_open, source, note FROM trading_days ORDER BY trade_date'
+        ).fetchall()
+        self.assertEqual(
+            [tuple(row) for row in rows],
+            [
+                ('2001-01-02', 1, 'twse_fmtqik', 'open day from TWSE FMTQIK'),
+                ('2001-01-03', 1, 'twse_fmtqik', 'open day from TWSE FMTQIK'),
+                ('2001-01-04', 0, 'twse_fmtqik', 'closed day inferred from TWSE FMTQIK'),
+            ],
+        )
 
 
 if __name__ == '__main__':

@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.3.4.0"
-SCHEMA_VERSION = "0.3-legal-investors"
+APP_VERSION = "0.3.5.0"
+SCHEMA_VERSION = "0.3-margin-trading"
 
 
 def _path_from_env(name: str, default: Path) -> Path:
@@ -50,6 +50,7 @@ DATASET_DAILY_CLOSE = "daily_close"
 DATASET_ATTENTION_NOTICE = "attention_notice"
 DATASET_DISPOSAL_NOTICE = "disposal_notice"
 DATASET_LEGAL_INVESTOR = "legal_investor"
+DATASET_MARGIN = "margin"
 MARKETS = ("TWSE", "TPEX")
 
 API_HOST = os.environ.get("VERISTOCK_API_HOST", "127.0.0.1")
@@ -100,6 +101,23 @@ URL_TWSE_LEGAL_INVESTOR = (
 URL_TPEX_LEGAL_INVESTOR = (
     "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade"
     "?type=Daily&sect=EW&date={date_url}&id=&response=csv"
+)
+
+URL_TWSE_MARGIN = (
+    "https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN"
+    "?response=csv&date={date_yyyymmdd}&selectType=ALL"
+)
+URL_TPEX_MARGIN_SBL_HIS = (
+    "https://www.tpex.org.tw/www/zh-tw/margin/sblHis"
+    "?date={date_url}&id=&response=csv&order=0&sort=asc"
+)
+URL_TPEX_MARGIN_SBL_HIS2 = (
+    "https://www.tpex.org.tw/www/zh-tw/margin/sblHis2"
+    "?date={date_url}&id=&response=csv&order=0&sort=asc"
+)
+URL_TPEX_MARGIN_BALANCE = (
+    "https://www.tpex.org.tw/www/zh-tw/margin/balance"
+    "?date={date_url}&id=&response=csv"
 )
 URL_TWSE_DISPOSAL_NOTICE = (
     "https://www.twse.com.tw/rwd/zh/announcement/punish"

@@ -70,10 +70,15 @@ Viewed config.py:1-43
 * **目前狀態**：第一階段只做 `download-legal` 與 `inspect-legal`，保存官方原始 CSV 並檢查欄位，不入庫。
 
 #### 3. 信用交易資券餘額 (Margin)
-* **上市 (SII)**：
+* **上市 (SII)**：2001-01-02 起
   `https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=csv&date={sii_date}&selectType=ALL`
-* **上櫃 (OTC)**：
+* **上櫃 (OTC)**：2006-01-02 至 2012-03-16
+  `https://www.tpex.org.tw/www/zh-tw/margin/sblHis?date={otc_date_url}&id=&response=csv&order=0&sort=asc`
+* **上櫃 (OTC)**：2012-03-19 至 2012-10-01
+  `https://www.tpex.org.tw/www/zh-tw/margin/sblHis2?date={otc_date_url}&id=&response=csv&order=0&sort=asc`
+* **上櫃 (OTC)**：2012-10-02 起
   `https://www.tpex.org.tw/www/zh-tw/margin/balance?date={otc_date_url}&id=&response=csv`
+* **目前狀態**：第一階段只做 `download-margin`，保存官方原始 CSV，不 inspect、不 parse、不入庫。
 
 #### 4. 當沖交易統計 (DayTrading)
 * **上市 (SII)**：

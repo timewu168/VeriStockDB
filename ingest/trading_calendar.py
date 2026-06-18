@@ -237,6 +237,66 @@ def _has_inferred_closed_days(conn: sqlite3.Connection, start: str, end: str) ->
     return row is not None
 
 
+
+def backfill_trading_days_from_twse(
+    conn: sqlite3.Connection,
+    *,
+    start: str,
+    end: str,
+    fetcher: FetchTradingDaysJson = download_trading_days_json,
+    cooldown: CooldownController | None = None,
+    log: LogFunc | None = None,
+) -> int:
+    start_date = date.fromisoformat(validate_iso_date(start))
+    end_date = date.fromisoformat(validate_iso_date(end))
+    if start_date > end_date:
+        raise ValueError(f"trading calendar start date is after end date: {start} > {end}")
+    month_starts = _month_starts_between(start_date, end_date)
+    cooldown = cooldown or CooldownController()
+    before = conn.total_changes
+    if log:
+        log(f"INFO backfilling TWSE trading calendar {start_date.isoformat()} -> {end_date.isoformat()}")
+    for month_start in month_starts:
+        cooldown.before_request(log)
+        payload = fetcher(month_start.isoformat())
+        open_dates = parse_twse_fmtqik_open_dates(payload)
+        if not open_dates:
+            raise ValueError(f"TWSE FMTQIK returned 0 open days for {month_start.strftime('%Y-%m')}")
+        month_end = _month_end(month_start)
+        current = max(start_date, month_start)
+        stop = min(end_date, month_end)
+        while current <= stop:
+            trade_date = current.isoformat()
+            is_open_value = 1 if trade_date in open_dates else 0
+            note = "open day from TWSE FMTQIK" if is_open_value else "closed day inferred from TWSE FMTQIK"
+            conn.execute(
+                """
+                INSERT INTO trading_days(trade_date, is_open, source, note)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(trade_date) DO UPDATE SET
+                  is_open = excluded.is_open,
+                  source = excluded.source,
+                  note = excluded.note
+                """,
+                (trade_date, is_open_value, "twse_fmtqik", note),
+            )
+            current += timedelta(days=1)
+        if log:
+            log(
+                f"INFO TWSE FMTQIK month {month_start.strftime('%Y-%m')} "
+                f"open days={len(open_dates)}"
+            )
+    changed = conn.total_changes - before
+    if log:
+        log(f"INFO TWSE trading calendar backfilled rows={changed}")
+    return changed
+
+
+def _month_end(month_start: date) -> date:
+    year = month_start.year + (1 if month_start.month == 12 else 0)
+    month = 1 if month_start.month == 12 else month_start.month + 1
+    return date(year, month, 1) - timedelta(days=1)
+
 def parse_twse_fmtqik_open_dates(payload: dict) -> set[str]:
     if payload.get("stat") != "OK":
         raise ValueError(f"TWSE FMTQIK returned non-OK status: {payload.get('stat')}")

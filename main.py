@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 import sys
@@ -11,7 +12,9 @@ from ingest import attention_notice
 from ingest import close_importer
 from ingest import disposal_notice
 from ingest import legal_investor
+from ingest import margin
 from ingest.downloader import CooldownController
+from ingest import trading_calendar
 from ingest.trading_calendar import validate_iso_date
 from services import batch_status
 from services import telegram_notifier
@@ -40,6 +43,13 @@ def build_parser() -> argparse.ArgumentParser:
     update_close = subparsers.add_parser("update-close", help="update Close data from latest DB date to today")
     update_close.add_argument("--to", dest="end", help="target end date YYYY-MM-DD, default today")
     update_close.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
+    backfill_calendar = subparsers.add_parser(
+        "backfill-trading-days", help="backfill trading_days from TWSE FMTQIK monthly calendar"
+    )
+    backfill_calendar.add_argument("--from", dest="start", required=True, help="range start YYYY-MM-DD")
+    backfill_calendar.add_argument("--to", dest="end", required=True, help="range end YYYY-MM-DD")
+    backfill_calendar.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
     import_close_local = subparsers.add_parser(
         "import-close-local", help="import local Close CSV files in a date range"
@@ -83,6 +93,44 @@ def build_parser() -> argparse.ArgumentParser:
     download_legal.add_argument("--market", choices=config.MARKETS)
     download_legal.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
+    download_margin = subparsers.add_parser(
+        "download-margin", help="download official margin trading CSV files without importing"
+    )
+    download_margin.add_argument("--date", help="target date YYYY-MM-DD")
+    download_margin.add_argument("--from", dest="start", help="range start YYYY-MM-DD")
+    download_margin.add_argument("--to", dest="end", help="range end YYYY-MM-DD")
+    download_margin.add_argument("--market", choices=config.MARKETS)
+    download_margin.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+    download_margin.add_argument("--overwrite", action="store_true", help="redownload and overwrite existing margin CSV files")
+
+    inspect_margin = subparsers.add_parser(
+        "inspect-margin", help="inspect downloaded margin trading CSV files without importing"
+    )
+    inspect_margin.add_argument("--from", dest="start", required=True, help="range start YYYY-MM-DD")
+    inspect_margin.add_argument("--to", dest="end", required=True, help="range end YYYY-MM-DD")
+    inspect_margin.add_argument("--market", choices=config.MARKETS)
+    inspect_margin.add_argument("--report-dir", default=str(config.ROOT_DIR / "reports"))
+
+    import_margin = subparsers.add_parser(
+        "import-margin", help="dry-run margin trading CSV normalization before importing"
+    )
+    import_margin_mode = import_margin.add_mutually_exclusive_group(required=True)
+    import_margin_mode.add_argument("--dry-run", action="store_true", help="parse and validate only")
+    import_margin_mode.add_argument("--execute", action="store_true", help="write parsed rows to SQLite after dry-run validation")
+    import_margin.add_argument("--from", dest="start", required=True, help="range start YYYY-MM-DD")
+    import_margin.add_argument("--to", dest="end", required=True, help="range end YYYY-MM-DD")
+    import_margin.add_argument("--market", choices=config.MARKETS)
+    import_margin.add_argument("--twse-from", default=margin.TWSE_MARGIN_START, help="TWSE formal start date")
+    import_margin.add_argument("--tpex-from", default=margin.TPEX_FORMAL_MARGIN_START, help="TPEX formal start date")
+    import_margin.add_argument("--report-dir", default=str(config.ROOT_DIR / "reports"))
+
+    update_margin = subparsers.add_parser(
+        "update-margin", help="update one margin trading day without overwriting existing rows"
+    )
+    update_margin.add_argument("--date", help="target date YYYY-MM-DD, default today")
+    update_margin.add_argument("--market", choices=config.MARKETS)
+    update_margin.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
     inspect_legal = subparsers.add_parser(
         "inspect-legal", help="inspect local legal investor CSV files without importing"
     )
@@ -112,7 +160,7 @@ def build_parser() -> argparse.ArgumentParser:
     update_legal = subparsers.add_parser(
         "update-legal", help="manually update one legal investor trading day without overwriting existing rows"
     )
-    update_legal.add_argument("--date", required=True, help="target date YYYY-MM-DD")
+    update_legal.add_argument("--date", help="target date YYYY-MM-DD, default today")
     update_legal.add_argument("--market", choices=config.MARKETS)
     update_legal.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
@@ -283,6 +331,33 @@ def main(argv: list[str] | None = None) -> int:
                 return _cmd_report_legal(conn, args)
             finally:
                 conn.close()
+        if args.command == "download-margin":
+            db_connection.init_db(db_path)
+            conn = db_connection.connect(db_path)
+            try:
+                start, end, markets, open_dates = _prepare_margin_download(conn, args)
+            finally:
+                conn.close()
+            return _cmd_download_margin_from_dates(args, start, end, markets, open_dates)
+        if args.command == "inspect-margin":
+            db_connection.init_db(db_path)
+            conn = db_connection.connect(db_path)
+            try:
+                return _cmd_inspect_margin(conn, args)
+            finally:
+                conn.close()
+        if args.command == "import-margin":
+            db_connection.init_db(db_path)
+            conn = db_connection.connect(db_path)
+            try:
+                result = _cmd_import_margin(conn, args)
+                conn.commit()
+                return result
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
 
         db_connection.init_db(db_path)
         conn = db_connection.connect(db_path)
@@ -291,6 +366,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_import_close(conn, args)
             elif args.command == "update-close":
                 result = _cmd_update_close(conn, args)
+            elif args.command == "backfill-trading-days":
+                result = _cmd_backfill_trading_days(conn, args)
             elif args.command == "import-close-local":
                 result = _cmd_import_close_local(conn, args)
             elif args.command == "rollback-close":
@@ -309,6 +386,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_import_legal(conn, args)
             elif args.command == "update-legal":
                 result = _cmd_update_legal(conn, args)
+            elif args.command == "update-margin":
+                result = _cmd_update_margin(conn, args)
             elif args.command == "status":
                 result = _cmd_status(conn, args)
             elif args.command == "query-close":
@@ -342,6 +421,19 @@ def main(argv: list[str] | None = None) -> int:
     return 1
 
 
+
+def _cmd_backfill_trading_days(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    changed = trading_calendar.backfill_trading_days_from_twse(
+        conn,
+        start=validate_iso_date(args.start),
+        end=validate_iso_date(args.end),
+        cooldown=cooldown,
+        log=print,
+    )
+    print(f"trading_days backfill rows={changed}")
+    return 0
+
 def _cmd_import_close(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
     if args.file:
@@ -371,7 +463,7 @@ def _cmd_import_close(conn, args: argparse.Namespace) -> int:
         raise ValueError("import-close requires --date, --from/--to, or --file")
     stats = close_importer.import_close_day(
         conn,
-        trade_date=validate_iso_date(args.date),
+        trade_date=validate_iso_date(args.date or date.today().isoformat()),
         cooldown=cooldown,
         log=print,
     )
@@ -626,6 +718,114 @@ def _cmd_download_legal(conn, args: argparse.Namespace) -> int:
     return 0 if not failed else 2
 
 
+
+def _cmd_inspect_margin(conn, args: argparse.Namespace) -> int:
+    markets = (args.market,) if args.market else None
+    report = margin.audit_margin_csvs(
+        conn,
+        start=validate_iso_date(args.start),
+        end=validate_iso_date(args.end),
+        markets=markets,
+        report_dir=Path(args.report_dir),
+        log=print,
+    )
+    print(f"margin inspect expected={report.expected_files} actual={report.actual_files} OK={report.ok_files} SUSPICIOUS={report.suspicious_files} BAD={report.bad_files} MISSING={report.missing_files} EMPTY={report.empty_files} EXTRA={report.extra_files}")
+    print(f"summary: {report.summary_path}")
+    print(f"formats: {report.formats_path}")
+    print(f"bad_files: {report.bad_files_path}")
+    return 0 if report.bad_files == 0 and report.missing_files == 0 and report.empty_files == 0 and report.extra_files == 0 else 2
+
+
+def _cmd_import_margin(conn, args: argparse.Namespace) -> int:
+    markets = (args.market,) if args.market else None
+    start = validate_iso_date(args.start)
+    end = validate_iso_date(args.end)
+    twse_start = validate_iso_date(args.twse_from)
+    tpex_start = validate_iso_date(args.tpex_from)
+    if args.dry_run:
+        report = margin.dry_run_margin_import(
+            conn,
+            start=start,
+            end=end,
+            markets=markets,
+            twse_start=twse_start,
+            tpex_start=tpex_start,
+            report_dir=Path(args.report_dir),
+            log=print,
+        )
+        print(
+            f"margin dry-run expected={report.expected_files} parsed_files={report.parsed_files} rows={report.rows} "
+            f"duplicates={report.duplicate_keys} problems={report.problems} missing={report.missing_files} "
+            f"bad={report.bad_files} null_required={report.null_required} invalid_numeric={report.invalid_numeric} "
+            f"date_gaps={report.date_coverage_gaps}"
+        )
+        print(f"summary: {report.summary_path}")
+        print(f"daily_counts: {report.daily_counts_path}")
+        print(f"problems: {report.problems_path}")
+        return 0 if report.problems == 0 and report.duplicate_keys == 0 and report.missing_files == 0 and report.bad_files == 0 and report.null_required == 0 and report.invalid_numeric == 0 and report.date_coverage_gaps == 0 else 2
+
+    results = margin.import_margin_range(
+        conn,
+        start=start,
+        end=end,
+        markets=markets,
+        twse_start=twse_start,
+        tpex_start=tpex_start,
+        report_dir=Path(args.report_dir),
+        log=print,
+    )
+    total_rows = sum(result.row_count for result in results)
+    total_days = sum(result.open_days for result in results)
+    print(f"margin import OK markets={len(results)} open_days={total_days} rows={total_rows}")
+    for result in results:
+        print(f"  {result.market} range={result.start} -> {result.end} open_days={result.open_days} rows={result.row_count}")
+    return 0
+
+
+def _prepare_margin_download(conn, args: argparse.Namespace) -> tuple[str, str, tuple[str, ...], list[str]]:
+    if args.date:
+        if args.start or args.end:
+            raise ValueError("download-margin accepts --date or --from/--to, not both")
+        start = end = validate_iso_date(args.date)
+    else:
+        if not args.start or not args.end:
+            raise ValueError("download-margin requires --date or both --from and --to")
+        start = validate_iso_date(args.start)
+        end = validate_iso_date(args.end)
+    markets = (args.market,) if args.market else config.MARKETS
+    open_dates = trading_calendar.trading_days_between(conn, start, end)
+    return start, end, markets, open_dates
+
+
+def _cmd_download_margin_from_dates(
+    args: argparse.Namespace,
+    start: str,
+    end: str,
+    markets: tuple[str, ...],
+    open_dates: list[str],
+) -> int:
+    cooldowns = {
+        market: CooldownController(enabled=not args.no_cooldown)
+        for market in markets
+    }
+    results = margin.download_margin_dates(
+        open_dates,
+        start=start,
+        end=end,
+        markets=markets,
+        cooldowns=cooldowns,
+        overwrite=args.overwrite,
+        parallel_markets=args.market is None,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == "OK")
+    skipped = sum(1 for result in results if result.status == "SKIP")
+    failed = [result for result in results if result.status not in {"OK", "SKIP"}]
+    print(f"margin download OK={ok} SKIP={skipped} MISSING={len(failed)}")
+    for result in failed[:10]:
+        print(f"  {result.trade_date} {result.market} {result.status} {result.error}")
+    return 0 if not failed else 2
+
 def _cmd_inspect_legal(args: argparse.Namespace, db_path: Path) -> int:
     if args.sample_size < 0:
         raise ValueError("--sample-size must be >= 0")
@@ -729,7 +929,7 @@ def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
     results = legal_investor.update_legal_day(
         conn,
-        trade_date=validate_iso_date(args.date),
+        trade_date=validate_iso_date(args.date or date.today().isoformat()),
         markets=(args.market,) if args.market else None,
         cooldown=cooldown,
         log=print,
@@ -751,6 +951,32 @@ def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
             line += f' error={result.error}'
         print(line)
     return 0 if blocked == 0 else 2
+
+def _cmd_update_margin(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    results = margin.update_margin_day(
+        conn,
+        trade_date=validate_iso_date(args.date or date.today().isoformat()),
+        markets=(args.market,) if args.market else None,
+        cooldown=cooldown,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == 'OK')
+    exists = sum(1 for result in results if result.status == 'EXISTS')
+    closed = sum(1 for result in results if result.status == 'CLOSED')
+    blocked = sum(1 for result in results if result.status == 'BLOCKED')
+    print(f'margin update OK={ok} EXISTS={exists} CLOSED={closed} BLOCKED={blocked}')
+    for result in results:
+        source = result.source_file or '-'
+        line = (
+            f'  {result.trade_date} {result.market} {result.status} '
+            f'rows={result.row_count} file={source}'
+        )
+        if result.error:
+            line += f' error={result.error}'
+        print(line)
+    return 0 if blocked == 0 else 2
+
 
 def _cmd_report_legal(conn, args: argparse.Namespace) -> int:
     markets = (args.market,) if args.market else None

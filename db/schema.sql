@@ -76,6 +76,32 @@ CREATE INDEX IF NOT EXISTS idx_legal_investors_date ON legal_investors(trade_dat
 CREATE INDEX IF NOT EXISTS idx_legal_investors_stock ON legal_investors(stock_id);
 CREATE INDEX IF NOT EXISTS idx_legal_investors_date_stock ON legal_investors(trade_date, stock_id);
 
+CREATE TABLE IF NOT EXISTS margin_trading (
+  trade_date TEXT NOT NULL,
+  market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),
+  stock_id TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  margin_buy INTEGER NOT NULL,
+  margin_sell INTEGER NOT NULL,
+  margin_cash_repay INTEGER NOT NULL,
+  previous_margin_balance INTEGER NOT NULL,
+  margin_balance INTEGER NOT NULL,
+  margin_limit INTEGER NOT NULL,
+  short_buy INTEGER NOT NULL,
+  short_sell INTEGER NOT NULL,
+  short_stock_repay INTEGER NOT NULL,
+  previous_short_balance INTEGER NOT NULL,
+  short_balance INTEGER NOT NULL,
+  short_limit INTEGER NOT NULL,
+  offsetting INTEGER NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (trade_date, market, stock_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_margin_trading_date ON margin_trading(trade_date);
+CREATE INDEX IF NOT EXISTS idx_margin_trading_stock ON margin_trading(stock_id);
+CREATE INDEX IF NOT EXISTS idx_margin_trading_date_stock ON margin_trading(trade_date, stock_id);
+
 CREATE TABLE IF NOT EXISTS import_batches (
   batch_id TEXT PRIMARY KEY,
   dataset TEXT NOT NULL,
