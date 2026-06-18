@@ -718,6 +718,8 @@ Query：
 | `batch_id` | 否 | batch id |
 | `severity` | 否 | `WARN` / `BLOCK` |
 | `code` | 否 | error code |
+| `from` | 否 | `created_at` 日期起始，`YYYY-MM-DD` |
+| `to` | 否 | `created_at` 日期結束，`YYYY-MM-DD` |
 | `limit` | 否 | 分頁 |
 | `offset` | 否 | 分頁 |
 

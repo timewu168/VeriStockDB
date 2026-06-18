@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.8.4 - 2026-06-18
+
+### Changed
+
+- Added strict `from` / `to` date filters to `GET /api/v1/errors` and aligned the README API endpoint list.
+
 ## v0.3.8.3 - 2026-06-18
 
 ### Changed

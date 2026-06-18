@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.3.8.3
+Version: v0.3.8.4
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -136,6 +136,8 @@ export VERISTOCK_TELEGRAM_CHAT_ID=your-chat-id
 - `GET /api/v1/datasets`
 - `GET /api/v1/datasets/{dataset}/status`
 - `GET /api/v1/daily-close`
+- `GET /api/v1/attention-notices`
+- `GET /api/v1/disposal-notices`
 - `GET /api/v1/legal-investors`
 - `GET /api/v1/margin-trading`
 - `GET /api/v1/trading-days`

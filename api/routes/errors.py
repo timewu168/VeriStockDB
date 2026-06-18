@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from api.date_utils import validate_api_date
 from api.dataset_registry import get_dataset_definition
 from api.deps import read_only_connection, require_permission
 from api.schemas import success_response
@@ -22,12 +23,14 @@ def errors(
     batch_id: str | None = None,
     severity: str | None = None,
     code: str | None = None,
+    start: str | None = Query(default=None, alias="from"),
+    end: str | None = Query(default=None, alias="to"),
     limit: int = DEFAULT_LIMIT,
     offset: int = 0,
     _: None = Depends(require_permission("read")),
     conn: sqlite3.Connection = Depends(read_only_connection),
 ) -> dict:
-    filters = _validate_filters(dataset, batch_id, severity, code, limit, offset)
+    filters = _validate_filters(dataset, batch_id, severity, code, start, end, limit, offset)
     try:
         rows = _query_errors(conn, filters)
     except sqlite3.Error as exc:
@@ -59,6 +62,8 @@ def _validate_filters(
     batch_id: str | None,
     severity: str | None,
     code: str | None,
+    start: str | None,
+    end: str | None,
     limit: int,
     offset: int,
 ) -> dict:
@@ -77,6 +82,15 @@ def _validate_filters(
             "severity must be WARN or BLOCK",
             {"severity": severity},
         )
+    parsed_start = _validate_date_filter("from", start)
+    parsed_end = _validate_date_filter("to", end)
+    if parsed_start and parsed_end and parsed_start > parsed_end:
+        raise _api_error(
+            "INVALID_DATE",
+            status.HTTP_400_BAD_REQUEST,
+            "from must not be later than to",
+            {"from": start, "to": end},
+        )
     if limit < 1 or limit > MAX_LIMIT or offset < 0:
         raise _api_error(
             "INVALID_PAGINATION",
@@ -89,9 +103,25 @@ def _validate_filters(
         "batch_id": batch_id,
         "severity": normalized_severity,
         "code": code,
+        "from": parsed_start,
+        "to": parsed_end,
         "limit": limit,
         "offset": offset,
     }
+
+
+def _validate_date_filter(name: str, value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        return validate_api_date(value)
+    except ValueError as exc:
+        raise _api_error(
+            "INVALID_DATE",
+            status.HTTP_400_BAD_REQUEST,
+            f"{name} must use YYYY-MM-DD",
+            {name: value},
+        ) from exc
 
 
 def _query_errors(conn: sqlite3.Connection, filters: dict) -> list[sqlite3.Row]:
@@ -109,6 +139,12 @@ def _query_errors(conn: sqlite3.Connection, filters: dict) -> list[sqlite3.Row]:
     if filters["code"]:
         clauses.append("e.code = ?")
         params.append(filters["code"])
+    if filters["from"]:
+        clauses.append("substr(e.created_at, 1, 10) >= ?")
+        params.append(filters["from"])
+    if filters["to"]:
+        clauses.append("substr(e.created_at, 1, 10) <= ?")
+        params.append(filters["to"])
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     params.extend([int(filters["limit"]) + 1, int(filters["offset"])])
     return conn.execute(

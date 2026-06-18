@@ -101,11 +101,25 @@ class CoreApiTests(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.detail["code"], "INVALID_DATE")
 
+    def test_errors_reject_invalid_date_filter(self) -> None:
+        with self.assertRaises(HTTPException) as cm:
+            errors(dataset="daily_close", start="20260615", end=None, conn=self.conn)
+
+        self.assertEqual(cm.exception.status_code, 400)
+        self.assertEqual(cm.exception.detail["code"], "INVALID_DATE")
+
     def test_errors_and_events_filters(self) -> None:
-        error_body = errors(dataset="daily_close", severity="WARN", conn=self.conn)
+        error_body = errors(
+            dataset="daily_close",
+            severity="WARN",
+            start="2026-06-15",
+            end="2026-06-15",
+            conn=self.conn,
+        )
         event_body = events(dataset="daily_close", start=None, end=None, stock_id="2330", event_type="DOUBLE_CHECK", conn=self.conn)
 
         self.assertEqual(error_body["data"][0]["code"], "SAMPLE_WARN")
+        self.assertEqual(error_body["meta"]["filters"]["from"], "2026-06-15")
         self.assertEqual(event_body["data"][0]["stored_close_cents"], 12345)
 
     def _create_schema(self) -> None:
