@@ -30,9 +30,9 @@
 | `v0.3.3` | Telegram Bot API：更新後訊息通知 | 完成 |
 | `v0.3.4` | 三大法人 | 未開始 |
 | `v0.3.5` | 資券 | 未開始 |
-| `v0.3.6` | 當沖 | 未開始 |
-| `v0.3.7` | 月營收 | 未開始 |
-| `v0.3.8` | Close 月資料對帳 `reconcile-close-month` | 未開始 |
+| `v0.3.6` | 當沖 | 延後 |
+| `v0.3.7` | 月營收 | 延後 |
+| `v0.3.8` | Close 月資料對帳 `reconcile-close-month` | 已實作，待發版 |
 | `v0.4.0-public-preview` | 開源前整理 | 未開始 |
 | `v0.5.0` | PWA 前端 | 未開始 |
 
@@ -267,6 +267,8 @@ python main.py notify-telegram --message "VeriStockDB test message"
 
 目標：把 `docs/close_monthly_reconciliation_backlog.md` 轉成正式功能。
 
+狀態：已實作 `reconcile-close-month`，待 commit / tag / push。
+
 預計命令：
 
 ```powershell
@@ -275,14 +277,14 @@ python main.py reconcile-close-month --month YYYY-MM
 
 檢查清單：
 
-- [ ] 官方個股月資料 API 確認。
-- [ ] 預設樣本股確認：TWSE `0050`、`1101`，TPEX `5483`。
-- [ ] 支援使用者自選 `--stock-id`。
-- [ ] 支援 `--market`。
-- [ ] 第一版只比對 `close` 與 `volume`。
-- [ ] 差異會標記 `RECHECK`。
-- [ ] 差異訊息包含月份、市場、股票代號、日期、欄位、DB 值、官方值。
-- [ ] 不取代 `audit-month`，只作為跨來源對帳。
+- [x] 官方個股月資料 API 確認。
+- [x] 預設樣本股確認：TWSE `0050`、`1101`，TPEX `5483`。
+- [x] 支援使用者自選 `--stock-id`。
+- [x] 支援 `--market`。
+- [x] 第一版只比對 `close` 與 `volume`。
+- [x] 差異會標記 `RECHECK`。
+- [x] 差異訊息包含月份、市場、股票代號、日期、欄位、DB 值、官方值。
+- [x] 不取代 `audit-month`，只作為跨來源對帳。
 
 ## v0.4.0-public-preview 開源前整理
 

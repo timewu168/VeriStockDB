@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.3.5.1"
+APP_VERSION = "0.3.8.0"
 SCHEMA_VERSION = "0.3-margin-trading"
 
 
@@ -75,6 +75,14 @@ URL_TWSE_CLOSE = (
 URL_TPEX_CLOSE = (
     "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes"
     "?date={date_url}&id=&response=csv"
+)
+URL_TWSE_STOCK_MONTH = (
+    "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY"
+    "?response=json&date={date_yyyymmdd}&stockNo={stock_id}"
+)
+URL_TPEX_STOCK_MONTH = (
+    "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock"
+    "?date={date_url}&code={stock_id}&response=json"
 )
 URL_TWSE_TRADING_DAYS = (
     "https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK"

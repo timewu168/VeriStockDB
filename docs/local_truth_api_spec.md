@@ -289,6 +289,8 @@ require_quality=any
 | `GET` | `/api/v1/daily-close` | read | 第一版實作 | Close 查詢 |
 | `GET` | `/api/v1/attention-notices` | read | `v0.3.1` 實作 | 注意股公告查詢 |
 | `GET` | `/api/v1/disposal-notices` | read | `v0.3.2` 實作 | 處置股公告查詢 |
+| `GET` | `/api/v1/legal-investors` | read | `v0.3.4` 實作 | 三大法人查詢 |
+| `GET` | `/api/v1/margin-trading` | read | `v0.3.5` 實作 | 資券查詢 |
 | `GET` | `/api/v1/trading-days` | read | 第一版實作 | 交易日查詢 |
 | `GET` | `/api/v1/batches` | read | 第一版實作 | batch 查詢 |
 | `GET` | `/api/v1/batches/{batch_id}` | read | 第一版實作 | batch 單筆查詢 |
@@ -361,12 +363,16 @@ require_quality=any
 ]
 ```
 
+目前已包含並預計持續擴充：
+
+- `daily_close`
+- `attention_notice`
+- `disposal_notice`
+- `legal_investor`
+- `margin`
+
 未來預計加入：
 
-- `attention_announcements`
-- `disposition_announcements`
-- `daily_institutional_trades`
-- `daily_margin`
 - `daily_day_trading`
 - `monthly_revenue`
 
@@ -483,6 +489,70 @@ GET /api/v1/daily-close?stock_id=2330&from=2026-05-01&to=2026-06-02&require_qual
     "has_more": false
   }
 }
+```
+
+### 13.5a `GET /api/v1/legal-investors`
+
+用途：查詢三大法人每日買賣超資料。
+
+Query 與 `daily-close` 相同，支援 `from`、`to`、`stock_id`、`stock_ids`、`market`、`fields`、`require_quality`、`limit`、`offset`。
+
+允許欄位：
+
+- `trade_date`
+- `market`
+- `stock_id`
+- `stock_name`
+- `foreign_buy`
+- `foreign_sell`
+- `foreign_net`
+- `investment_trust_buy`
+- `investment_trust_sell`
+- `investment_trust_net`
+- `dealer_buy`
+- `dealer_sell`
+- `dealer_net`
+- `dealer_hedge_buy`
+- `dealer_hedge_sell`
+- `dealer_hedge_net`
+
+範例 request：
+
+```text
+GET /api/v1/legal-investors?stock_id=2330&from=2026-06-15&to=2026-06-15&market=TWSE&require_quality=ok
+```
+
+### 13.5b `GET /api/v1/margin-trading`
+
+用途：查詢信用交易資券餘額資料。
+
+Query 與 `daily-close` 相同，支援 `from`、`to`、`stock_id`、`stock_ids`、`market`、`fields`、`require_quality`、`limit`、`offset`。
+
+允許欄位：
+
+- `trade_date`
+- `market`
+- `stock_id`
+- `stock_name`
+- `margin_buy`
+- `margin_sell`
+- `margin_cash_repay`
+- `previous_margin_balance`
+- `margin_balance`
+- `margin_limit`
+- `short_buy`
+- `short_sell`
+- `short_stock_repay`
+- `previous_short_balance`
+- `short_balance`
+- `short_limit`
+- `offsetting`
+- `note`
+
+範例 request：
+
+```text
+GET /api/v1/margin-trading?stock_id=2330&from=2026-06-15&to=2026-06-15&market=TWSE&require_quality=ok
 ```
 
 ### 13.6 `GET /api/v1/trading-days`

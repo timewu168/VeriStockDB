@@ -21,6 +21,7 @@ from services import telegram_notifier
 from services.backup import backup_database
 from services.monthly_archive import archive_month
 from services.monthly_audit import audit_month
+from services.close_monthly_reconcile import reconcile_close_month
 from services.monthly_finalize import finalize_close_months
 from services.ops_check import run_ops_check
 
@@ -248,6 +249,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="skip last-day rollback requirement for historical/local audits",
     )
 
+    reconcile = subparsers.add_parser(
+        "reconcile-close-month", help="reconcile daily_close with official monthly stock JSON"
+    )
+    reconcile.add_argument("--month", required=True, help="target month YYYY-MM")
+    reconcile.add_argument("--market", choices=config.MARKETS)
+    reconcile.add_argument("--stock-id", action="append", help="stock ID to reconcile; repeatable")
+    reconcile.add_argument("--from", dest="start", help="optional range start YYYY-MM-DD within month")
+    reconcile.add_argument("--to", dest="end", help="optional range end YYYY-MM-DD within month")
+    reconcile.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
     archive = subparsers.add_parser("archive-month", help="ZIP and verify monthly CSV files")
     archive.add_argument("--dataset", default=config.DATASET_DAILY_CLOSE)
     archive.add_argument("--month", required=True, help="YYYY-MM")
@@ -400,6 +411,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_approve_batch(conn, args)
             elif args.command == "audit-month":
                 result = _cmd_audit_month(conn, args)
+            elif args.command == "reconcile-close-month":
+                result = _cmd_reconcile_close_month(conn, args)
             elif args.command == "archive-month":
                 result = _cmd_archive_month(conn, args)
             elif args.command == "finalize-close-months":
@@ -1196,6 +1209,27 @@ def _cmd_audit_month(conn, args: argparse.Namespace) -> int:
     print(f"{result.dataset} {result.month} {result.status}")
     for error in result.errors:
         print(f"  {error}")
+    return 0 if result.status == "OK" else 2
+
+
+def _cmd_reconcile_close_month(conn, args: argparse.Namespace) -> int:
+    result = reconcile_close_month(
+        conn,
+        month=args.month,
+        markets=(args.market,) if args.market else None,
+        stock_ids=args.stock_id,
+        start=args.start,
+        end=args.end,
+        cooldown=CooldownController(enabled=not args.no_cooldown),
+        log=print,
+    )
+    print(f"daily_close {result.month} reconcile {result.status}")
+    for target in result.targets:
+        print(f"  {target.market} {target.stock_id} {target.status} rows={target.checked_rows}")
+        for error in target.errors[:10]:
+            print(f"    {error}")
+        if len(target.errors) > 10:
+            print(f"    ... {len(target.errors) - 10} more")
     return 0 if result.status == "OK" else 2
 
 

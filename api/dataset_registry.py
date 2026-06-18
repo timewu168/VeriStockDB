@@ -36,6 +36,20 @@ SUPPORTED_DATASETS = {
         markets=config.MARKETS,
         status_endpoint=f"/api/v1/datasets/{config.DATASET_DISPOSAL_NOTICE}/status",
     ),
+    config.DATASET_LEGAL_INVESTOR: DatasetDefinition(
+        dataset=config.DATASET_LEGAL_INVESTOR,
+        title="Legal Investors",
+        period_type="date",
+        markets=config.MARKETS,
+        status_endpoint=f"/api/v1/datasets/{config.DATASET_LEGAL_INVESTOR}/status",
+    ),
+    config.DATASET_MARGIN: DatasetDefinition(
+        dataset=config.DATASET_MARGIN,
+        title="Margin Trading",
+        period_type="date",
+        markets=config.MARKETS,
+        status_endpoint=f"/api/v1/datasets/{config.DATASET_MARGIN}/status",
+    ),
 }
 
 

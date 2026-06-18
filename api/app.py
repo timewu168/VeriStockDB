@@ -15,6 +15,8 @@ from api.routes import (
     events,
     health,
     info,
+    legal_investors,
+    margin_trading,
     ops,
     trading_days,
 )
@@ -36,6 +38,8 @@ def create_app() -> FastAPI:
     app.include_router(daily_close.router, prefix="/api/v1")
     app.include_router(attention_notices.router, prefix="/api/v1")
     app.include_router(disposal_notices.router, prefix="/api/v1")
+    app.include_router(legal_investors.router, prefix="/api/v1")
+    app.include_router(margin_trading.router, prefix="/api/v1")
     app.include_router(trading_days.router, prefix="/api/v1")
     app.include_router(batches.router, prefix="/api/v1")
     app.include_router(errors.router, prefix="/api/v1")

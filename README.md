@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.3.4.0
+Version: v0.3.8.0
 
 VeriStockDB 是一個本機台股 SQLite 資料庫專案，目標是把官方資料下載、檢查、擋錯後才入庫，讓使用者查到乾淨可信的資料。
 
@@ -71,6 +71,10 @@ python main.py query-close --stock-id 2330 --from 2024-01-01 --to 2024-12-31
 # 執行指定月份的零容忍月度檢查
 python main.py audit-month --dataset daily_close --month 2024-06
 
+# 使用官方個股月資料 JSON 對帳 daily_close 的 close 與 volume，不改寫主表
+python main.py reconcile-close-month --month 2026-06
+python main.py reconcile-close-month --month 2026-06 --market TWSE --stock-id 2330 --from 2026-06-01 --to 2026-06-17
+
 # 歷史起點或單市場資料可指定月檢範圍，避免把未匯入市場或起點前交易日列為缺漏
 python main.py audit-month --dataset daily_close --month 2004-02 --market TWSE --from 2004-02-11 --skip-rollback
 
@@ -132,6 +136,8 @@ export VERISTOCK_TELEGRAM_CHAT_ID=your-chat-id
 - `GET /api/v1/datasets`
 - `GET /api/v1/datasets/{dataset}/status`
 - `GET /api/v1/daily-close`
+- `GET /api/v1/legal-investors`
+- `GET /api/v1/margin-trading`
 - `GET /api/v1/trading-days`
 - `GET /api/v1/batches`
 - `GET /api/v1/batches/{batch_id}`

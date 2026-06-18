@@ -14,6 +14,7 @@ import config
 
 
 FetchCloseCsv = Callable[[str, str], bytes]
+FetchCloseMonthJson = Callable[[str, str, str], dict]
 FetchAttentionCsv = Callable[[str, str, str], bytes]
 FetchDisposalCsv = Callable[[str, str, str], bytes]
 FetchLegalCsv = Callable[[str, str], bytes]
@@ -47,6 +48,16 @@ def official_close_url(market: str, trade_date: str) -> str:
     if market == "TPEX":
         date_url = quote(trade_date.replace("-", "/"), safe="")
         return config.URL_TPEX_CLOSE.format(date_url=date_url)
+    raise ValueError(f"unknown market: {market}")
+
+
+def official_stock_month_url(market: str, month: str, stock_id: str) -> str:
+    yyyymmdd = f"{month.replace('-', '')}01"
+    if market == "TWSE":
+        return config.URL_TWSE_STOCK_MONTH.format(date_yyyymmdd=yyyymmdd, stock_id=stock_id)
+    if market == "TPEX":
+        date_url = quote(f"{month.replace('-', '/')}/01", safe="")
+        return config.URL_TPEX_STOCK_MONTH.format(date_url=date_url, stock_id=stock_id)
     raise ValueError(f"unknown market: {market}")
 
 
@@ -124,6 +135,19 @@ def download_close_csv(market: str, trade_date: str) -> bytes:
     )
     with urlopen(request, timeout=30, context=official_ssl_context()) as response:
         return response.read()
+
+
+def download_close_month_json(market: str, month: str, stock_id: str) -> dict:
+    url = official_stock_month_url(market, month, stock_id)
+    request = Request(
+        url,
+        headers={
+            "User-Agent": f"VeriStockDB/{config.APP_VERSION} (+https://github.com/timewu168/VeriStockDB)",
+            "Accept": "application/json,*/*",
+        },
+    )
+    with urlopen(request, timeout=30, context=official_ssl_context()) as response:
+        return json.loads(response.read().decode("utf-8-sig"))
 
 
 def download_attention_csv(market: str, start: str, end: str) -> bytes:

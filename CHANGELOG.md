@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.8.0 - 2026-06-18
+
+### Added
+
+- Added `reconcile-close-month` to compare `daily_close` close and volume against official TWSE/TPEX monthly stock JSON without downloading CSV or overwriting canonical rows.
+- Added TWSE/TPEX monthly stock JSON fetchers and parser tests, including TPEX monthly lot rounding tolerance for volume checks.
+- Added read-only Local Truth API endpoints for `legal_investors` and `margin_trading` with date range, stock ID, market, field selection, quality, and pagination filters.
+
 ## v0.3.4.0 - 2026-06-16
 
 ### Added
