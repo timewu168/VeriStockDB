@@ -17,6 +17,8 @@ TASK_LABELS = {
     "rollback-close": "Close 三日回滾",
     "update-attention": "注意股公告更新",
     "update-disposal": "處置股公告更新",
+    "update-legal": "法人資料更新",
+    "update-margin": "資券資料更新",
     "backup": "DB 備份",
     "ops-check": "部署健康檢查",
     "notify-telegram": "Telegram 通知測試",

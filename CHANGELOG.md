@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.8.3 - 2026-06-18
+
+### Changed
+
+- Added Telegram task notifications for `update-legal` and `update-margin`, including `BLOCKED` results returned as normal command exit codes.
+
 ## v0.3.8.2 - 2026-06-18
 
 ### Changed

@@ -940,10 +940,12 @@ def _print_legal_dry_run_results(results: list[legal_investor.LegalDryRunResult]
 
 def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
+    target_date = validate_iso_date(args.date or date.today().isoformat())
+    markets = (args.market,) if args.market else None
     results = legal_investor.update_legal_day(
         conn,
-        trade_date=validate_iso_date(args.date or date.today().isoformat()),
-        markets=(args.market,) if args.market else None,
+        trade_date=target_date,
+        markets=markets,
         cooldown=cooldown,
         log=print,
     )
@@ -954,6 +956,7 @@ def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
     print(
         f'legal_investor update OK={ok} EXISTS={exists} CLOSED={closed} BLOCKED={blocked}'
     )
+    errors: list[str] = []
     for result in results:
         source = result.source_file or '-'
         line = (
@@ -962,15 +965,26 @@ def _cmd_update_legal(conn, args: argparse.Namespace) -> int:
         )
         if result.error:
             line += f' error={result.error}'
+            if result.status == 'BLOCKED':
+                errors.append(f'{result.trade_date} {result.market}: {result.error}')
         print(line)
+    stats = _single_day_update_stats(ok=ok, exists=exists, closed=closed, blocked=blocked)
+    _emit_stats_notification(
+        'update-legal',
+        stats,
+        lines=_single_day_update_lines(target_date=target_date, markets=markets),
+        errors=errors,
+    )
     return 0 if blocked == 0 else 2
 
 def _cmd_update_margin(conn, args: argparse.Namespace) -> int:
     cooldown = CooldownController(enabled=not args.no_cooldown)
+    target_date = validate_iso_date(args.date or date.today().isoformat())
+    markets = (args.market,) if args.market else None
     results = margin.update_margin_day(
         conn,
-        trade_date=validate_iso_date(args.date or date.today().isoformat()),
-        markets=(args.market,) if args.market else None,
+        trade_date=target_date,
+        markets=markets,
         cooldown=cooldown,
         log=print,
     )
@@ -979,6 +993,7 @@ def _cmd_update_margin(conn, args: argparse.Namespace) -> int:
     closed = sum(1 for result in results if result.status == 'CLOSED')
     blocked = sum(1 for result in results if result.status == 'BLOCKED')
     print(f'margin update OK={ok} EXISTS={exists} CLOSED={closed} BLOCKED={blocked}')
+    errors: list[str] = []
     for result in results:
         source = result.source_file or '-'
         line = (
@@ -987,7 +1002,16 @@ def _cmd_update_margin(conn, args: argparse.Namespace) -> int:
         )
         if result.error:
             line += f' error={result.error}'
+            if result.status == 'BLOCKED':
+                errors.append(f'{result.trade_date} {result.market}: {result.error}')
         print(line)
+    stats = _single_day_update_stats(ok=ok, exists=exists, closed=closed, blocked=blocked)
+    _emit_stats_notification(
+        'update-margin',
+        stats,
+        lines=_single_day_update_lines(target_date=target_date, markets=markets),
+        errors=errors,
+    )
     return 0 if blocked == 0 else 2
 
 
@@ -1368,17 +1392,37 @@ def _format_stats(stats: dict[str, int]) -> str:
     )
 
 
+def _single_day_update_stats(*, ok: int, exists: int, closed: int, blocked: int) -> dict[str, int]:
+    return {
+        "OK": ok,
+        "FIXED": 0,
+        "BLOCKED": blocked,
+        "RECHECK": 0,
+        "MISSING": 0,
+        "SKIPPED": exists + closed,
+    }
+
+
+def _single_day_update_lines(*, target_date: str, markets: tuple[str, ...] | None) -> list[str]:
+    return [
+        f"target: {target_date}",
+        f"markets: {','.join(markets) if markets else 'TWSE,TPEX'}",
+    ]
+
+
 def _emit_stats_notification(
     task_name: str,
     stats: dict[str, int],
     *,
     lines: list[str] | None = None,
+    errors: list[str] | None = None,
 ) -> None:
     _emit_telegram_notification(
         task_name,
         telegram_notifier.status_from_stats(stats),
         stats=stats,
         lines=lines,
+        errors=errors,
     )
 
 
