@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.4.2 - 2026-06-29
+
+### Added
+
+- Added MIT `LICENSE`, `CONTRIBUTING.md`, and `SECURITY.md` for public repository hygiene.
+- Added GitHub issue templates for bug reports and feature requests.
+- Added GitHub Actions CI to run unit tests and Python compile checks on push and pull requests.
+
+### Verified
+
+- Unit tests passed: 73 tests OK, 11 skipped.
+- Python compile check passed.
+- Diff whitespace check passed.
+- New repository hygiene files contain no private deployment paths or secret markers.
+
 ## v0.4.1 - 2026-06-18
 
 ### Changed

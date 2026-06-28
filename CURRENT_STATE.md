@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Current public-preview gate status: `v0.4.0` public-preview released; `v0.4.1` public repo polish ready.
-- Latest release/tag target: `v0.4.1` public repo polish.
+- Current public-preview gate status: `v0.4.0` public-preview released; `v0.4.2` repository hygiene ready.
+- Latest release/tag target: `v0.4.2` repository hygiene.
 - Public repo polish replaces private deployment paths with example paths and keeps DB/schema unchanged.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, trading days, dataset status, batches, errors, events, and ops summary.
@@ -95,13 +95,13 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.4.1`.
+- Current code version in `config.py`: `APP_VERSION=0.4.2`.
 - Current schema version: `SCHEMA_VERSION=0.3-margin-trading`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `trading_days`, `import_batches`, `import_errors`, `data_events`, and `settings`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `margin_trading` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - No SQLite schema migration is pending in the current working tree.
-- Current `v0.4.1` polish changes are docs/templates/version only; no SQLite schema migration is included.
+- Current `v0.4.2` repository hygiene changes are docs/metadata/CI only; no SQLite schema migration is included.
 
 ## Modified Files
 
@@ -112,9 +112,12 @@ Current tracked modified files in working tree:
 - `CURRENT_STATE.md`
 - `CHANGELOG.md`
 - `docs/local_truth_api_spec.md`
-- `deploy/systemd/*.service`
-- `deploy/systemd/veristockdb.env.example`
-- public deployment docs under `docs/` and `docs/pm_handoff/`
+- `LICENSE`
+- `CONTRIBUTING.md`
+- `SECURITY.md`
+- `.github/ISSUE_TEMPLATE/bug_report.md`
+- `.github/ISSUE_TEMPLATE/feature_request.md`
+- `.github/workflows/ci.yml`
 
 Current untracked local files/directories not intended for Git:
 
@@ -125,7 +128,7 @@ Current untracked local files/directories not intended for Git:
 
 ## Next Gate
 
-- After `v0.4.1`, the GitHub repository can be made public from repository settings.
+- After `v0.4.2`, the GitHub repository can be made public from repository settings.
 - Before making the GitHub repo public, verify the repo does not include `data/`, SQLite DB files, tokens, private server paths, private server secrets, or production-only systemd secrets.
 - Deferred dataset work remains `v0.3.6` day trading and `v0.3.7` monthly revenue.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.

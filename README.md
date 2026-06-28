@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.4.1
+Version: v0.4.2
 
 VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
