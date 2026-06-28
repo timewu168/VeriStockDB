@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.4.3 - 2026-06-29
+
+### Added
+
+- Added a README "Why This Matters" section explaining VeriStockDB's local, reproducible, validation-first canonical DB value for fragmented Taiwan stock official data.
+- Opened public GitHub issues for parser regression fixtures, release workflow automation, repo hygiene scanning, and canonical SQLite architecture documentation.
+
+### Verified
+
+- GitHub repository is public with README, MIT license, SECURITY, CONTRIBUTING, issue templates, and open public issues.
+- GitHub profile is publicly accessible.
+- Unit tests passed: 73 tests OK, 11 skipped.
+- Python compile check passed.
+- Diff whitespace check passed.
+
 ## v0.4.2 - 2026-06-29
 
 ### Added

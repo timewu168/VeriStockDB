@@ -2,18 +2,19 @@
 
 ## Current Stage
 
-- Current public-preview gate status: `v0.4.0` public-preview released; `v0.4.2` repository hygiene ready.
-- Latest release/tag target: `v0.4.2` repository hygiene.
-- Public repo polish replaces private deployment paths with example paths and keeps DB/schema unchanged.
+- Latest release target: `v0.4.3` open-source application readiness.
+- Latest pushed release before this update: `baa235d Release v0.4.2 repo hygiene`, tag `v0.4.2`, pushed to `origin/main`.
+- Public-preview gate status: `v0.4.0` completed; `v0.4.1` public repo polish completed; `v0.4.2` open-source repo hygiene completed; `v0.4.3` prepares the repository for Codex for Open Source application review.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, trading days, dataset status, batches, errors, events, and ops summary.
+- Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 - `v0.3.6` day trading and `v0.3.7` monthly revenue are intentionally deferred.
 
 ## Accepted Baseline
 
-- SQLite DB path: `/opt/veristockdb/app/data/db/veristock.db`.
+- SQLite DB path example: `/opt/veristockdb/app/data/db/veristock.db`.
 - Latest verified SQLite `PRAGMA integrity_check`: `ok` on 2026-06-18 after legal/margin gap repair.
-- Latest verified DB size: `3719970816` bytes.
+- Latest verified DB size: `3719970816` bytes on 2026-06-18.
 - Latest schema validation on 2026-06-18: all expected tables and columns OK for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `trading_days`, `import_batches`, `import_errors`, and `data_events`.
 - Latest duplicate key check on 2026-06-18:
   - `daily_close`: `0`
@@ -22,9 +23,9 @@
   - `legal_investors`: `0`
   - `margin_trading`: `0`
 - Latest formal date coverage gaps on 2026-06-18:
-  - `daily_close`: TWSE `0`, TPEX `0`.
-  - `legal_investors`: TWSE `0`, TPEX `0`.
-  - `margin_trading`: TWSE `0`, TPEX `0`.
+  - `daily_close`: TWSE `0`, TPEX `0`
+  - `legal_investors`: TWSE `0`, TPEX `0`
+  - `margin_trading`: TWSE `0`, TPEX `0`
 - Latest non-open/unknown trade-date row check on 2026-06-18: OK for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, and `margin_trading`.
 - Latest recent batch/error state on 2026-06-18: no recent non-OK batches; no recent `import_errors`.
 - Verified DB row counts on 2026-06-18:
@@ -45,12 +46,16 @@
   - `/mnt/veristockdb-cold/veristockdb/backup/veristock_pre_margin_import_20260618_074854.db`, integrity `ok`, bytes `2380640256`.
   - `/mnt/veristockdb-cold/veristockdb/backup/veristock_pre_trading_days_backfill_20010102_20040201_20260616_081936.db`, integrity `ok`, bytes `2379722752`.
   - `/mnt/veristockdb-cold/veristockdb/backup/veristock_pre_legal_update_20260615_20260616_071818.db`, integrity `ok`, bytes `2379341824`.
-- Latest accepted test validation baseline for `v0.4.0` gate:
-  - `python3 -m unittest discover -s tests`: `73` tests run, `11` skipped, OK.
-  - Real DB route smoke succeeded for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `trading_days`, and `errors` on 2026-06-18.
-- Latest post-`v0.3.8.4` targeted update-flow validation before full release test:
-  - `python3 -m unittest tests.test_update_notifications tests.test_legal_investor tests.test_margin -v`: `47` OK.
-  - `python3 -m compileall -q main.py tests/test_update_notifications.py`: OK.
+- Latest release validation for `v0.4.3` on 2026-06-29:
+  - `python3 -m unittest discover -s tests`: `73` tests OK, `11` skipped.
+  - `PYTHONPYCACHEPREFIX=/tmp/veristockdb_pycache_043 python3 -m compileall -q api ingest services main.py tests config.py`: OK.
+  - `git diff --check`: OK.
+  - Public/private path scan: no tracked private deployment paths or private service-account references.
+- Latest public repository verification on 2026-06-29:
+  - GitHub repository `timewu168/VeriStockDB` is public.
+  - GitHub profile `timewu168` is publicly accessible.
+  - GitHub repository exposes README, MIT `LICENSE`, `SECURITY.md`, and `CONTRIBUTING.md`.
+  - Open public issues exist for parser regression fixtures, release workflow automation, repo hygiene scanning, and canonical SQLite architecture documentation.
 
 ## SQLite/ClickHouse Truth Boundary
 
@@ -75,12 +80,12 @@
   - TPEX: `tradingStock?date={YYYY%2FMM%2F01}&code={stock_id}&response=json`.
   - It compares `close` and `volume` only, records `RECHECK` on mismatch, and never overwrites `daily_close`.
   - TPEX monthly volume is reported as lots and may be rounded; reconciliation allows a `500` share tolerance for TPEX volume only. Prices remain exact.
-- Legal investor CSV source root: `/opt/veristockdb/app/data/csv/legal_investor`.
+- Legal investor CSV source root example: `/opt/veristockdb/app/data/csv/legal_investor`.
 - Legal investor commands are implemented and accepted: `download-legal`, `inspect-legal`, `report-legal`, `import-legal --dry-run`, `import-legal`, `update-legal`.
-- `update-legal` now scans missing open trading dates through the target date per market, so internal gaps such as `2026-06-16`/`2026-06-17` are recovered even when `MAX(trade_date)` already reaches the target.
-- Margin CSV source root: `/opt/veristockdb/app/data/csv/margin`.
+- `update-legal` scans missing open trading dates through the target date per market, so internal gaps such as `2026-06-16`/`2026-06-17` are recovered even when `MAX(trade_date)` already reaches the target.
+- Margin CSV source root example: `/opt/veristockdb/app/data/csv/margin`.
 - Margin commands are implemented and accepted: `download-margin`, `inspect-margin`, `import-margin --dry-run`, `import-margin --execute`, `update-margin`.
-- `update-margin` now scans missing open trading dates through the target date per market, so internal gaps are recovered even when `MAX(trade_date)` already reaches the target.
+- `update-margin` scans missing open trading dates through the target date per market, so internal gaps are recovered even when `MAX(trade_date)` already reaches the target.
 - Production systemd schedules currently verified:
   - Close: `Mon..Fri 17:10`.
   - Legal investors: `Mon..Fri 18:00`.
@@ -95,41 +100,31 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.4.2`.
-- Current schema version: `SCHEMA_VERSION=0.3-margin-trading`.
+- Current code version in `config.py`: `APP_VERSION=0.4.3`.
+- Current schema version in `config.py`: `SCHEMA_VERSION=0.3-margin-trading`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `trading_days`, `import_batches`, `import_errors`, `data_events`, and `settings`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `margin_trading` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
-- No SQLite schema migration is pending in the current working tree.
-- Current `v0.4.2` repository hygiene changes are docs/metadata/CI only; no SQLite schema migration is included.
+- No SQLite schema migration is pending.
+- `v0.4.3` open-source application readiness changes are docs/metadata only; no SQLite schema migration is included.
 
 ## Modified Files
 
-Current tracked modified files in working tree:
-
-- `config.py`
-- `README.md`
-- `CURRENT_STATE.md`
-- `CHANGELOG.md`
-- `docs/local_truth_api_spec.md`
-- `LICENSE`
-- `CONTRIBUTING.md`
-- `SECURITY.md`
-- `.github/ISSUE_TEMPLATE/bug_report.md`
-- `.github/ISSUE_TEMPLATE/feature_request.md`
-- `.github/workflows/ci.yml`
-
-Current untracked local files/directories not intended for Git:
-
-- `.venv/`
-- `reports/`
-- `e --to 2026-06-04`
-- `udo systemctl daemon-reload`
+- Tracked working tree after `v0.4.3` commit/tag/push should be clean.
+- Current local untracked files/directories not intended for Git:
+  - `.venv/`
+  - `reports/`
+  - `e --to 2026-06-04`
+  - `udo systemctl daemon-reload`
 
 ## Next Gate
 
-- After `v0.4.2`, the GitHub repository can be made public from repository settings.
-- Before making the GitHub repo public, verify the repo does not include `data/`, SQLite DB files, tokens, private server paths, private server secrets, or production-only systemd secrets.
+- The GitHub repository is public and ready for Open Source application review.
+- Before submitting external application forms, verify:
+  - Application text contains no confidential information, private deployment paths, tokens, production logs, DB files, CSV files, or backup details.
+  - README renders the "Why This Matters" section clearly.
+  - `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, issue templates, public issues, and Actions tab are visible.
+  - tag `v0.4.3` is visible after release push.
 - Deferred dataset work remains `v0.3.6` day trading and `v0.3.7` monthly revenue.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 
@@ -146,7 +141,7 @@ Do not perform any of these without explicit user approval:
 - Create or overwrite ClickHouse tables.
 - Run ClickHouse backfill or production sync.
 - Delete backup, archive, quarantine, CSV, report, or log files.
-- Execute formal public-release cleanup that rewrites git history unless explicitly authorized.
+- Rewrite git history.
 
 ## Required Data/DB Validation Checks
 
@@ -170,26 +165,24 @@ Before accepting any future DB-changing work:
 
 ## Important Paths / Latest Reports
 
-- Repo: `/opt/veristockdb/app`
+- Repo example path: `/opt/veristockdb/app`
 - Current state file: `/opt/veristockdb/app/CURRENT_STATE.md`
-- SQLite DB: `/opt/veristockdb/app/data/db/veristock.db`
-- Hot CSV root: `/opt/veristockdb/app/data/csv`
-- Legal investor CSV root: `/opt/veristockdb/app/data/csv/legal_investor`
-- Margin CSV root: `/opt/veristockdb/app/data/csv/margin`
-- Reports root: `/opt/veristockdb/app/reports`
-- Logs: `/var/log/veristockdb`
-- Backup root: `/mnt/veristockdb-cold/veristockdb/backup`
-- Archive root: `/mnt/veristockdb-cold/veristockdb/archive`
-- Legal investor service/timer:
+- SQLite DB example path: `/opt/veristockdb/app/data/db/veristock.db`
+- Hot CSV root example: `/opt/veristockdb/app/data/csv`
+- Legal investor CSV root example: `/opt/veristockdb/app/data/csv/legal_investor`
+- Margin CSV root example: `/opt/veristockdb/app/data/csv/margin`
+- Reports root example: `/opt/veristockdb/app/reports`
+- Logs example path: `/var/log/veristockdb`
+- Backup root example: `/mnt/veristockdb-cold/veristockdb/backup`
+- Archive root example: `/mnt/veristockdb-cold/veristockdb/archive`
+- Legal investor service/timer examples:
   - `/etc/systemd/system/veristockdb-update-legal.service`
   - `/etc/systemd/system/veristockdb-update-legal.timer`
-- Margin service/timer:
+- Margin service/timer examples:
   - `/etc/systemd/system/veristockdb-update-margin.service`
   - `/etc/systemd/system/veristockdb-update-margin.timer`
-- Attention timer:
-  - `/etc/systemd/system/veristockdb-update-attention.timer`
-- Disposal timer:
-  - `/etc/systemd/system/veristockdb-update-disposal.timer`
+- Attention timer example: `/etc/systemd/system/veristockdb-update-attention.timer`
+- Disposal timer example: `/etc/systemd/system/veristockdb-update-disposal.timer`
 - Margin CSV audits:
   - TWSE: `/opt/veristockdb/app/reports/margin_csv_audit_20260618_072603.txt`
   - TPEX: `/opt/veristockdb/app/reports/margin_csv_audit_20260618_072538.txt`
@@ -197,5 +190,5 @@ Before accepting any future DB-changing work:
   - `/opt/veristockdb/app/reports/margin_import_dry_run_20260618_075908.txt`
   - `/opt/veristockdb/app/reports/margin_import_daily_counts_20260618_075908.csv`
   - `/opt/veristockdb/app/reports/margin_import_problems_20260618_075908.csv`
-- Margin pre-import backup:
+- Margin pre-import backup example:
   - `/mnt/veristockdb-cold/veristockdb/backup/veristock_pre_margin_import_20260618_074854.db`
