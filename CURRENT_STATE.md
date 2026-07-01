@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Latest release target: `v0.4.5` monthly revenue canonical DB/API release.
-- Latest pushed release before this update: `v0.4.4`.
+- Latest release target: `v0.4.7` production schedule state release.
+- Latest pushed release before this update: `v0.4.6`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
@@ -58,9 +58,9 @@
   - `/mnt/veristockdb-cold/veristockdb/backup/veristock_pre_margin_import_20260618_074854.db`, integrity `ok`, bytes `2380640256`.
   - `/mnt/veristockdb-cold/veristockdb/backup/veristock_pre_trading_days_backfill_20010102_20040201_20260616_081936.db`, integrity `ok`, bytes `2379722752`.
   - `/mnt/veristockdb-cold/veristockdb/backup/veristock_pre_legal_update_20260615_20260616_071818.db`, integrity `ok`, bytes `2379341824`.
-- Latest release validation for `v0.4.3` on 2026-06-29:
-  - `python3 -m unittest discover -s tests`: `73` tests OK, `11` skipped.
-  - `PYTHONPYCACHEPREFIX=/tmp/veristockdb_pycache_043 python3 -m compileall -q api ingest services main.py tests config.py`: OK.
+- Latest release validation for `v0.4.7` on 2026-07-01:
+  - `python3 -m unittest discover -s tests`: `97` tests OK, `15` skipped.
+  - `PYTHONPYCACHEPREFIX=/tmp/veristockdb_pycache_047 python3 -m py_compile config.py`: OK.
   - `git diff --check`: OK.
   - Public/private path scan: no tracked private deployment paths or private service-account references.
 - Latest public repository verification on 2026-06-29:
@@ -109,7 +109,9 @@
   - Attention notices: `Mon..Fri 19:00`.
   - Disposal notices: `Mon..Fri 19:05`.
   - Margin trading: `Mon..Fri 21:05`.
-- Monthly revenue has no production systemd timer enabled.
+  - Day trading: `Mon..Fri 21:10`, enabled and active on 2026-07-01.
+  - Monthly revenue: `Mon..Fri *-*-10..12 21:15`, enabled and active on 2026-07-01.
+- Monthly revenue production service uses `/usr/local/bin/veristockdb-update-revenue-guard.sh` so the job runs only on the 10th, or on the next Monday when the 10th is Saturday/Sunday; other 11th/12th weekday timer hits only log a skip.
 - Margin official source scope:
   - TWSE from `2001-01-02`: `MI_MARGN?response=csv&date={YYYYMMDD}&selectType=ALL`.
   - TPEX canonical scope from `2008-09-30`: `balance?date={YYYY%2FMM%2FDD}&id=&response=csv`.
@@ -118,7 +120,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.4.5`.
+- Current code version in `config.py`: `APP_VERSION=0.4.7`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, and `settings`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -126,11 +128,11 @@
 - `day_trading` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `monthly_revenue` canonical key: `PRIMARY KEY (revenue_month, market, stock_id)`.
 - No SQLite schema migration is pending.
-- `v0.4.5` includes the accepted `monthly_revenue` SQLite schema now present in the production DB.
+- `v0.4.7` includes accepted day trading and monthly revenue production schedule state in documentation; no SQLite schema migration is pending.
 
 ## Modified Files
 
-- Tracked working tree after `v0.4.3` commit/tag/push should be clean.
+- Tracked working tree after `v0.4.7` commit/tag/push should be clean.
 - Current local untracked files/directories not intended for Git:
   - `.venv/`
   - `reports/`
@@ -139,7 +141,7 @@
 
 ## Next Gate
 
-- Current gate: commit and release the completed day trading and monthly revenue DB/API work after tests, DB validation, and docs validation pass.
+- Current gate: observe the first production day trading timer run and the next monthly revenue timer run; verify logs, batch state, DB latest period, duplicate keys, and API status afterward.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 
 ## Locked Actions
@@ -195,6 +197,13 @@ Before accepting any future DB-changing work:
 - Margin service/timer examples:
   - `/etc/systemd/system/veristockdb-update-margin.service`
   - `/etc/systemd/system/veristockdb-update-margin.timer`
+- Day trading service/timer examples:
+  - `/etc/systemd/system/veristockdb-update-day-trading.service`
+  - `/etc/systemd/system/veristockdb-update-day-trading.timer`
+- Monthly revenue service/timer examples:
+  - `/etc/systemd/system/veristockdb-update-revenue.service`
+  - `/etc/systemd/system/veristockdb-update-revenue.timer`
+  - `/usr/local/bin/veristockdb-update-revenue-guard.sh`
 - Attention timer example: `/etc/systemd/system/veristockdb-update-attention.timer`
 - Disposal timer example: `/etc/systemd/system/veristockdb-update-disposal.timer`
 - Margin CSV audits:
