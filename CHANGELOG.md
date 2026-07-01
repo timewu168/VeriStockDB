@@ -1,5 +1,19 @@
 # 版本紀錄
 
+## v0.6.1 - 2026-07-01
+
+### 新增
+
+- 新增 `schedule-health` CLI，檢查 production update timers、log tail 與 dataset freshness。
+- 新增 `GET /api/v1/ops/schedule-health`，提供排程健康結構化報表。
+- PWA「系統」頁新增排程健康表格，顯示整體、Timer、Log、Data、Latest、Expected、Last、Next。
+- 新增 schedule health 單元測試，涵蓋 timer 正常、timer disabled、log error 與資料落後。
+
+### 變更
+
+- 將 app version bump 至 `0.6.1`。
+- 更新 PWA service worker cache，確保 v0.6.1 靜態資源刷新。
+
 ## v0.6.0 - 2026-07-01
 
 ### 新增

@@ -294,6 +294,33 @@
               <p class="muted token-note">Token 只存於此瀏覽器 localStorage，不寫入 repo 或 DB。</p>
             </section>
           </div>
+          <section class="panel schedule-health-panel">
+            <div class="panel-head">
+              <div>
+                <h2>排程健康</h2>
+                <span class="muted">檢查 timer 是否啟用、log 是否有錯、資料是否追上最新期間</span>
+              </div>
+              <button class="text-button" id="reload-schedule-health">重新整理</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>資料集</th>
+                    <th>整體</th>
+                    <th>Timer</th>
+                    <th>Log</th>
+                    <th>Data</th>
+                    <th>Latest</th>
+                    <th>Expected</th>
+                    <th>Last</th>
+                    <th>Next</th>
+                  </tr>
+                </thead>
+                <tbody id="schedule-health-table"></tbody>
+              </table>
+            </div>
+          </section>
         </section>
       </main>
     </div>

@@ -50,7 +50,8 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 | `v0.5.0` | Local Management PWA MVP 與手動更新 jobs API | 完成 |
 | `v0.5.1` | `ops_jobs` 持久化、PWA 表格查詢、jobs detail | 完成 |
 | `v0.5.2` | PWA 手動更新 job list、dashboard job 摘要、smoke tests | 完成 |
-| `v0.6.0` | PWA 資料健康 drill-down | 進行中 |
+| `v0.6.0` | PWA 資料健康 drill-down | 完成 |
+| `v0.6.1` | 排程健康報表 | 進行中 |
 
 ## 目前已接受的 canonical datasets
 
@@ -126,18 +127,25 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 
 目標：將目前靠人工確認的排程狀態整理成可查詢報表。
 
-候選項目：
+範圍：
 
-- systemd timer expected/actual report。
-- 最近排程 log 摘要。
-- dataset 最新日期與 timer 最近執行時間對照。
-- Telegram 通知漏發檢查。
+- systemd timer enabled/active/last/next report。
+- 最近排程 log tail marker 檢查。
+- dataset latest/expected freshness 檢查。
+- PWA 系統頁表格顯示。
+
+Deferred：
+
+- Telegram 通知漏發檢查先不做，後續若需要再補。
 
 完成條件：
 
-- [ ] 不修改正式排程，除非另行授權。
-- [ ] 不讀任意路徑，只讀設定允許的 log path。
-- [ ] API 或 CLI 有穩定輸出。
+- [x] 不修改正式排程。
+- [x] 不讀任意路徑，只讀設定允許的 log path。
+- [x] CLI 有穩定輸出。
+- [x] API 有穩定輸出。
+- [x] PWA 系統頁可查看。
+- [x] 補單元測試。
 
 ### v0.6.2：文件邊界整理
 
@@ -192,10 +200,10 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 
 ## 目前下一步
 
-目前 `v0.6.0` 正在進行 PWA 資料健康 drill-down。
+目前 `v0.6.1` 正在進行排程健康報表。
 
 後續功能 gate：
 
-1. 完成 `v0.6.0` 驗證與 release。
+1. 完成 `v0.6.1` 驗證與 release。
 2. 更新 `CURRENT_STATE.md`。
-3. 進入 `v0.6.1` 排程健康報表。
+3. 進入 `v0.6.2` 文件邊界整理。

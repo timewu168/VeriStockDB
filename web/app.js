@@ -129,6 +129,7 @@ function bindActions() {
   $("#reload-errors").addEventListener("click", loadErrors);
   $("#reload-events").addEventListener("click", loadEvents);
   $("#reload-jobs").addEventListener("click", loadJobs);
+  $("#reload-schedule-health").addEventListener("click", loadScheduleHealth);
   $("#reload-dataset-detail").addEventListener("click", () => {
     if (state.selectedDataset) loadDatasetHealth(state.selectedDataset);
   });
@@ -167,11 +168,14 @@ function refreshCurrentView() {
   else if (active === "events") {
     loadErrors();
     loadEvents();
+  } else if (active === "system") {
+    loadInfo();
+    loadScheduleHealth();
   } else refreshAll();
 }
 
 async function refreshAll() {
-  await Promise.allSettled([loadInfo(), loadDatasets(), loadBatches(), loadErrors(), loadEvents(), loadJobs()]);
+  await Promise.allSettled([loadInfo(), loadDatasets(), loadBatches(), loadErrors(), loadEvents(), loadJobs(), loadScheduleHealth()]);
 }
 
 async function loadInfo() {
@@ -638,6 +642,40 @@ function renderJob(job) {
     <pre>${escapeHtml(job.stdout_tail || "-")}</pre>
     <h2>stderr tail</h2>
     <pre>${escapeHtml(job.stderr_tail || "-")}</pre>
+  `;
+}
+
+async function loadScheduleHealth() {
+  const table = $("#schedule-health-table");
+  if (!table) return;
+  try {
+    const response = await api("/api/v1/ops/schedule-health");
+    table.innerHTML = response.data.schedules.map(renderScheduleRow).join("") || rowMessage("沒有排程資料", 9);
+  } catch (error) {
+    table.innerHTML = rowMessage(`讀取排程健康失敗：${escapeHtml(error.message)}`, 9);
+  }
+}
+
+function renderScheduleRow(item) {
+  const data = item.data || {};
+  const timer = item.timer || {};
+  const log = item.log || {};
+  const title = item.title || labelDataset(item.dataset);
+  return `
+    <tr>
+      <td>
+        <strong>${escapeHtml(title)}</strong>
+        <div class="subtle">${escapeHtml(item.dataset || "-")}</div>
+      </td>
+      <td>${pill(item.status)}</td>
+      <td title="${escapeHtml(timer.message || "")}">${pill(timer.status)}</td>
+      <td title="${escapeHtml(log.message || "")}">${pill(log.status)}</td>
+      <td title="${escapeHtml(data.message || "")}">${pill(data.status)}</td>
+      <td>${escapeHtml(data.observed_period || "-")}</td>
+      <td>${escapeHtml(data.expected_period || "-")}</td>
+      <td>${escapeHtml(timer.last_trigger || "-")}</td>
+      <td>${escapeHtml(timer.next_trigger || "-")}</td>
+    </tr>
   `;
 }
 

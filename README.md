@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.6.0
+Version: v0.6.1
 
 VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
@@ -65,6 +65,7 @@ python3 main.py init-db
 python3 main.py status
 python3 main.py status --problems --details
 python3 main.py ops-check
+python3 main.py schedule-health
 python3 main.py backup
 ```
 
@@ -207,6 +208,7 @@ Local Truth API 已完成以下端點：
 - `GET /api/v1/errors`
 - `GET /api/v1/events`
 - `GET /api/v1/ops/summary`
+- `GET /api/v1/ops/schedule-health`
 - `GET /api/v1/jobs`
 - `GET /api/v1/jobs/{job_id}`
 - `POST /api/v1/jobs/update-dataset`
@@ -234,6 +236,7 @@ PWA 目前用於本機資料健康檢查與人工補救，不是選股工具：
 
 - 查看資料集最新日期與問題批次。
 - 點選資料集查看 latest、quality、recent batches、problem batches、recent errors、recent events、recent jobs。
+- 在系統頁查看排程健康：timer 是否啟用、log tail 是否有錯、資料 latest 是否追上 expected。
 - 手動執行 allow-listed `update-*` jobs。
 - 查看最近手動更新 job、錯誤摘要、stdout/stderr tail。
 - 使用 Local Truth API 查詢正式資料；查詢結果以表格顯示。

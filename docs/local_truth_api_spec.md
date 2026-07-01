@@ -303,6 +303,7 @@ require_quality=any
 | `GET` | `/api/v1/errors` | read | 第一版實作 | import_errors 查詢 |
 | `GET` | `/api/v1/events` | read | 第一版實作 | data_events 查詢 |
 | `GET` | `/api/v1/ops/summary` | ops | 第一版實作 | ops-check 摘要 |
+| `GET` | `/api/v1/ops/schedule-health` | ops | `v0.6.1` 實作 | 排程、log、資料更新健康報表 |
 | `POST` | `/api/v1/jobs/update-dataset` | ops | `v0.5.0` 實作 | 觸發 allow-listed dataset 更新 |
 | `GET` | `/api/v1/jobs` | ops | `v0.5.1` 實作 | 查詢手動更新 job 歷史 |
 | `GET` | `/api/v1/jobs/{job_id}` | ops | `v0.5.1` 實作 | 查詢單一手動更新 job |
@@ -952,6 +953,36 @@ Query：
     }
   ]
 }
+```
+
+### 13.11a `GET /api/v1/ops/schedule-health`
+
+用途：檢查 production update timers、log tail 與 dataset freshness。
+
+權限：`ops`。
+
+Query：
+
+| 參數 | 必填 | 說明 |
+| --- | --- | --- |
+| `skip_systemd` | 否 | `true` 時略過 systemd timer 檢查 |
+
+檢查項目：
+
+- Timer：`systemctl is-enabled`、`systemctl is-active`、last/next trigger。
+- Log：檢查設定 log 目錄內各 update log 的近期 tail 是否有 `ERROR`、`Traceback`、`FAILED`、`BLOCKED` 等 marker。
+- Data：比較 dataset canonical latest / latest batch 與 expected period。
+
+資料 expected period：
+
+- 日資料：`trading_days` 中今日以前最新 open date。
+- 月營收：依每月 10 號公開規則計算 latest published revenue month。
+
+範例 request：
+
+```text
+GET /api/v1/ops/schedule-health
+GET /api/v1/ops/schedule-health?skip_systemd=true
 ```
 
 ### 13.12 `POST /api/v1/jobs/update-dataset`

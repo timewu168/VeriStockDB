@@ -26,6 +26,7 @@ from services.monthly_audit import audit_month
 from services.close_monthly_reconcile import reconcile_close_month
 from services.monthly_finalize import finalize_close_months
 from services.ops_check import run_ops_check
+from services.schedule_health import run_schedule_health
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -269,6 +270,12 @@ def build_parser() -> argparse.ArgumentParser:
     ops.add_argument("--log-dir", default=str(config.LOG_DIR))
     ops.add_argument("--skip-systemd", action="store_true", help="skip systemd timer checks")
 
+    schedule_health = subparsers.add_parser(
+        "schedule-health", help="check production timers, logs, and dataset freshness"
+    )
+    schedule_health.add_argument("--log-dir", default=str(config.LOG_DIR))
+    schedule_health.add_argument("--skip-systemd", action="store_true", help="skip systemd timer checks")
+
     notify = subparsers.add_parser("notify-telegram", help="send a Telegram notification")
     notify_target = notify.add_mutually_exclusive_group(required=True)
     notify_target.add_argument("--test", action="store_true", help="send a VeriStockDB test notification")
@@ -394,6 +401,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "ops-check":
             return _cmd_ops_check(db_path, args)
+        if args.command == "schedule-health":
+            return _cmd_schedule_health(db_path, args)
         if args.command == "notify-telegram":
             return _cmd_notify_telegram(args)
         if args.command == "inspect-attention":
@@ -710,6 +719,30 @@ def _cmd_ops_check(db_path: Path, args: argparse.Namespace) -> int:
             ],
         )
     return 2 if result.has_errors else 0
+
+
+def _cmd_schedule_health(db_path: Path, args: argparse.Namespace) -> int:
+    result = run_schedule_health(
+        db_path=db_path,
+        log_dir=Path(args.log_dir),
+        check_systemd=not args.skip_systemd,
+    )
+    print(f"schedule-health {result.status}")
+    for item in result.schedules:
+        print(
+            f"  {item['status']:<5} {item['dataset']:<18} "
+            f"timer={item['timer']['status']} log={item['log']['status']} data={item['data']['status']}"
+        )
+        print(
+            f"        latest={item['data']['observed_period'] or '-'} "
+            f"expected={item['data']['expected_period'] or '-'} "
+            f"last={item['timer']['last_trigger'] or '-'} next={item['timer']['next_trigger'] or '-'}"
+        )
+        if item["status"] != "OK":
+            print(f"        timer: {item['timer']['message']}")
+            print(f"        log: {item['log']['message']}")
+            print(f"        data: {item['data']['message']}")
+    return 2 if result.status == "ERROR" else 0
 
 
 def _cmd_notify_telegram(args: argparse.Namespace) -> int:
