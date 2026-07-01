@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.4.3
+Version: v0.5.2
 
 VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
@@ -19,8 +19,11 @@ VeriStockDB 不是交易建議系統，不連接券商，不下單，也不是�
 - `disposal_notices`
 - `legal_investors`
 - `margin_trading`
+- `day_trading`
+- `monthly_revenue`
 - `trading_days`
 - `import_batches`, `import_errors`, `data_events`, `settings`
+- `ops_jobs` for PWA manual-update job history; not canonical market data
 
 ClickHouse 目前沒有被啟用為真理資料庫；若之後導入，只能先作為分析或高流量查詢層，不能取代 SQLite canonical data。
 
@@ -148,7 +151,7 @@ python3 main.py import-revenue --execute --from 2013-01 --to 2026-05
 python3 main.py update-revenue
 ```
 
-`update-revenue` 依每月 10 號公開規則判定最新可用月份，從各市場 DB 內最後 `revenue_month + 1` 補到目標月份，不覆寫既有資料。月營收目前未啟用正式 systemd 排程。
+`update-revenue` 依每月 10 號公開規則判定最新可用月份，從各市場 DB 內最後 `revenue_month + 1` 補到目標月份，不覆寫既有資料。
 
 Close 月資料對帳與封存：
 
@@ -176,16 +179,19 @@ python3 main.py notify-telegram --message "VeriStockDB test message"
 - Attention notices：`Mon..Fri 19:00`
 - Disposal notices：`Mon..Fri 19:05`
 - Margin trading：`Mon..Fri 21:05`
+- Day trading：`Mon..Fri 21:10`
+- Monthly revenue：`Mon..Fri *-*-10..12 21:15`，由 guard script 判斷 10 號或遇假日順延
 
 Timer 使用 `Persistent=true`。修改 production systemd timer 需要人工 sudo，不能未授權改動。
 
 ## Local Truth API
 
-Read-only API 已完成以下端點：
+Local Truth API 已完成以下端點：
 
 - `GET /health`
 - `GET /api/v1/info`
 - `GET /api/v1/datasets`
+- `GET /api/v1/datasets/status-summary`
 - `GET /api/v1/datasets/{dataset}/status`
 - `GET /api/v1/daily-close`
 - `GET /api/v1/attention-notices`
@@ -200,6 +206,9 @@ Read-only API 已完成以下端點：
 - `GET /api/v1/errors`
 - `GET /api/v1/events`
 - `GET /api/v1/ops/summary`
+- `GET /api/v1/jobs`
+- `GET /api/v1/jobs/{job_id}`
+- `POST /api/v1/jobs/update-dataset`
 
 啟動：
 
@@ -209,6 +218,26 @@ python3 -m api
 ```
 
 預設綁定 `127.0.0.1:8000`。完整 API 契約見 `docs/local_truth_api_spec.md`。
+
+## Local Management PWA
+
+`v0.5.x` 起提供本地管理 PWA，靜態檔位於 `web/`，由 FastAPI 掛載在 `/`。
+
+啟動範例：
+
+```bash
+python3 -m uvicorn api.app:app --host 127.0.0.1 --port 8000
+```
+
+PWA 目前用於本機資料健康檢查與人工補救，不是選股工具：
+
+- 查看資料集最新日期與問題批次。
+- 手動執行 allow-listed `update-*` jobs。
+- 查看最近手動更新 job、錯誤摘要、stdout/stderr tail。
+- 使用 Local Truth API 查詢正式資料；查詢結果以表格顯示。
+- Close 價格在 PWA 顯示層會把 API 的 cents 整數除以 `100` 顯示為元；API 與 DB 契約仍是 cents。
+
+PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command。
 
 ## Data Sources
 

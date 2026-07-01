@@ -1,5 +1,90 @@
 # Changelog
 
+## v0.5.2 - 2026-07-01
+
+### Added
+
+- Added a dedicated PWA manual-update jobs view with recent job history.
+- Added dashboard recent-job summary cards.
+- Added click-to-open job detail drawer from job rows.
+- Added route-level smoke coverage for jobs list/detail and PWA query table contracts.
+
+### Changed
+
+- Failed jobs are highlighted in the PWA and show an error summary.
+- Bumped PWA service-worker cache to refresh static assets.
+
+### Verified
+
+- Unit tests passed: 107 tests OK.
+- `node --check web/app.js` passed.
+- Python compile check passed.
+- Diff whitespace check passed.
+
+## v0.5.1 - 2026-07-01
+
+### Added
+
+- Added `ops_jobs` operational table for PWA manual-update job persistence.
+- Added persisted job list/detail behavior for `/api/v1/jobs` and `/api/v1/jobs/{job_id}`.
+- Added PWA job detail display for messages, stdout tail, stderr tail, return code, and error message.
+- Added query table output with Chinese column labels.
+- Added query limit/offset inputs with default limit `10000`.
+- Added OS dependency documentation for `sqlite3`, `nodejs`, and `npm`.
+
+### Changed
+
+- Manual update jobs now survive API restarts.
+- Incomplete jobs left by API restart are marked `FAILED`.
+- Close price fields are displayed in TWD in the PWA by dividing API cent values by `100`; DB/API storage remains integer cents.
+
+### Verified
+
+- User verified manual update can create a job.
+- User verified `/api/v1/jobs` still shows historical jobs after API restart.
+- Unit tests passed: 105 tests OK.
+- `node --check web/app.js` passed.
+- Python compile check passed.
+- Diff whitespace check passed.
+
+## v0.5.0 - 2026-07-01
+
+### Added
+
+- Added Local Management PWA under `web/`, served by FastAPI static mount at `/`.
+- Added PWA dashboard, dataset status, batches, errors/events, query, and system views.
+- Added manual dataset update buttons backed by allow-listed `main.py update-*` commands.
+- Added job API endpoints: `POST /api/v1/jobs/update-dataset`, `GET /api/v1/jobs`, and `GET /api/v1/jobs/{job_id}`.
+- Added single-writer guard so only one manual update job can run at a time.
+- Added dataset status summary endpoint for the PWA.
+
+### Changed
+
+- FastAPI read-only SQLite connections now use `check_same_thread=False` to avoid random threadpool-related 500/503 errors.
+- Dataset latest-period status prefers canonical table max period before batch fallback.
+
+### Verified
+
+- User verified the PWA no longer shows the initial blocking modal and random dataset status errors.
+- Parallel API smoke across health, datasets, status summary, batches, errors, events, and jobs returned 200 without SQLite thread errors.
+- Unit tests passed: 104 tests OK.
+- Python compile check passed.
+- Diff whitespace check passed.
+
+## v0.4.7 - 2026-07-01
+
+### Changed
+
+- Documented accepted production schedule state for day trading and monthly revenue.
+- Updated current-state handoff for the completed day-trading and monthly-revenue schedule setup.
+
+### Verified
+
+- Unit tests passed: 97 tests OK, 15 skipped.
+- Python compile check passed.
+- Diff whitespace check passed.
+- Public/private path scan passed.
+
 ## v0.4.6 - 2026-07-01
 
 ### Changed
@@ -33,6 +118,22 @@
 - Monthly revenue formal import: `280,711` rows, duplicate keys `0`, required blanks `0`, SQLite integrity `ok`.
 - Monthly revenue update smoke run: latest market months remain `2026-05` for TWSE and TPEX.
 - Unit tests passed: 95 tests OK, 13 skipped.
+- Diff whitespace check passed.
+
+## v0.4.4 - 2026-07-01
+
+### Added
+
+- Added day-trading CSV download, validation, parser, dry-run, formal import/update, and read-only API support.
+- Added monthly revenue CSV download/import groundwork before the final canonical API release in `v0.4.5`.
+
+### Changed
+
+- Expanded documentation and state tracking for day trading and monthly revenue ETL work.
+
+### Verified
+
+- Day-trading historical import/update baseline accepted through `2026-06-30`.
 - Diff whitespace check passed.
 
 ## v0.4.3 - 2026-06-29
@@ -128,6 +229,30 @@
 - Added `reconcile-close-month` to compare `daily_close` close and volume against official TWSE/TPEX monthly stock JSON without downloading CSV or overwriting canonical rows.
 - Added TWSE/TPEX monthly stock JSON fetchers and parser tests, including TPEX monthly lot rounding tolerance for volume checks.
 - Added read-only Local Truth API endpoints for `legal_investors` and `margin_trading` with date range, stock ID, market, field selection, quality, and pagination filters.
+
+## v0.3.5.1 - 2026-06-18
+
+### Changed
+
+- Fixed disposal notice update horizon so official range queries extend beyond the current DB latest disposal date when needed to capture newly published announcements.
+
+### Notes
+
+- Official disposal endpoint behavior can return stocks active during a queried date rather than only announcements published on that date; update logic accounts for this by extending the query end date.
+
+## v0.3.5.0 - 2026-06-18
+
+### Added
+
+- Added canonical SQLite `margin_trading` schema and indexes.
+- Added margin CSV download, inspection, validation, dry-run, formal import, and update workflows.
+- Added TPEX margin source normalization using the accepted `balance` endpoint from `2008-09-30`.
+- Added read-only margin API support through `GET /api/v1/margin-trading`.
+
+### Notes
+
+- TWSE margin canonical scope starts at `2001-01-02`.
+- TPEX canonical scope starts at `2008-09-30`; earlier downloaded files are not accepted for canonical import.
 
 ## v0.3.4.0 - 2026-06-16
 

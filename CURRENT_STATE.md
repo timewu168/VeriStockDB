@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Latest release target: `v0.5.2` Local Management PWA job list and smoke-test improvements.
-- Latest pushed release before this update: `v0.5.1`.
+- Latest release target: documentation cleanup after `v0.5.2`.
+- Latest pushed release before this update: `v0.5.2`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
@@ -88,6 +88,9 @@
   - Recent manual update jobs are visible in a dedicated PWA view and dashboard summary.
   - Failed jobs are highlighted and show error summaries.
   - API smoke tests cover jobs list/detail and PWA query table contract.
+- Documentation cleanup after `v0.5.2`:
+  - README version and current scope are being aligned to `v0.5.2`.
+  - `CHANGELOG.md` is the canonical release history file and is being backfilled for missing tags.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -162,15 +165,10 @@
 
 ## Modified Files
 
-- `v0.5.2` working tree changes before commit/tag/push:
+- Documentation cleanup working tree changes before commit:
   - `CURRENT_STATE.md`
-  - `config.py`
-  - `tests/test_api_core.py`
-  - `tests/test_api_jobs.py`
-  - `web/app.js`
-  - `web/index.html`
-  - `web/service-worker.js`
-  - `web/styles.css`
+  - `CHANGELOG.md`
+  - `README.md`
 
 Previously committed `v0.5.1` files:
 
@@ -195,7 +193,7 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: validate and optionally commit/tag/push `v0.5.2`.
+- Current gate: validate documentation cleanup and commit without creating a new release tag unless explicitly requested.
 - After `v0.5.2`, next functional gate is optional job log refresh UX or broader PWA smoke coverage.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
