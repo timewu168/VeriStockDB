@@ -1,5 +1,10 @@
 # DB Backup / Restore SOP
 
+<!-- i18n-switch -->
+[中文](../docs/backup_restore_sop.md) | [English](en/backup_restore_sop.md)
+<!-- /i18n-switch -->
+
+
 此文件是 VeriStockDB SQLite canonical DB 的備份與還原標準流程。任何正式還原都必須由人工執行，不可透過 PWA/API 自動觸發。
 
 ## 適用範圍

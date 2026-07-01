@@ -1,5 +1,10 @@
 # 版本紀錄
 
+<!-- i18n-switch -->
+[中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
+<!-- /i18n-switch -->
+
+
 ## v0.6.5 - 2026-07-02
 
 ### 新增

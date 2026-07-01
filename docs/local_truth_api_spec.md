@@ -1,5 +1,10 @@
 # Local Truth API 規格文件
 
+<!-- i18n-switch -->
+[中文](../docs/local_truth_api_spec.md) | [English](en/local_truth_api_spec.md)
+<!-- /i18n-switch -->
+
+
 狀態：Local Truth API 已完成至 `v0.5.2`，涵蓋 Close、注意、處置、法人、資券、當沖、月營收、交易日、批次、錯誤、事件、ops summary、dataset status summary 與 PWA 手動更新 jobs。PWA jobs 僅能執行 allow-listed `update-*` 命令，不提供任意 shell command。
 
 建立日期：2026-06-04

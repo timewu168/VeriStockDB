@@ -1,5 +1,10 @@
 # Legal Investor Ingestion Blockers
 
+<!-- i18n-switch -->
+[中文](../docs/legal_investor_ingestion_blockers.md) | [English](en/legal_investor_ingestion_blockers.md)
+<!-- /i18n-switch -->
+
+
 Last updated: 2026-06-15
 
 ## Current Rule

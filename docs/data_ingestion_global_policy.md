@@ -1,5 +1,10 @@
 # VeriStockDB Data Ingestion Global Policy
 
+<!-- i18n-switch -->
+[中文](../docs/data_ingestion_global_policy.md) | [English](en/data_ingestion_global_policy.md)
+<!-- /i18n-switch -->
+
+
 This policy applies to every official-data table in VeriStockDB: Close, Legal,
 Margin, DayTrading, Revenue, Notice, Disposal, and future datasets.
 

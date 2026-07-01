@@ -1,0 +1,115 @@
+VeriStockDB Official Data Source URL Reference
+
+Language: English
+Chinese version: ../URL.txt
+
+This file summarizes the accepted official sources used by VeriStockDB. Always verify official endpoint behavior before changing downloader, parser, or importer logic.
+
+1. Trading Days
+
+TWSE monthly trading-day source:
+https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={date_yyyymmdd}&response=json
+
+Parameter:
+- {date_yyyymmdd}: Gregorian date in YYYYMMDD, usually the first day of the month.
+
+TPEX fallback monthly market index source:
+https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex?date={date_url}&id=&response=json
+
+Parameter:
+- {date_url}: URL-encoded Gregorian date YYYY%2FMM%2FDD, usually the first day of the month.
+
+2. Daily Close
+
+TWSE:
+https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?response=csv&date={sii_date}&type=ALLBUT0999NOTIND
+
+TPEX:
+https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date={otc_date_url}&id=&response=csv
+
+Parameters:
+- {sii_date}: YYYYMMDD.
+- {otc_date_url}: YYYY%2FMM%2FDD.
+
+3. Legal Investors
+
+TWSE:
+https://www.twse.com.tw/rwd/zh/fund/T86?date={sii_date}&selectType=ALLBUT0999&response=csv
+
+TPEX:
+https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&sect=EW&date={otc_date_url}&id=&response=csv
+
+Canonical SQLite scope:
+- TWSE from 2012-05-04.
+- TPEX from 2007-04-23.
+
+4. Margin Trading
+
+TWSE:
+https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=csv&date={sii_date}&selectType=ALL
+
+TPEX accepted canonical source:
+https://www.tpex.org.tw/www/zh-tw/margin/balance?date={otc_date_url}&id=&response=csv
+
+Canonical SQLite scope:
+- TWSE from 2001-01-02.
+- TPEX from 2008-09-30.
+
+5. Day Trading
+
+TWSE:
+https://www.twse.com.tw/rwd/zh/dayTrading/TWTB4U?response=csv&date={sii_date}&selectType=All
+
+TPEX:
+https://www.tpex.org.tw/www/zh-tw/intraday/stat?type=Daily&date={otc_date_url}&id=&response=csv
+
+Canonical SQLite scope:
+- From 2014-01-06.
+
+6. Monthly Revenue
+
+TWSE:
+https://mopsov.twse.com.tw/server-java/FileDownLoad?step=9&functionName=show_file2&filePath=%2Ft21%2Fsii%2F&fileName=t21sc03_{roc_month}.csv
+
+TPEX:
+https://mopsov.twse.com.tw/server-java/FileDownLoad?step=9&functionName=show_file2&filePath=%2Ft21%2Fotc%2F&fileName=t21sc03_{roc_month}.csv
+
+Parameter:
+- {roc_month}: ROCYear_Month, for example 115_6.
+
+Important header:
+- The download request must include Referer: https://mops.twse.com.tw/mops/web/t21sc03_bootstrap
+
+Canonical SQLite scope:
+- From 2013-01.
+
+7. Attention Notices
+
+TWSE:
+https://www.twse.com.tw/rwd/zh/announcement/notice?response=csv&startDate={start_date_sii}&endDate={end_date_sii}&stockNo=&sortKind=STKNO&querytype=1&selectType=
+
+TPEX:
+https://www.tpex.org.tw/www/zh-tw/bulletin/attention?startDate={start_date_otc}&endDate={end_date_otc}&code=&cate=&type=all&order=date&id=&response=csv
+
+8. Disposal Notices
+
+TWSE:
+https://www.twse.com.tw/rwd/zh/announcement/punish?response=csv&startDate={start_date_sii}&endDate={end_date_sii}&stockNo=&sortKind=DATE&querytype=&selectType=&proceType=&remarkType=
+
+TPEX:
+https://www.tpex.org.tw/www/zh-tw/bulletin/disposal?startDate={start_date_otc}&endDate={end_date_otc}&code=&cate=&type=all&reason=-1&measure=-1&order=date&id=&response=csv
+
+Operational note:
+- Disposal update should query beyond the latest accepted announcement date to capture official records that appear only when the endpoint date window is extended.
+
+9. Close Monthly Reconciliation
+
+TWSE stock monthly JSON:
+https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date={yyyymm01}&stockNo={stock_id}
+
+TPEX stock monthly JSON:
+https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?date={yyyy_mm_01_url}&code={stock_id}&response=json
+
+Use:
+- Reconciliation compares close and volume only.
+- It must not overwrite canonical daily_close rows automatically.

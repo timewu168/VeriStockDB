@@ -1,5 +1,10 @@
 # PWA 與 CLI 中文顯示邊界備忘
 
+<!-- i18n-switch -->
+[中文](../docs/pwa_cli_i18n_boundary_note.md) | [English](en/pwa_cli_i18n_boundary_note.md)
+<!-- /i18n-switch -->
+
+
 狀態：已落地到 `v0.5.x` PWA/API。此文件保留為架構邊界備忘。
 
 ## 核心結論

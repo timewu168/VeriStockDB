@@ -1,5 +1,10 @@
 # CURRENT_STATE.md
 
+<!-- i18n-switch -->
+[English](CURRENT_STATE.md) | [中文](CURRENT_STATE.zh-TW.md)
+<!-- /i18n-switch -->
+
+
 ## Current Stage
 
 - Latest release target: `v0.6.5` all-dataset health check.

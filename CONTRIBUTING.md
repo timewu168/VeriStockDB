@@ -1,5 +1,10 @@
 # Contributing
 
+<!-- i18n-switch -->
+[English](CONTRIBUTING.md) | [中文](CONTRIBUTING.zh-TW.md)
+<!-- /i18n-switch -->
+
+
 Thanks for considering a contribution to VeriStockDB.
 
 VeriStockDB treats SQLite as the canonical truth store. Contributions that touch data ingestion, schema, official-source parsing, or scheduling should preserve the project's validation-first behavior.

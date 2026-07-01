@@ -1,5 +1,10 @@
 # v0.3.3 Telegram Bot API 通知規格
 
+<!-- i18n-switch -->
+[中文](../docs/telegram_notification_spec.md) | [English](en/telegram_notification_spec.md)
+<!-- /i18n-switch -->
+
+
 狀態：完成。
 
 建立日期：2026-06-05

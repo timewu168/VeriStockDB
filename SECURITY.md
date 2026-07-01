@@ -1,5 +1,10 @@
 # Security Policy
 
+<!-- i18n-switch -->
+[English](SECURITY.md) | [中文](SECURITY.zh-TW.md)
+<!-- /i18n-switch -->
+
+
 ## Supported Versions
 
 Security updates are handled on the `main` branch and the latest tagged public-preview release.

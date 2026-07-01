@@ -1,5 +1,10 @@
 # Close 月資料對帳功能備忘
 
+<!-- i18n-switch -->
+[中文](../docs/close_monthly_reconciliation_backlog.md) | [English](en/close_monthly_reconciliation_backlog.md)
+<!-- /i18n-switch -->
+
+
 狀態：已實作為 `reconcile-close-month`。
 
 ## 背景

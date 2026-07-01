@@ -1,5 +1,10 @@
 # VeriStockDB 專案完成度總盤點
 
+<!-- i18n-switch -->
+[中文](../docs/project_completion_inventory.md) | [English](en/project_completion_inventory.md)
+<!-- /i18n-switch -->
+
+
 更新日期：2026-07-02
 
 適用版本：`v0.6.5`
@@ -325,4 +330,4 @@ PM 或整合 owner 接手時，先確認：
 8. `docs/backup_restore_sop.md`
 9. 其他 `docs/` 目前有效文件
 
-`docs/pm_handoff/` 是歷史封存，只能作參考，不能取代目前狀態。
+舊 `docs/pm_handoff/` 交接包已移出 repo 工作樹並保留於冷封存區，只能作參考，不能取代目前狀態。

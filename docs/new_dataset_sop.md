@@ -1,5 +1,10 @@
 # 新增資料表 SOP
 
+<!-- i18n-switch -->
+[中文](../docs/new_dataset_sop.md) | [English](en/new_dataset_sop.md)
+<!-- /i18n-switch -->
+
+
 本文是 VeriStockDB 之後新增官方資料表時的標準流程。目標是避免重新摸索既有規則，並確保新資料集進入 SQLite canonical truth 前，已完成下載、驗證、dry-run、正式入庫、排程、API、PWA 與文件邊界。
 
 新增資料表時不得跳過本 SOP。若某一步不適用，必須在文件或 release note 中明確標成 deferred 或不適用原因。

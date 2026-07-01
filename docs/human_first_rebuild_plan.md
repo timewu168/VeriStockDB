@@ -1,5 +1,10 @@
 # VeriStockDB 人本重做規劃書
 
+<!-- i18n-switch -->
+[中文](../docs/human_first_rebuild_plan.md) | [English](en/human_first_rebuild_plan.md)
+<!-- /i18n-switch -->
+
+
 版本：v0.2-rebuild-plan  
 日期：2026-06-02  
 定位：重新規劃一個人用得懂、資料乾淨、能擋官方錯誤的台股 SQLite 資料庫。

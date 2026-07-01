@@ -1,5 +1,10 @@
 # Ubuntu 私有部署驗證紀錄
 
+<!-- i18n-switch -->
+[中文](../docs/ubuntu_private_deployment_status.md) | [English](en/ubuntu_private_deployment_status.md)
+<!-- /i18n-switch -->
+
+
 驗證日期：2026-06-04
 主機：`time-home-server`
 部署版本：`v0.2.6`

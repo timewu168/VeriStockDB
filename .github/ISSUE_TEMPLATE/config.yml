@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation / 文件
+    url: https://github.com/timewu168/VeriStockDB#readme
+    about: Read the bilingual README before opening an issue. / 開 issue 前請先閱讀雙語 README。

@@ -1,5 +1,10 @@
 # VeriStockDB 版本路線與檢查清單
 
+<!-- i18n-switch -->
+[中文](../docs/version_roadmap_checklist.md) | [English](en/version_roadmap_checklist.md)
+<!-- /i18n-switch -->
+
+
 狀態：已對齊 `v0.6.5` 實際完成範圍。
 
 更新日期：2026-07-01

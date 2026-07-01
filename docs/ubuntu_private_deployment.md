@@ -1,5 +1,10 @@
 # Ubuntu 私有部署備忘
 
+<!-- i18n-switch -->
+[中文](../docs/ubuntu_private_deployment.md) | [English](en/ubuntu_private_deployment.md)
+<!-- /i18n-switch -->
+
+
 狀態：v0.2.5 起支援環境變數路徑設定；v0.2.6 起提供 systemd service/timer 範本。
 
 ## 硬碟分層
