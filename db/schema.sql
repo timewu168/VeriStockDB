@@ -118,6 +118,30 @@ CREATE INDEX IF NOT EXISTS idx_day_trading_date ON day_trading(trade_date);
 CREATE INDEX IF NOT EXISTS idx_day_trading_stock ON day_trading(stock_id);
 CREATE INDEX IF NOT EXISTS idx_day_trading_date_stock ON day_trading(trade_date, stock_id);
 
+CREATE TABLE IF NOT EXISTS monthly_revenue (
+  revenue_month TEXT NOT NULL,
+  market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),
+  stock_id TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  industry TEXT NOT NULL,
+  report_date TEXT NOT NULL,
+  roc_period TEXT NOT NULL,
+  current_month_revenue INTEGER NOT NULL,
+  previous_month_revenue INTEGER NOT NULL,
+  previous_year_month_revenue INTEGER NOT NULL,
+  month_over_month_pct REAL,
+  year_over_year_pct REAL,
+  cumulative_revenue INTEGER NOT NULL,
+  previous_year_cumulative_revenue INTEGER NOT NULL,
+  cumulative_growth_pct REAL,
+  note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (revenue_month, market, stock_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_monthly_revenue_month ON monthly_revenue(revenue_month);
+CREATE INDEX IF NOT EXISTS idx_monthly_revenue_stock ON monthly_revenue(stock_id);
+CREATE INDEX IF NOT EXISTS idx_monthly_revenue_month_stock ON monthly_revenue(revenue_month, stock_id);
+
 CREATE TABLE IF NOT EXISTS import_batches (
   batch_id TEXT PRIMARY KEY,
   dataset TEXT NOT NULL,

@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.4.5 - 2026-07-01
+
+### Added
+
+- Added `monthly_revenue` SQLite canonical table, parser, dry-run, protected execute import, and `update-revenue`.
+- Added `GET /api/v1/monthly-revenue` with month range, stock ID, market, field selection, quality, and pagination filters.
+- Added monthly revenue full historical import for `2013-01` through `2026-05`.
+- Added day-trading canonical import/update/API support and completed historical import through `2026-06-30`.
+
+### Changed
+
+- Updated README dataset, CLI, API, and source documentation for day trading and monthly revenue.
+
+### Verified
+
+- Monthly revenue formal import: `280,711` rows, duplicate keys `0`, required blanks `0`, SQLite integrity `ok`.
+- Monthly revenue update smoke run: latest market months remain `2026-05` for TWSE and TPEX.
+- Unit tests passed: 95 tests OK, 13 skipped.
+- Diff whitespace check passed.
+
 ## v0.4.3 - 2026-06-29
 
 ### Added

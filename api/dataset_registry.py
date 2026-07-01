@@ -57,6 +57,13 @@ SUPPORTED_DATASETS = {
         markets=config.MARKETS,
         status_endpoint=f"/api/v1/datasets/{config.DATASET_DAY_TRADING}/status",
     ),
+    config.DATASET_REVENUE: DatasetDefinition(
+        dataset=config.DATASET_REVENUE,
+        title="Monthly Revenue",
+        period_type="month",
+        markets=config.MARKETS,
+        status_endpoint=f"/api/v1/datasets/{config.DATASET_REVENUE}/status",
+    ),
 }
 
 

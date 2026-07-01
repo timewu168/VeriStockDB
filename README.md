@@ -2,7 +2,7 @@
 
 Version: v0.4.3
 
-VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
+VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
 VeriStockDB 不是交易建議系統，不連接券商，不下單，也不是公開雲端 API。
 
@@ -113,6 +113,29 @@ python3 main.py update-margin
 
 `update-margin` 會掃描目標日前所有「交易日但該市場缺 row」的日期並補齊，不只看今天或 `MAX(trade_date)`。
 
+當沖：
+
+```bash
+python3 main.py download-day-trading --from 2014-01-06 --to 2026-06-30
+python3 main.py inspect-day-trading --date 2026-06-30 --market TWSE
+python3 main.py import-day-trading --dry-run --from 2014-01-06 --to 2026-06-30
+python3 main.py import-day-trading --execute --from 2014-01-06 --to 2026-06-30
+python3 main.py update-day-trading
+```
+
+`update-day-trading` 會掃描目標日前所有「交易日但該市場缺 row」的日期並補齊，不覆寫既有資料。
+
+月營收：
+
+```bash
+python3 main.py download-revenue --from 2013-01 --to 2026-05
+python3 main.py import-revenue --dry-run --from 2013-01 --to 2026-05
+python3 main.py import-revenue --execute --from 2013-01 --to 2026-05
+python3 main.py update-revenue
+```
+
+`update-revenue` 依每月 10 號公開規則判定最新可用月份，從各市場 DB 內最後 `revenue_month + 1` 補到目標月份，不覆寫既有資料。月營收目前未啟用正式 systemd 排程。
+
 Close 月資料對帳與封存：
 
 ```bash
@@ -155,6 +178,8 @@ Read-only API 已完成以下端點：
 - `GET /api/v1/disposal-notices`
 - `GET /api/v1/legal-investors`
 - `GET /api/v1/margin-trading`
+- `GET /api/v1/day-trading`
+- `GET /api/v1/monthly-revenue`
 - `GET /api/v1/trading-days`
 - `GET /api/v1/batches`
 - `GET /api/v1/batches/{batch_id}`
@@ -179,6 +204,8 @@ python3 -m api
 - Disposal notices：TWSE/TPEX 官方處置公告 CSV；查詢區間會延伸到目標日後方以取得最新公告。
 - Legal investors：TWSE/TPEX 官方三大法人 CSV。
 - Margin trading：TWSE `MI_MARGN`，TPEX `margin/balance` CSV；TPEX canonical scope 從 `2008-09-30` 開始。
+- Day trading：TWSE `TWTB4U`、TPEX `intraday/stat` CSV，canonical scope 從 `2014-01-06` 開始。
+- Monthly revenue：MOPS `t21sc03_{roc_month}.csv`，canonical scope 從 `2013-01` 開始，依每月 10 號公開規則更新。
 - Close monthly reconciliation：TWSE/TPEX 官方個股月資料 JSON，只對帳 `close` 與 `volume`，不覆寫 `daily_close`。
 
 ## Paths
@@ -223,6 +250,5 @@ python3 -m api
 
 ## Deferred Work
 
-- `v0.3.6` day trading deferred。
-- `v0.3.7` monthly revenue deferred。
 - `v0.4.0 public-preview` release gate 已完成；後續新增資料集仍需重新通過 DB/API/docs/repo safety gate。
+- 月營收尚未啟用正式 systemd 排程。

@@ -126,6 +126,24 @@ def build_parser() -> argparse.ArgumentParser:
     download_revenue.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
     download_revenue.add_argument("--overwrite", action="store_true", help="redownload and overwrite existing revenue CSV files")
 
+    import_revenue = subparsers.add_parser(
+        "import-revenue", help="dry-run monthly revenue CSV normalization before importing"
+    )
+    import_revenue_mode = import_revenue.add_mutually_exclusive_group(required=True)
+    import_revenue_mode.add_argument("--dry-run", action="store_true", help="parse and validate only")
+    import_revenue_mode.add_argument("--execute", action="store_true", help="write parsed rows to SQLite after dry-run validation")
+    import_revenue.add_argument("--from", dest="start", required=True, help="range start month YYYY-MM")
+    import_revenue.add_argument("--to", dest="end", required=True, help="range end month YYYY-MM")
+    import_revenue.add_argument("--market", choices=config.MARKETS)
+    import_revenue.add_argument("--report-dir", default=str(config.ROOT_DIR / "reports"))
+
+    update_revenue = subparsers.add_parser(
+        "update-revenue", help="update missing monthly revenue data through the latest published month"
+    )
+    update_revenue.add_argument("--month", help="target latest revenue month YYYY-MM, default latest published month")
+    update_revenue.add_argument("--market", choices=config.MARKETS)
+    update_revenue.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
     inspect_day_trading = subparsers.add_parser(
         "inspect-day-trading", help="inspect local day-trading CSV files without importing"
     )
@@ -408,6 +426,18 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_download_day_trading_from_dates(args, start, end, markets, open_dates)
         if args.command == "download-revenue":
             return _cmd_download_revenue(args)
+        if args.command == "import-revenue":
+            db_connection.init_db(db_path)
+            conn = db_connection.connect(db_path)
+            try:
+                result = _cmd_import_revenue(conn, args)
+                conn.commit()
+                return result
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
         if args.command == "inspect-day-trading":
             return _cmd_inspect_day_trading(args)
         if args.command == "import-day-trading":
@@ -473,6 +503,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_update_margin(conn, args)
             elif args.command == "update-day-trading":
                 result = _cmd_update_day_trading(conn, args)
+            elif args.command == "update-revenue":
+                result = _cmd_update_revenue(conn, args)
             elif args.command == "status":
                 result = _cmd_status(conn, args)
             elif args.command == "query-close":
@@ -995,6 +1027,52 @@ def _cmd_download_revenue(args: argparse.Namespace) -> int:
     return 0 if not failed else 2
 
 
+def _cmd_import_revenue(conn, args: argparse.Namespace) -> int:
+    markets = (args.market,) if args.market else None
+    report_dir = Path(args.report_dir)
+    if args.dry_run:
+        report = revenue.dry_run_revenue_import(
+            conn,
+            start=args.start,
+            end=args.end,
+            markets=markets,
+            report_dir=report_dir,
+            log=print,
+        )
+        print(
+            "revenue dry-run "
+            f"expected={report.expected_files} parsed={report.parsed_files} "
+            f"missing={report.missing_files} bad={report.bad_files} "
+            f"duplicates={report.duplicate_keys} rows={report.total_rows} "
+            f"problems={len(report.problems)}"
+        )
+        print(f"  report={report.summary_path}")
+        for problem in report.problems[:20]:
+            print(
+                f"  {problem.revenue_month} {problem.market} {problem.problem} "
+                f"stock={problem.stock_id or '-'} detail={problem.detail} file={problem.path}"
+            )
+        return 0 if not report.problems and not report.duplicate_keys and not report.missing_files and not report.bad_files else 2
+
+    results = revenue.import_revenue_range(
+        conn,
+        start=args.start,
+        end=args.end,
+        markets=markets,
+        report_dir=report_dir,
+        log=print,
+    )
+    total_months = sum(result.months for result in results)
+    total_rows = sum(result.row_count for result in results)
+    print(f"revenue import OK markets={len(results)} months={total_months} rows={total_rows}")
+    for result in results:
+        print(
+            f"  {result.market} range={result.start} -> {result.end} "
+            f"months={result.months} rows={result.row_count}"
+        )
+    return 0
+
+
 def _cmd_inspect_day_trading(args: argparse.Namespace) -> int:
     if args.sample_size < 0:
         raise ValueError("--sample-size must be >= 0")
@@ -1316,6 +1394,52 @@ def _cmd_update_day_trading(conn, args: argparse.Namespace) -> int:
     return 0 if blocked == 0 else 2
 
 
+def _cmd_update_revenue(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    target_month = args.month or revenue.latest_published_revenue_month()
+    if target_month > revenue.latest_published_revenue_month():
+        raise ValueError(f"update-revenue --month is after latest published month {revenue.latest_published_revenue_month()}")
+    markets = (args.market,) if args.market else None
+    latest_before = _latest_revenue_months_by_market(conn, markets)
+    results = _update_revenue_range_from_latest(
+        conn,
+        target_month=target_month,
+        markets=markets,
+        cooldown=cooldown,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == "OK")
+    exists = sum(1 for result in results if result.status == "EXISTS")
+    closed = sum(1 for result in results if result.status == "CLOSED")
+    blocked = sum(1 for result in results if result.status == "BLOCKED")
+    print(f"revenue update OK={ok} EXISTS={exists} CLOSED={closed} BLOCKED={blocked}")
+    errors: list[str] = []
+    for result in results:
+        source = result.source_file or "-"
+        line = (
+            f"  {result.revenue_month} {result.market} {result.status} "
+            f"rows={result.row_count} file={source}"
+        )
+        if result.error:
+            line += f" error={result.error}"
+            if result.status == "BLOCKED":
+                errors.append(f"{result.revenue_month} {result.market}: {result.error}")
+        print(line)
+    stats = _single_day_update_stats(ok=ok, exists=exists, closed=closed, blocked=blocked)
+    _emit_stats_notification(
+        "update-revenue",
+        stats,
+        lines=_month_update_lines(
+            target_month=target_month,
+            markets=markets,
+            latest_before=latest_before,
+            latest_after=_latest_revenue_months_by_market(conn, markets),
+        ),
+        errors=errors,
+    )
+    return 0 if blocked == 0 else 2
+
+
 
 def _update_legal_range_from_latest(
     conn,
@@ -1402,6 +1526,46 @@ def _update_day_trading_range_from_latest(
                 )
             )
     return results
+
+
+def _update_revenue_range_from_latest(
+    conn,
+    *,
+    target_month: str,
+    markets: tuple[str, ...] | None,
+    cooldown: CooldownController,
+    log,
+) -> list[revenue.RevenueUpdateResult]:
+    results: list[revenue.RevenueUpdateResult] = []
+    for market in markets or config.MARKETS:
+        for month in _missing_revenue_months_through(conn, market=market, target_month=target_month):
+            results.extend(
+                revenue.update_revenue_month(
+                    conn,
+                    month=month,
+                    markets=(market,),
+                    cooldown=cooldown,
+                    log=log,
+                )
+            )
+    return results
+
+
+def _missing_revenue_months_through(conn, *, market: str, target_month: str) -> list[str]:
+    latest = _latest_revenue_month(conn, market)
+    start = revenue.REVENUE_START_MONTH if latest is None else _next_revenue_month(latest)
+    if start > target_month:
+        return []
+    return revenue.revenue_months_between(start, target_month)
+
+
+def _next_revenue_month(month: str) -> str:
+    year, month_number = map(int, month.split("-"))
+    month_number += 1
+    if month_number == 13:
+        year += 1
+        month_number = 1
+    return f"{year:04d}-{month_number:02d}"
 
 
 def _missing_open_dates_through(
@@ -1866,6 +2030,21 @@ def _range_update_lines(
     ]
 
 
+def _month_update_lines(
+    *,
+    target_month: str,
+    markets: tuple[str, ...] | None,
+    latest_before: dict[str, str | None],
+    latest_after: dict[str, str | None],
+) -> list[str]:
+    return [
+        f"target: {target_month}",
+        f"markets: {','.join(markets) if markets else 'TWSE,TPEX'}",
+        f"latest_before: {_format_market_latest(latest_before)}",
+        f"latest_after: {_format_market_latest(latest_after)}",
+    ]
+
+
 def _emit_stats_notification(
     task_name: str,
     stats: dict[str, int],
@@ -1923,6 +2102,19 @@ def _update_lines(
 def _latest_by_market(func, conn, markets: tuple[str, ...] | None) -> dict[str, str | None]:
     target_markets = markets or config.MARKETS
     return {market: func(conn, market) for market in target_markets}
+
+
+def _latest_revenue_month(conn, market: str) -> str | None:
+    row = conn.execute(
+        "SELECT MAX(revenue_month) AS latest FROM monthly_revenue WHERE market = ?",
+        (market,),
+    ).fetchone()
+    value = row["latest"] if hasattr(row, "keys") else row[0]
+    return str(value) if value else None
+
+
+def _latest_revenue_months_by_market(conn, markets: tuple[str, ...] | None) -> dict[str, str | None]:
+    return {market: _latest_revenue_month(conn, market) for market in markets or config.MARKETS}
 
 
 def _format_market_latest(values: dict[str, str | None]) -> str:

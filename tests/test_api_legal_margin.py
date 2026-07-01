@@ -9,12 +9,14 @@ try:
     from api.routes.day_trading import day_trading
     from api.routes.legal_investors import legal_investors
     from api.routes.margin_trading import margin_trading
+    from api.routes.monthly_revenue import monthly_revenue
 except ModuleNotFoundError as exc:
     HTTPException = None
     list_datasets = None
     day_trading = None
     legal_investors = None
     margin_trading = None
+    monthly_revenue = None
     FASTAPI_IMPORT_ERROR = exc
 else:
     FASTAPI_IMPORT_ERROR = None
@@ -88,6 +90,32 @@ class LegalMarginApiTests(unittest.TestCase):
             },
         )
 
+    def test_monthly_revenue_query_fields_and_quality(self) -> None:
+        body = monthly_revenue(
+            start="2026-05",
+            end="2026-05",
+            stock_id="2330",
+            market="TWSE",
+            fields="revenue_month,market,stock_id,current_month_revenue,cumulative_growth_pct",
+            require_quality="ok",
+            conn=self.conn,
+        )
+        self.assertTrue(body["ok"])
+        self.assertEqual(
+            body["data"],
+            [
+                {
+                    "revenue_month": "2026-05",
+                    "market": "TWSE",
+                    "stock_id": "2330",
+                    "current_month_revenue": 1000,
+                    "cumulative_growth_pct": 7.5,
+                }
+            ],
+        )
+        self.assertEqual(body["meta"]["unit"], "thousand_twd")
+        self.assertEqual(body["meta"]["quality"]["status"], "OK")
+
     def test_quality_rejected_for_problem_batch(self) -> None:
         self.conn.execute(
             "UPDATE import_batches SET status = 'RECHECK', error_summary = 'sample issue' "
@@ -110,6 +138,7 @@ class LegalMarginApiTests(unittest.TestCase):
         self.assertIn("legal_investor", datasets)
         self.assertIn("margin", datasets)
         self.assertIn("day_trading", datasets)
+        self.assertIn("revenue", datasets)
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(":memory:")
@@ -171,6 +200,25 @@ class LegalMarginApiTests(unittest.TestCase):
               day_trade_buy_amount INTEGER NOT NULL,
               day_trade_sell_amount INTEGER NOT NULL,
               PRIMARY KEY (trade_date, market, stock_id)
+            );
+            CREATE TABLE monthly_revenue (
+              revenue_month TEXT NOT NULL,
+              market TEXT NOT NULL,
+              stock_id TEXT NOT NULL,
+              stock_name TEXT NOT NULL,
+              industry TEXT NOT NULL,
+              report_date TEXT NOT NULL,
+              roc_period TEXT NOT NULL,
+              current_month_revenue INTEGER NOT NULL,
+              previous_month_revenue INTEGER NOT NULL,
+              previous_year_month_revenue INTEGER NOT NULL,
+              month_over_month_pct REAL,
+              year_over_year_pct REAL,
+              cumulative_revenue INTEGER NOT NULL,
+              previous_year_cumulative_revenue INTEGER NOT NULL,
+              cumulative_growth_pct REAL,
+              note TEXT NOT NULL DEFAULT '',
+              PRIMARY KEY (revenue_month, market, stock_id)
             );
             CREATE TABLE import_batches (
               batch_id TEXT PRIMARY KEY,
@@ -287,12 +335,34 @@ class LegalMarginApiTests(unittest.TestCase):
                 101000,
             ),
         )
+        conn.execute(
+            "INSERT INTO monthly_revenue VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "2026-05",
+                "TWSE",
+                "2330",
+                "台積電",
+                "半導體業",
+                "2026-07-01",
+                "115/5",
+                1000,
+                900,
+                800,
+                11.1,
+                25.0,
+                5000,
+                4651,
+                7.5,
+                "",
+            ),
+        )
         batches = [
             ("legal_investor:TWSE:2026-06-15", "legal_investor", "TWSE", "2026-06-15", "OK", 1),
             ("margin:TWSE:2026-06-15", "margin", "TWSE", "2026-06-15", "OK", 1),
             ("margin:TPEX:2026-06-15", "margin", "TPEX", "2026-06-15", "OK", 1),
             ("day_trading:TWSE:2026-06-30", "day_trading", "TWSE", "2026-06-30", "OK", 1),
             ("day_trading:TPEX:2026-06-30", "day_trading", "TPEX", "2026-06-30", "OK", 1),
+            ("revenue:TWSE:2026-05", "revenue", "TWSE", "2026-05", "OK", 1),
         ]
         for batch in batches:
             conn.execute(
