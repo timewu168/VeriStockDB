@@ -97,6 +97,7 @@ const state = {
   datasets: [],
   statuses: new Map(),
   pendingDataset: null,
+  selectedDataset: null,
   jobPollTimer: null,
 };
 
@@ -128,6 +129,10 @@ function bindActions() {
   $("#reload-errors").addEventListener("click", loadErrors);
   $("#reload-events").addEventListener("click", loadEvents);
   $("#reload-jobs").addEventListener("click", loadJobs);
+  $("#reload-dataset-detail").addEventListener("click", () => {
+    if (state.selectedDataset) loadDatasetHealth(state.selectedDataset);
+  });
+  $("#close-dataset-detail").addEventListener("click", closeDatasetDetail);
   $("#cancel-update").addEventListener("click", closeUpdateModal);
   $("#confirm-update").addEventListener("click", startUpdateJob);
   $("#query-dataset").addEventListener("change", updateQueryDateInputs);
@@ -154,7 +159,10 @@ function showView(view) {
 
 function refreshCurrentView() {
   const active = $(".view.active")?.id?.replace("view-", "") || "dashboard";
-  if (active === "datasets") loadDatasets();
+  if (active === "datasets") {
+    loadDatasets();
+    if (state.selectedDataset) loadDatasetHealth(state.selectedDataset);
+  }
   else if (active === "batches") loadBatches();
   else if (active === "events") {
     loadErrors();
@@ -212,7 +220,7 @@ function renderDatasets() {
     const problems = status.quality?.problem_batches ?? 0;
     const canUpdate = UPDATE_HINTS[dataset.dataset];
     return `
-      <tr>
+      <tr class="clickable-row ${state.selectedDataset === dataset.dataset ? "selected-row" : ""}" data-dataset-detail="${escapeHtml(dataset.dataset)}">
         <td>
           <strong>${labelDataset(dataset.dataset)}</strong>
           <div class="subtle">${escapeHtml(dataset.dataset)}</div>
@@ -247,8 +255,154 @@ function renderDatasets() {
     })
     .join("");
   $$("[data-update]").forEach((button) => {
-    button.addEventListener("click", () => openUpdateModal(button.dataset.update));
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openUpdateModal(button.dataset.update);
+    });
   });
+  $$("[data-dataset-detail]").forEach((row) => {
+    row.addEventListener("click", () => openDatasetDetail(row.dataset.datasetDetail));
+  });
+}
+
+async function openDatasetDetail(dataset) {
+  state.selectedDataset = dataset;
+  $("#dataset-detail-panel").hidden = false;
+  renderDatasets();
+  await loadDatasetHealth(dataset);
+}
+
+function closeDatasetDetail() {
+  state.selectedDataset = null;
+  $("#dataset-detail-panel").hidden = true;
+  renderDatasets();
+}
+
+async function loadDatasetHealth(dataset) {
+  $("#dataset-detail-title").textContent = `${labelDataset(dataset)}健康詳情`;
+  $("#dataset-detail-subtitle").textContent = dataset;
+  setDatasetDetailLoading("讀取中");
+  try {
+    const response = await api(`/api/v1/datasets/${encodeURIComponent(dataset)}/health`);
+    renderDatasetHealth(response.data);
+  } catch (error) {
+    $("#dataset-detail-metrics").innerHTML = `<div class="detail-message">讀取失敗：${escapeHtml(error.message)}</div>`;
+    clearDatasetDetailLists();
+  }
+}
+
+function setDatasetDetailLoading(message) {
+  $("#dataset-detail-metrics").innerHTML = `<div class="detail-message">${escapeHtml(message)}</div>`;
+  clearDatasetDetailLists();
+}
+
+function clearDatasetDetailLists() {
+  $("#dataset-detail-batches").innerHTML = emptyList("尚無資料");
+  $("#dataset-detail-problems").innerHTML = emptyList("尚無資料");
+  $("#dataset-detail-errors").innerHTML = emptyList("尚無資料");
+  $("#dataset-detail-events").innerHTML = emptyList("尚無資料");
+  $("#dataset-detail-jobs").innerHTML = emptyList("尚無資料");
+}
+
+function renderDatasetHealth(health) {
+  const quality = health.quality || {};
+  const summary = health.summary || {};
+  $("#dataset-detail-title").textContent = `${labelDataset(health.dataset)}健康詳情`;
+  $("#dataset-detail-subtitle").textContent = `${escapeHtml(health.dataset)} · ${escapeHtml(health.period_type || "-")}`;
+  $("#dataset-detail-metrics").innerHTML = `
+    <article class="mini-metric">
+      <span>最新資料</span>
+      <strong>${escapeHtml(health.latest_period || "-")}</strong>
+    </article>
+    <article class="mini-metric">
+      <span>品質</span>
+      <strong>${pillText(quality.status || "UNKNOWN")}</strong>
+    </article>
+    <article class="mini-metric">
+      <span>問題批次</span>
+      <strong>${quality.problem_batches ?? 0}</strong>
+    </article>
+    <article class="mini-metric">
+      <span>OK 批次</span>
+      <strong>${summary.OK ?? 0}</strong>
+    </article>
+    <article class="mini-metric">
+      <span>RECHECK</span>
+      <strong>${summary.RECHECK ?? 0}</strong>
+    </article>
+    <article class="mini-metric">
+      <span>MISSING</span>
+      <strong>${summary.MISSING ?? 0}</strong>
+    </article>
+  `;
+  $("#dataset-detail-batches").innerHTML = renderDetailList(health.recent_batches, renderDetailBatch, "沒有近期批次");
+  $("#dataset-detail-problems").innerHTML = renderDetailList(health.problem_batches, renderDetailBatch, "沒有問題批次");
+  $("#dataset-detail-errors").innerHTML = renderDetailList(health.recent_errors, renderDetailError, "沒有近期錯誤");
+  $("#dataset-detail-events").innerHTML = renderDetailList(health.recent_events, renderDetailEvent, "沒有近期事件");
+  $("#dataset-detail-jobs").innerHTML = renderDetailList(health.recent_jobs, renderDetailJob, "沒有手動更新紀錄");
+  $$("#dataset-detail-jobs [data-job-id]").forEach((node) => {
+    node.addEventListener("click", () => openJobDetail(node.dataset.jobId));
+  });
+}
+
+function renderDetailList(items, renderer, emptyMessage) {
+  return Array.isArray(items) && items.length ? items.map(renderer).join("") : emptyList(emptyMessage);
+}
+
+function emptyList(message) {
+  return `<div class="list-row"><span>${escapeHtml(message)}</span></div>`;
+}
+
+function renderDetailBatch(batch) {
+  return `
+    <div class="list-row">
+      <div>
+        <strong>${escapeHtml(batch.period || "-")} · ${escapeHtml(batch.market || "-")}</strong>
+        <span>rows ${batch.row_count ?? "-"} · retry ${batch.retry_count ?? 0}</span>
+        ${batch.error_summary ? `<span class="error-text">${escapeHtml(batch.error_summary)}</span>` : ""}
+      </div>
+      ${pill(batch.status)}
+    </div>
+  `;
+}
+
+function renderDetailError(error) {
+  return `
+    <div class="list-row">
+      <div>
+        <strong>${escapeHtml(error.code || "-")} · ${escapeHtml(error.severity || "-")}</strong>
+        <span>${escapeHtml(error.message || "-")}</span>
+        <span>${escapeHtml(error.created_at || "-")}</span>
+      </div>
+      ${pill(error.severity === "BLOCK" ? "BLOCKED" : "RECHECK")}
+    </div>
+  `;
+}
+
+function renderDetailEvent(event) {
+  return `
+    <div class="list-row">
+      <div>
+        <strong>${escapeHtml(event.event_type || "-")} · ${escapeHtml(event.period || "-")}</strong>
+        <span>${escapeHtml(event.market || "-")} ${escapeHtml(event.stock_id || "")} ${escapeHtml(event.stock_name || "")}</span>
+        ${event.note ? `<span>${escapeHtml(event.note)}</span>` : ""}
+      </div>
+      <span class="pill">${escapeHtml(event.created_at || "-")}</span>
+    </div>
+  `;
+}
+
+function renderDetailJob(job) {
+  return `
+    <div class="list-row clickable-row ${job.status === "FAILED" ? "failed-row" : ""}" data-job-id="${escapeHtml(job.job_id)}">
+      <div>
+        <strong>${escapeHtml(job.status || "-")} · ${escapeHtml(job.job_id || "-")}</strong>
+        <span>${escapeHtml(job.finished_at || job.created_at || "-")}</span>
+        ${job.error_message ? `<span class="error-text">${escapeHtml(job.error_message)}</span>` : ""}
+      </div>
+      ${pill(job.status)}
+    </div>
+  `;
 }
 
 async function loadBatches() {
@@ -598,6 +752,10 @@ function pill(status) {
   const value = String(status || "UNKNOWN");
   const cls = value === "OK" || value === "DONE" ? "ok" : value === "BLOCKED" || value === "FAILED" || value === "ERROR" ? "error" : value === "RECHECK" || value === "MISSING" || value === "RUNNING" ? "warn" : "";
   return `<span class="pill ${cls}">${escapeHtml(value)}</span>`;
+}
+
+function pillText(status) {
+  return String(status || "UNKNOWN");
 }
 
 function rowMessage(message, colspan) {

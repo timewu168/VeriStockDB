@@ -112,6 +112,41 @@
               </table>
             </div>
           </section>
+          <section class="panel dataset-detail-panel" id="dataset-detail-panel" hidden>
+            <div class="panel-head">
+              <div>
+                <h2 id="dataset-detail-title">資料集詳情</h2>
+                <span class="muted" id="dataset-detail-subtitle">點選資料集查看健康狀態</span>
+              </div>
+              <div class="panel-actions">
+                <button class="text-button" id="reload-dataset-detail">重新整理</button>
+                <button class="text-button" id="close-dataset-detail">關閉</button>
+              </div>
+            </div>
+            <div class="detail-metrics" id="dataset-detail-metrics"></div>
+            <div class="detail-grid">
+              <section class="detail-section">
+                <h3>最近批次</h3>
+                <div class="compact-list" id="dataset-detail-batches"></div>
+              </section>
+              <section class="detail-section">
+                <h3>問題批次</h3>
+                <div class="compact-list" id="dataset-detail-problems"></div>
+              </section>
+              <section class="detail-section">
+                <h3>最近錯誤</h3>
+                <div class="compact-list" id="dataset-detail-errors"></div>
+              </section>
+              <section class="detail-section">
+                <h3>最近事件</h3>
+                <div class="compact-list" id="dataset-detail-events"></div>
+              </section>
+              <section class="detail-section">
+                <h3>最近手動更新</h3>
+                <div class="compact-list" id="dataset-detail-jobs"></div>
+              </section>
+            </div>
+          </section>
         </section>
 
         <section class="view" id="view-batches">

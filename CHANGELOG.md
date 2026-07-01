@@ -1,5 +1,19 @@
 # 版本紀錄
 
+## v0.6.0 - 2026-07-01
+
+### 新增
+
+- 新增 `GET /api/v1/datasets/{dataset}/health`，提供 PWA dataset drill-down 使用。
+- PWA 資料集頁新增可點擊 drill-down 詳情，整合最新資料、品質、批次、問題批次、近期錯誤、近期事件與近期手動更新 job。
+- 新增 dataset health API route smoke 測試。
+
+### 變更
+
+- 將 app version bump 至 `0.6.0`。
+- 更新 PWA service worker cache，確保 v0.6.0 靜態資源刷新。
+- 更新 Local Truth API 文件，加入 dataset health endpoint。
+
 ## v0.5.2 - 2026-07-01
 
 ### 新增

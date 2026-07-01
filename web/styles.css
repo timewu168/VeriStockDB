@@ -284,6 +284,11 @@ h2 {
   border-bottom: 1px solid var(--border);
 }
 
+.panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .table-wrap {
   overflow: auto;
 }
@@ -326,6 +331,14 @@ tbody tr:hover {
   background: rgba(224, 108, 117, 0.13);
 }
 
+.selected-row {
+  background: rgba(53, 182, 139, 0.08);
+}
+
+.selected-row:hover {
+  background: rgba(53, 182, 139, 0.13);
+}
+
 .job-error-cell {
   max-width: 360px;
   overflow: hidden;
@@ -338,6 +351,72 @@ tbody tr:hover {
 
 .dashboard-jobs-panel {
   margin-top: 14px;
+}
+
+.dataset-detail-panel {
+  margin-top: 14px;
+}
+
+.detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mini-metric,
+.detail-message {
+  min-width: 0;
+  border: 1px solid rgba(45, 58, 53, 0.72);
+  border-radius: 6px;
+  background: var(--surface-2);
+  padding: 10px;
+}
+
+.mini-metric span,
+.mini-metric strong {
+  display: block;
+}
+
+.mini-metric span {
+  color: var(--muted);
+}
+
+.mini-metric strong {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.detail-message {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+}
+
+.detail-section {
+  min-width: 0;
+  border: 1px solid rgba(45, 58, 53, 0.72);
+  border-radius: 6px;
+  background: rgba(17, 24, 21, 0.42);
+}
+
+.detail-section h3 {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(45, 58, 53, 0.72);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.detail-section:last-child {
+  grid-column: 1 / -1;
 }
 
 .compact-list {
@@ -542,6 +621,8 @@ select {
 
   .metric-grid,
   .split-grid,
+  .detail-metrics,
+  .detail-grid,
   .query-form {
     grid-template-columns: 1fr;
   }
@@ -549,6 +630,18 @@ select {
   .panel-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .panel-actions {
+    width: 100%;
+  }
+
+  .panel-actions .text-button {
+    flex: 1;
+  }
+
+  .detail-section:last-child {
+    grid-column: auto;
   }
 
   th,

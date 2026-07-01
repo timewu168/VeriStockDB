@@ -10,7 +10,7 @@ try:
     from api.routes.disposal_notices import disposal_notices
     from api.routes.trading_days import trading_days
     from api.routes.batches import batches
-    from api.routes.datasets import dataset_status
+    from api.routes.datasets import dataset_health, dataset_status
     from api.routes.errors import errors
     from api.routes.events import events
 except ModuleNotFoundError as exc:
@@ -20,6 +20,7 @@ except ModuleNotFoundError as exc:
     disposal_notices = None
     trading_days = None
     batches = None
+    dataset_health = None
     dataset_status = None
     errors = None
     events = None
@@ -121,6 +122,18 @@ class CoreApiTests(unittest.TestCase):
         body = dataset_status("daily_close", start=None, end=None, conn=self.conn)
 
         self.assertEqual(body["data"]["latest_period"], "2026-06-15")
+
+    def test_dataset_health_returns_drilldown_contract(self) -> None:
+        body = dataset_health("daily_close", conn=self.conn)
+
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["data"]["dataset"], "daily_close")
+        self.assertEqual(body["data"]["latest_period"], "2026-06-15")
+        self.assertEqual(body["data"]["quality"]["status"], "OK")
+        self.assertEqual(body["data"]["recent_batches"][0]["batch_id"], "daily_close:TWSE:2026-06-15")
+        self.assertEqual(body["data"]["recent_errors"][0]["code"], "SAMPLE_WARN")
+        self.assertEqual(body["data"]["recent_events"][0]["event_type"], "DOUBLE_CHECK")
+        self.assertEqual(body["data"]["recent_jobs"][0]["status"], "DONE")
 
     def test_errors_reject_invalid_date_filter(self) -> None:
         with self.assertRaises(HTTPException) as cm:
@@ -272,6 +285,20 @@ class CoreApiTests(unittest.TestCase):
               note TEXT,
               created_at TEXT NOT NULL
             );
+            CREATE TABLE ops_jobs(
+              job_id TEXT PRIMARY KEY,
+              dataset TEXT NOT NULL,
+              command_json TEXT NOT NULL,
+              status TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              started_at TEXT,
+              finished_at TEXT,
+              returncode INTEGER,
+              stdout_tail TEXT NOT NULL DEFAULT '',
+              stderr_tail TEXT NOT NULL DEFAULT '',
+              error_message TEXT,
+              messages_json TEXT NOT NULL DEFAULT '[]'
+            );
             """
         )
 
@@ -340,6 +367,30 @@ class CoreApiTests(unittest.TestCase):
                 None,
                 "ok",
                 "2026-06-15T00:00:00Z",
+            ),
+        )
+        self.conn.execute(
+            """
+            INSERT INTO ops_jobs(
+              job_id, dataset, command_json, status, created_at, started_at,
+              finished_at, returncode, stdout_tail, stderr_tail, error_message,
+              messages_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "job_test",
+                "daily_close",
+                '["python3","main.py","update-close"]',
+                "DONE",
+                "2026-06-15T00:00:00Z",
+                "2026-06-15T00:00:01Z",
+                "2026-06-15T00:00:02Z",
+                0,
+                "",
+                "",
+                None,
+                "[]",
             ),
         )
 

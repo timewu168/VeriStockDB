@@ -50,6 +50,7 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 | `v0.5.0` | Local Management PWA MVP 與手動更新 jobs API | 完成 |
 | `v0.5.1` | `ops_jobs` 持久化、PWA 表格查詢、jobs detail | 完成 |
 | `v0.5.2` | PWA 手動更新 job list、dashboard job 摘要、smoke tests | 完成 |
+| `v0.6.0` | PWA 資料健康 drill-down | 進行中 |
 
 ## 目前已接受的 canonical datasets
 
@@ -97,29 +98,31 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 - [ ] push 到 GitHub。
 - [ ] 若影響 Ubuntu 部署，server 已套用並驗證。
 
-## v0.6.0 候選方向
+## v0.6.x 收尾路線
 
-`v0.6.0` 尚未定案。下一輪應先從以下候選挑一個做，不要同時展開：
+`v0.6.x` 目標是把專案推到可長時間運行觀察的狀態。完成後不急著新增資料表，先觀察排程、官方格式、資料缺口與維護流程。
 
-### 方向 A：PWA 資料健康儀表板強化
+### v0.6.0：PWA 資料健康 drill-down
 
 目標：讓 PWA 更快定位資料問題。
 
-候選項目：
+範圍：
 
 - dataset status drill-down。
-- 一鍵查看最近 `import_errors` / `data_events` 對應資料集。
-- 最近排程結果摘要。
-- 單一 dataset 的最新日期、缺口、最近 batch、最近 job 整合畫面。
+- 單一 dataset 的 latest period、quality、summary。
+- 最近 `import_batches`。
+- 問題批次：`BLOCKED`、`RECHECK`、`MISSING`。
+- 最近 `import_errors` / `data_events`。
+- 最近手動更新 jobs。
 
 完成條件：
 
-- [ ] 只走 Local Truth API。
-- [ ] 不新增破壞性操作。
-- [ ] 補 API/PWA smoke tests。
-- [ ] 更新 `docs/local_truth_api_spec.md`。
+- [x] 只走 Local Truth API。
+- [x] 不新增破壞性操作。
+- [x] 補 API smoke test。
+- [x] 更新 `docs/local_truth_api_spec.md`。
 
-### 方向 B：排程驗證與營運報表
+### v0.6.1：排程健康報表
 
 目標：將目前靠人工確認的排程狀態整理成可查詢報表。
 
@@ -136,7 +139,7 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 - [ ] 不讀任意路徑，只讀設定允許的 log path。
 - [ ] API 或 CLI 有穩定輸出。
 
-### 方向 C：文件與公開維護流程
+### v0.6.2：文件邊界整理
 
 目標：降低開源後接手成本。
 
@@ -153,6 +156,31 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 - [ ] `CURRENT_STATE.md` 只保留下一輪接手必要狀態。
 - [ ] 舊 handoff 文件標示 archive，不作為現況來源。
 
+### v0.6.3：備份/還原演練文件
+
+目標：確保 DB 出問題時能依照 SOP 回復。
+
+候選項目：
+
+- 停服務流程。
+- 保留事故當下 DB。
+- 指定 backup restore。
+- `PRAGMA integrity_check` 驗證。
+- row count / latest period smoke check。
+
+### v0.6.4：全資料集健康檢查
+
+目標：一次檢查所有 canonical datasets。
+
+候選項目：
+
+- row count。
+- duplicate key。
+- latest date/month。
+- gap count。
+- recent non-OK batches。
+- recent errors/events。
+
 ## 暫不做
 
 - 不新增 ClickHouse canonical truth。
@@ -164,10 +192,10 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 
 ## 目前下一步
 
-目前 `v0.5.2` 功能已完成，下一步應先完成文件收斂並與 `CHANGELOG.md` 一起 commit/push。
+目前 `v0.6.0` 正在進行 PWA 資料健康 drill-down。
 
-建議下一個功能 gate：
+後續功能 gate：
 
-1. 從 `v0.6.0` 候選方向 A/B/C 中選一個。
+1. 完成 `v0.6.0` 驗證與 release。
 2. 更新 `CURRENT_STATE.md`。
-3. 實作前先確認是否涉及 DB、排程或 schema 變更。
+3. 進入 `v0.6.1` 排程健康報表。

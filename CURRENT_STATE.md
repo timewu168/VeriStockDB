@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Latest release target: documentation cleanup after `v0.5.2`.
-- Latest pushed release before this update: `v0.5.2`.
+- Latest release target: `v0.6.0` PWA dataset health drill-down.
+- Latest pushed release before this update: documentation cleanup commit after `v0.5.2`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
@@ -12,6 +12,7 @@
 - Manual update job API persists job records in `ops_jobs`; one active job at a time and no arbitrary command execution remain required.
 - PWA query result view uses table output. Empty stock ID means query the full date/month range; non-empty stock ID filters to that stock.
 - PWA manual update view now includes a full recent jobs table; selecting a row opens the job detail drawer with messages, stdout/stderr tail, and error summary.
+- `v0.6.0` adds a read-only dataset health endpoint and PWA dataset drill-down for latest period, quality, recent batches, problem batches, recent errors, recent events, and recent jobs.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -93,6 +94,9 @@
   - `CHANGELOG.md` is the canonical release history file and has been backfilled for tracked tags.
   - `CHANGELOG.md` is being localized to Chinese.
   - `docs/local_truth_api_spec.md` and `docs/version_roadmap_checklist.md` are being aligned to the accepted `v0.5.2` PWA/API state.
+- `v0.6.0` implementation in progress:
+  - `GET /api/v1/datasets/{dataset}/health` added as a read-only PWA drill-down endpoint.
+  - PWA dataset table rows open an inline health detail panel.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -152,7 +156,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.5.2`.
+- Current code version in `config.py`: `APP_VERSION=0.6.0`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -167,12 +171,20 @@
 
 ## Modified Files
 
-- Documentation cleanup working tree changes before commit:
+- `v0.6.0` working tree changes before commit:
   - `CURRENT_STATE.md`
   - `CHANGELOG.md`
+  - `README.md`
+  - `config.py`
+  - `api/routes/datasets.py`
+  - `tests/test_api_core.py`
   - `docs/local_truth_api_spec.md`
   - `docs/pwa_cli_i18n_boundary_note.md`
   - `docs/version_roadmap_checklist.md`
+  - `web/index.html`
+  - `web/app.js`
+  - `web/styles.css`
+  - `web/service-worker.js`
 
 Previously committed `v0.5.1` files:
 
@@ -195,8 +207,8 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: validate documentation cleanup and commit without creating a new release tag unless explicitly requested.
-- After documentation cleanup, next functional gate should be selected from `docs/version_roadmap_checklist.md` `v0.6.0` candidates.
+- Current gate: validate `v0.6.0` PWA dataset health drill-down and release with commit/tag/push after user approval.
+- After `v0.6.0`, next planned `v0.6.x` item is schedule health reporting unless reprioritized.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 

@@ -289,6 +289,7 @@ require_quality=any
 | `GET` | `/api/v1/datasets` | read | 第一版實作 | dataset 清單 |
 | `GET` | `/api/v1/datasets/{dataset}/status` | read | 第一版實作 | dataset 批次狀態 |
 | `GET` | `/api/v1/datasets/status-summary` | read | `v0.5.0` 實作 | PWA dataset 狀態摘要 |
+| `GET` | `/api/v1/datasets/{dataset}/health` | read | `v0.6.0` 實作 | PWA dataset drill-down |
 | `GET` | `/api/v1/daily-close` | read | 第一版實作 | Close 查詢 |
 | `GET` | `/api/v1/attention-notices` | read | `v0.3.1` 實作 | 注意股公告查詢 |
 | `GET` | `/api/v1/disposal-notices` | read | `v0.3.2` 實作 | 處置股公告查詢 |
@@ -433,7 +434,30 @@ Query：
 GET /api/v1/datasets/status-summary
 ```
 
-### 13.4b PWA 查詢共通規則
+### 13.4b `GET /api/v1/datasets/{dataset}/health`
+
+用途：PWA 資料集 drill-down 使用的單一資料集健康詳情。
+
+此 endpoint 是 read-only，不觸發下載或入庫。
+
+回傳內容：
+
+- dataset 基本資訊。
+- `summary` 與 `quality`。
+- canonical latest period。
+- 最近 `import_batches`。
+- 最近問題 batches：`BLOCKED`、`RECHECK`、`MISSING`。
+- 最近 `import_errors`。
+- 最近 `data_events`。
+- 最近 `ops_jobs`。
+
+範例 request：
+
+```text
+GET /api/v1/datasets/daily_close/health
+```
+
+### 13.4c PWA 查詢共通規則
 
 PWA 查詢畫面使用既有資料查詢 API，不直接讀 SQLite。
 
