@@ -266,6 +266,10 @@ PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command�
 - Monthly revenue：MOPS `t21sc03_{roc_month}.csv`，canonical scope 從 `2013-01` 開始，依每月 10 號公開規則更新。
 - Close monthly reconciliation：TWSE/TPEX 官方個股月資料 JSON，只對帳 `close` 與 `volume`，不覆寫 `daily_close`。
 
+### 資料源邊界
+
+VeriStockDB v0.6.5 的 canonical pipeline 目前使用已驗證的官方 CSV/JSON 下載流程、本機 cache/archive，以及使用者提供的 CSV 匯入。TWSE/TPEX OpenAPI 端點在現階段不作為 canonical database 既有 CSV/JSON 來源的替代品，因為其欄位、語意或涵蓋範圍可能與目前驗證流程使用的來源不同。使用者必須自行遵守各資料來源的使用條款；VeriStockDB 不授予官方原始資料的再散布權利。
+
 ## Documentation Boundary
 
 - `CURRENT_STATE.md` 是下一輪 Codex/PM/worker 接手的唯一狀態摘要。

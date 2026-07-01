@@ -101,6 +101,22 @@ Accepted private deployment schedule:
 
 Production timer changes require explicit operator approval and manual sudo action.
 
+## Data Sources
+
+- Close: official TWSE/TPEX daily close CSV.
+- Trading days: TWSE `FMTQIK` monthly calendar, with TPEX fallback when TWSE is abnormal.
+- Attention notices: official TWSE/TPEX attention notice CSV.
+- Disposal notices: official TWSE/TPEX disposal notice CSV; update windows extend past the target date to capture newly published notices.
+- Legal investors: official TWSE/TPEX institutional-investor CSV.
+- Margin trading: TWSE `MI_MARGN` and TPEX `margin/balance` CSV; TPEX canonical scope starts from `2008-09-30`.
+- Day trading: TWSE `TWTB4U` and TPEX `intraday/stat` CSV; canonical scope starts from `2014-01-06`.
+- Monthly revenue: MOPS `t21sc03_{roc_month}.csv`; canonical scope starts from `2013-01` and follows the monthly publication rule around the 10th.
+- Close monthly reconciliation: official TWSE/TPEX per-stock monthly JSON; reconciles only `close` and `volume` and does not overwrite `daily_close`.
+
+### Source Boundary
+
+VeriStockDB v0.6.5 canonical pipeline currently uses verified official CSV/JSON download flows, local cache/archive, and user-supplied CSV import. TWSE/TPEX OpenAPI endpoints are not used as replacements at this stage because their fields, semantics, or coverage may differ from the CSV/JSON sources used by the canonical database. Users must comply with the terms of each data source; VeriStockDB does not grant redistribution rights for official raw data.
+
 ## Local Truth API
 
 Start the API:
