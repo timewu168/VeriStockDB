@@ -1,4 +1,4 @@
-const CACHE_NAME = "veristockdb-pwa-v050-r1";
+const CACHE_NAME = "veristockdb-pwa-v051-r4";
 const APP_ASSETS = [
   "/",
   "/index.html",

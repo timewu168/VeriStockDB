@@ -18,6 +18,71 @@ const UPDATE_HINTS = {
   revenue: "update-revenue",
 };
 
+const MONTHLY_QUERY_ROUTES = new Set(["monthly-revenue"]);
+
+const FIELD_LABELS = {
+  trade_date: "交易日期",
+  revenue_month: "營收月份",
+  market: "市場",
+  stock_id: "證券代號",
+  stock_name: "證券名稱",
+  open_cents: "開盤價",
+  high_cents: "最高價",
+  low_cents: "最低價",
+  close_cents: "收盤價",
+  volume: "成交股數",
+  amount: "成交金額",
+  transactions: "成交筆數",
+  notice_text: "注意公告",
+  disposal_start_date: "處置起日",
+  disposal_end_date: "處置迄日",
+  reason_text: "處置原因",
+  disposal_text: "處置內容",
+  foreign_buy: "外陸資買進",
+  foreign_sell: "外陸資賣出",
+  foreign_net: "外陸資買賣超",
+  investment_trust_buy: "投信買進",
+  investment_trust_sell: "投信賣出",
+  investment_trust_net: "投信買賣超",
+  dealer_buy: "自營商買進",
+  dealer_sell: "自營商賣出",
+  dealer_net: "自營商買賣超",
+  dealer_hedge_buy: "自營商避險買進",
+  dealer_hedge_sell: "自營商避險賣出",
+  dealer_hedge_net: "自營商避險買賣超",
+  margin_buy: "融資買進",
+  margin_sell: "融資賣出",
+  margin_cash_repay: "融資現償",
+  previous_margin_balance: "前資餘額",
+  margin_balance: "融資餘額",
+  margin_limit: "融資限額",
+  short_buy: "融券買進",
+  short_sell: "融券賣出",
+  short_stock_repay: "融券現償",
+  previous_short_balance: "前券餘額",
+  short_balance: "融券餘額",
+  short_limit: "融券限額",
+  offsetting: "資券互抵",
+  note: "註記",
+  suspend_sell_note: "暫停先賣後買註記",
+  day_trade_volume: "當沖成交股數",
+  day_trade_buy_amount: "當沖買進金額",
+  day_trade_sell_amount: "當沖賣出金額",
+  industry: "產業別",
+  report_date: "申報日期",
+  roc_period: "民國年月",
+  current_month_revenue: "本月營收",
+  previous_month_revenue: "上月營收",
+  previous_year_month_revenue: "去年同月營收",
+  month_over_month_pct: "月增率(%)",
+  year_over_year_pct: "年增率(%)",
+  cumulative_revenue: "累計營收",
+  previous_year_cumulative_revenue: "去年累計營收",
+  cumulative_growth_pct: "累計年增率(%)",
+};
+
+const PRICE_CENT_FIELDS = new Set(["open_cents", "high_cents", "low_cents", "close_cents"]);
+
 const pageTitles = {
   dashboard: ["總覽", "本地真理資料庫狀態與排程更新摘要"],
   datasets: ["資料集狀態", "檢查最新資料、問題批次，必要時手動重新更新"],
@@ -63,6 +128,7 @@ function bindActions() {
   $("#reload-events").addEventListener("click", loadEvents);
   $("#cancel-update").addEventListener("click", closeUpdateModal);
   $("#confirm-update").addEventListener("click", startUpdateJob);
+  $("#query-dataset").addEventListener("change", updateQueryDateInputs);
   $("#close-job").addEventListener("click", () => {
     $("#job-drawer").hidden = true;
   });
@@ -71,6 +137,7 @@ function bindActions() {
     refreshAll();
   });
   $("#query-form").addEventListener("submit", runQuery);
+  updateQueryDateInputs();
 }
 
 function showView(view) {
@@ -264,8 +331,13 @@ async function loadJobs() {
   try {
     const response = await api("/api/v1/jobs?limit=5");
     const running = response.data.find((job) => !job.terminal);
-    $("#metric-job").textContent = running ? running.status : "待命";
-    $("#metric-job-detail").textContent = running ? labelDataset(running.dataset) : "single writer guard";
+    const latest = response.data[0];
+    $("#metric-job").textContent = running ? running.status : latest ? latest.status : "待命";
+    $("#metric-job-detail").textContent = running
+      ? labelDataset(running.dataset)
+      : latest
+        ? `${labelDataset(latest.dataset)} · ${latest.finished_at || latest.created_at || "-"}`
+        : "single writer guard";
     if (running) {
       renderJob(running);
       pollJob(running.job_id);
@@ -324,11 +396,12 @@ function pollJob(jobId) {
 
 function renderJob(job) {
   $("#job-drawer").hidden = false;
+  const messages = Array.isArray(job.messages) ? job.messages : [];
   $("#job-detail").innerHTML = `
     <div class="list-row">
       <div>
         <strong>${labelDataset(job.dataset)} · ${escapeHtml(job.job_id)}</strong>
-        <span>${escapeHtml(job.command.join(" "))}</span>
+        <span>${escapeHtml((job.command || []).join(" "))}</span>
       </div>
       ${pill(job.status)}
     </div>
@@ -339,6 +412,22 @@ function renderJob(job) {
       <dt>returncode</dt><dd>${job.returncode ?? "-"}</dd>
     </dl>
     ${job.error_message ? `<p class="pill error">${escapeHtml(job.error_message)}</p>` : ""}
+    <h2>messages</h2>
+    <div class="compact-list job-messages">
+      ${
+        messages.length
+          ? messages.map((message) => `
+              <div class="list-row">
+                <div>
+                  <strong>${escapeHtml(message.code || "-")}</strong>
+                  <span>${escapeHtml(message.message || "-")}</span>
+                </div>
+                ${pill(message.level || "INFO")}
+              </div>
+            `).join("")
+          : `<div class="list-row"><span>沒有訊息</span></div>`
+      }
+    </div>
     <h2>stdout tail</h2>
     <pre>${escapeHtml(job.stdout_tail || "-")}</pre>
     <h2>stderr tail</h2>
@@ -354,13 +443,77 @@ async function runQuery(event) {
   if ($("#query-to").value) params.set("to", $("#query-to").value);
   if ($("#query-stock").value.trim()) params.set("stock_id", $("#query-stock").value.trim());
   if ($("#query-market").value) params.set("market", $("#query-market").value);
-  params.set("limit", "20");
+  params.set("limit", normalizedNumber($("#query-limit").value, 10000, 1, 10000));
+  params.set("offset", normalizedNumber($("#query-offset").value, 0, 0, Number.MAX_SAFE_INTEGER));
   try {
     const response = await api(`/api/v1/${dataset}?${params.toString()}`);
-    $("#query-result").textContent = JSON.stringify(response.data, null, 2);
+    renderQueryResult(response);
   } catch (error) {
-    $("#query-result").textContent = `查詢失敗：${error.message}`;
+    $("#query-summary").textContent = `查詢失敗：${error.message}`;
+    $("#query-head").innerHTML = "";
+    $("#query-result").innerHTML = "";
   }
+}
+
+function updateQueryDateInputs() {
+  const dataset = $("#query-dataset").value;
+  const isMonthly = MONTHLY_QUERY_ROUTES.has(dataset);
+  $("#query-from").type = isMonthly ? "month" : "date";
+  $("#query-to").type = isMonthly ? "month" : "date";
+  $("#query-from").placeholder = isMonthly ? "2026-05" : "2026-06-30";
+  $("#query-to").placeholder = isMonthly ? "2026-05" : "2026-06-30";
+}
+
+function renderQueryResult(response) {
+  const rows = Array.isArray(response.data) ? response.data : [];
+  const fields = response.meta?.fields?.length ? response.meta.fields : inferFields(rows);
+  const pagination = response.meta?.pagination || {};
+  const quality = response.meta?.quality?.status || "UNKNOWN";
+  $("#query-summary").innerHTML = `
+    <span>${rows.length} 筆</span>
+    <span>limit ${pagination.limit ?? "-"}</span>
+    <span>offset ${pagination.offset ?? "-"}</span>
+    <span>${pagination.has_more ? "還有更多資料" : "已到本頁結尾"}</span>
+    ${pill(quality)}
+  `;
+  if (!rows.length) {
+    $("#query-head").innerHTML = "";
+    $("#query-result").innerHTML = rowMessage("查無資料", Math.max(fields.length, 1));
+    return;
+  }
+  $("#query-head").innerHTML = `
+    <tr>${fields.map((field) => `<th title="${escapeHtml(field)}">${escapeHtml(fieldLabel(field))}</th>`).join("")}</tr>
+  `;
+  $("#query-result").innerHTML = rows
+    .map((row) => `
+      <tr>
+        ${fields.map((field) => `<td>${escapeHtml(displayCellValue(field, row[field]))}</td>`).join("")}
+      </tr>
+    `)
+    .join("");
+}
+
+function inferFields(rows) {
+  if (!rows.length || typeof rows[0] !== "object" || rows[0] === null) return [];
+  return Object.keys(rows[0]);
+}
+
+function fieldLabel(field) {
+  return FIELD_LABELS[field] || field;
+}
+
+function displayCellValue(field, value) {
+  if (value === null || value === undefined) return "";
+  if (!PRICE_CENT_FIELDS.has(field)) return value;
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return value;
+  return (numberValue / 100).toFixed(2);
+}
+
+function normalizedNumber(value, fallback, min, max) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return String(fallback);
+  return String(Math.min(Math.max(parsed, min), max));
 }
 
 async function api(path, options = {}) {

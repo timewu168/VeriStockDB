@@ -33,6 +33,20 @@ ClickHouse 目前沒有被啟用為真理資料庫；若之後導入，只能先
 - 日期格式統一使用 `YYYY-MM-DD`；API 拒絕 `20260615` 這類 compact date。
 - CSV 成功入庫後先留存，只有在月檢與 ZIP 驗證完成後才可封存 loose CSV。
 
+## System Requirements
+
+Ubuntu deployment expects these OS-level commands to be available:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip sqlite3 nodejs npm
+```
+
+- `python3`: CLI, ETL, API, and tests.
+- `sqlite3`: DB inspection, backup/integrity checks, and release validation.
+- `node`: PWA JavaScript syntax checks such as `node --check web/app.js`.
+- `npm`: available for future PWA tooling; the current PWA has no build step.
+
 ## CLI Commands
 
 裸執行會顯示 help，不會初始化 DB 或啟動資料流程：

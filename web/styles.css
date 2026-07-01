@@ -343,9 +343,13 @@ tbody tr:hover {
 
 .query-form {
   display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(8, minmax(112px, 1fr));
   gap: 10px;
   padding: 14px;
+}
+
+.query-form .primary-button {
+  align-self: end;
 }
 
 label {
@@ -364,15 +368,26 @@ select {
   padding: 7px 9px;
 }
 
-.result-box {
+.query-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 14px 10px;
+  color: var(--muted);
+}
+
+.query-summary span {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+}
+
+.query-result-wrap {
   margin: 0 14px 14px;
-  max-height: 360px;
-  overflow: auto;
+  max-height: 520px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #101614;
-  color: var(--text);
-  padding: 12px;
 }
 
 .info-list {
@@ -452,6 +467,14 @@ select {
 
 .job-detail {
   padding: 14px;
+}
+
+.job-detail h2 {
+  margin: 14px 0 8px;
+}
+
+.job-messages {
+  padding: 0;
 }
 
 .job-detail pre {

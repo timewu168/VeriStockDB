@@ -220,3 +220,24 @@ CREATE TABLE IF NOT EXISTS trading_days (
   source TEXT NOT NULL,
   note TEXT
 );
+
+CREATE TABLE IF NOT EXISTS ops_jobs (
+  job_id TEXT PRIMARY KEY,
+  dataset TEXT NOT NULL,
+  command_json TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('QUEUED', 'RUNNING', 'DONE', 'FAILED')),
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT,
+  returncode INTEGER,
+  stdout_tail TEXT NOT NULL DEFAULT '',
+  stderr_tail TEXT NOT NULL DEFAULT '',
+  error_message TEXT,
+  messages_json TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE INDEX IF NOT EXISTS idx_ops_jobs_created_at
+ON ops_jobs(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_ops_jobs_status
+ON ops_jobs(status);

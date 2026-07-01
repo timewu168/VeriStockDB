@@ -58,6 +58,20 @@ export VERISTOCK_LOG_DIR=/var/log/veristockdb
 
 先確認冷資料 SSD 已掛載到 `/mnt/veristockdb-cold`。
 
+先安裝系統依賴：
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip sqlite3 nodejs npm
+```
+
+必要 CLI：
+
+- `python3`：執行 ETL、API、測試。
+- `sqlite3`：檢查 DB、backup、integrity check。
+- `node`：檢查 PWA JavaScript，例如 `node --check web/app.js`。
+- `npm`：保留給後續 PWA tooling；目前 PWA 沒有 build step。
+
 ```bash
 sudo mkdir -p /opt/veristockdb/app/data/db
 sudo mkdir -p /opt/veristockdb/app/data/csv/daily_close

@@ -2,14 +2,15 @@
 
 ## Current Stage
 
-- Latest release target: `v0.5.0` Local Management PWA MVP.
-- Latest pushed release before this update: `v0.4.7`.
+- Latest release target: `v0.5.1` Local Management PWA job persistence and query table improvements.
+- Latest pushed release before this update: `v0.5.0`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
 - Local Management PWA MVP is implemented under `web/` and served by FastAPI static mount at `/`.
 - PWA dataset status page includes manual update buttons backed by allow-listed job API commands.
-- Manual update job API is MVP only: one in-memory job registry, one active job at a time, no arbitrary command execution, and job history is lost on API restart.
+- Manual update job API persists job records in `ops_jobs`; one active job at a time and no arbitrary command execution remain required.
+- PWA query result view uses table output. Empty stock ID means query the full date/month range; non-empty stock ID filters to that stock.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -75,6 +76,12 @@
   - Parallel API smoke across health, datasets, status summary, batches, errors, events, and jobs returned 200 without SQLite thread errors.
 - Accepted runtime fix: FastAPI read-only SQLite connections use `check_same_thread=False` to avoid random 500/503 failures caused by threadpool dependency enter/exit running in different threads.
 - Accepted UI smoke: user confirmed PWA no longer has the initial blocking modal and random dataset-status errors after the fix.
+- Latest `v0.5.1` user-accepted PWA behavior on 2026-07-01:
+  - Manual update button can create a job.
+  - After API restart, `/api/v1/jobs` still shows historical jobs.
+  - Query output is table-based with Chinese column labels.
+  - Query limit is user-configurable up to `10000`; default is `10000`, not `20`.
+  - Close price fields are displayed in TWD by dividing API cent values by `100`; API and DB remain integer cents.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -134,28 +141,40 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.5.0`.
+- Current code version in `config.py`: `APP_VERSION=0.5.1`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
-- `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, and `settings`.
+- `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `margin_trading` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `day_trading` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `monthly_revenue` canonical key: `PRIMARY KEY (revenue_month, market, stock_id)`.
+- `ops_jobs` is an operational PWA/job table, not canonical market data.
 - No SQLite schema migration is pending.
 - `v0.4.7` includes accepted day trading and monthly revenue production schedule state in documentation; no SQLite schema migration is pending.
 - `v0.5.0` PWA/API work does not change canonical SQLite schema.
+- `v0.5.1` adds `ops_jobs`; job API also creates this table with `CREATE TABLE IF NOT EXISTS` for existing deployments.
 
 ## Modified Files
 
-- `v0.5.0` working tree changes before commit/tag/push:
+- `v0.5.1` working tree changes before commit/tag/push:
   - `api/app.py`
-  - `api/deps.py`
-  - `api/routes/datasets.py`
   - `api/routes/jobs.py`
   - `config.py`
+  - `db/schema.sql`
+  - `README.md`
+  - `docs/ubuntu_private_deployment.md`
+  - `tests/test_api_jobs.py`
+  - `web/app.js`
+  - `web/index.html`
+  - `web/service-worker.js`
+  - `web/styles.css`
+
+Previously committed `v0.5.0` files:
+
+  - `api/deps.py`
+  - `api/routes/datasets.py`
   - `tests/test_api_core.py`
   - `tests/test_api_legal_margin.py`
-  - `tests/test_api_jobs.py`
   - `web/`
 - Current local untracked files/directories not intended for Git:
   - `.venv/`
@@ -165,8 +184,8 @@
 
 ## Next Gate
 
-- Current gate: finalize `v0.5.0` by running tests, then commit/tag/push the Local Management PWA MVP.
-- After `v0.5.0`, next functional gate is `v0.5.1`: persistent job history, log tail/last error display, and fuller PWA query page.
+- Current gate: final validation, then commit/tag/push `v0.5.1`.
+- After `v0.5.1`, next functional gate is fuller PWA query controls, pagination controls, and optional job log refresh UX.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 

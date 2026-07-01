@@ -153,7 +153,7 @@
           <section class="panel">
             <div class="panel-head">
               <h2>查詢入口</h2>
-              <span class="muted">v0.5.0 先提供查詢骨架，完整資料表查詢下一版擴充</span>
+              <span class="muted">未輸入股號會查詢整個日期區間；輸入股號才查個股</span>
             </div>
             <form class="query-form" id="query-form">
               <label>
@@ -162,6 +162,10 @@
                   <option value="daily-close">Close</option>
                   <option value="attention-notices">注意公告</option>
                   <option value="disposal-notices">處置公告</option>
+                  <option value="legal-investors">法人</option>
+                  <option value="margin-trading">資券</option>
+                  <option value="day-trading">當沖</option>
+                  <option value="monthly-revenue">月營收</option>
                 </select>
               </label>
               <label>
@@ -184,9 +188,23 @@
                   <option value="TPEX">TPEX</option>
                 </select>
               </label>
+              <label>
+                筆數
+                <input id="query-limit" type="number" min="1" max="10000" value="10000" />
+              </label>
+              <label>
+                起始
+                <input id="query-offset" type="number" min="0" value="0" />
+              </label>
               <button class="primary-button" type="submit">查詢</button>
             </form>
-            <pre class="result-box" id="query-result">尚未查詢</pre>
+            <div class="query-summary" id="query-summary">尚未查詢</div>
+            <div class="table-wrap query-result-wrap">
+              <table>
+                <thead id="query-head"></thead>
+                <tbody id="query-result"></tbody>
+              </table>
+            </div>
           </section>
         </section>
 

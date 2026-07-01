@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -21,9 +22,17 @@ else:
 class JobsApiTests(unittest.TestCase):
     def setUp(self) -> None:
         jobs_route._jobs.clear()
+        jobs_route._schema_ready = False
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = f"{self.temp_dir.name}/jobs.db"
+        self.db_patch = patch.object(jobs_route.config, "DB_PATH", self.db_path)
+        self.db_patch.start()
 
     def tearDown(self) -> None:
         jobs_route._jobs.clear()
+        jobs_route._schema_ready = False
+        self.db_patch.stop()
+        self.temp_dir.cleanup()
 
     def test_rejects_unsupported_dataset(self) -> None:
         with self.assertRaises(HTTPException) as cm:
@@ -45,6 +54,10 @@ class JobsApiTests(unittest.TestCase):
         self.assertEqual(body["data"]["dataset"], "legal_investor")
         self.assertEqual(body["data"]["command"], ["python3", "main.py", "update-legal"])
         self.assertEqual(body["data"]["status"], "QUEUED")
+        saved = jobs_route._load_job(body["data"]["job_id"])
+        self.assertIsNotNone(saved)
+        self.assertEqual(saved.dataset, "legal_investor")
+        self.assertEqual(saved.status, "QUEUED")
 
     def test_single_writer_guard_blocks_second_job(self) -> None:
         jobs_route.update_dataset_job(
@@ -67,6 +80,25 @@ class JobsApiTests(unittest.TestCase):
 
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.detail["code"], "INVALID_PAGINATION")
+
+    def test_initialize_job_store_marks_abandoned_jobs_failed(self) -> None:
+        body = jobs_route.update_dataset_job(
+            jobs_route.UpdateDatasetRequest(dataset="daily_close"),
+            BackgroundTasks(),
+        )
+        job_id = body["data"]["job_id"]
+        job = jobs_route._load_job(job_id)
+        self.assertIsNotNone(job)
+        job.status = "RUNNING"
+        jobs_route._upsert_job(job)
+
+        jobs_route._jobs.clear()
+        jobs_route.initialize_job_store()
+        saved = jobs_route._load_job(job_id)
+
+        self.assertIsNotNone(saved)
+        self.assertEqual(saved.status, "FAILED")
+        self.assertEqual(saved.error_message, "API restarted before manual update completed")
 
     def test_read_only_connection_allows_fastapi_threadpool_use(self) -> None:
         class FakeConnection:
