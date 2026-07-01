@@ -25,6 +25,7 @@ from services.monthly_archive import archive_month
 from services.monthly_audit import audit_month
 from services.close_monthly_reconcile import reconcile_close_month
 from services.monthly_finalize import finalize_close_months
+from services.dataset_health_check import run_dataset_health_check
 from services.ops_check import run_ops_check
 from services.schedule_health import run_schedule_health
 
@@ -276,6 +277,11 @@ def build_parser() -> argparse.ArgumentParser:
     schedule_health.add_argument("--log-dir", default=str(config.LOG_DIR))
     schedule_health.add_argument("--skip-systemd", action="store_true", help="skip systemd timer checks")
 
+    subparsers.add_parser(
+        "dataset-health-check",
+        help="check all canonical datasets for row count, duplicate keys, latest period, gaps, and recent errors",
+    )
+
     notify = subparsers.add_parser("notify-telegram", help="send a Telegram notification")
     notify_target = notify.add_mutually_exclusive_group(required=True)
     notify_target.add_argument("--test", action="store_true", help="send a VeriStockDB test notification")
@@ -403,6 +409,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_ops_check(db_path, args)
         if args.command == "schedule-health":
             return _cmd_schedule_health(db_path, args)
+        if args.command == "dataset-health-check":
+            return _cmd_dataset_health_check(db_path)
         if args.command == "notify-telegram":
             return _cmd_notify_telegram(args)
         if args.command == "inspect-attention":
@@ -742,6 +750,34 @@ def _cmd_schedule_health(db_path: Path, args: argparse.Namespace) -> int:
             print(f"        timer: {item['timer']['message']}")
             print(f"        log: {item['log']['message']}")
             print(f"        data: {item['data']['message']}")
+    return 2 if result.status == "ERROR" else 0
+
+
+def _cmd_dataset_health_check(db_path: Path) -> int:
+    result = run_dataset_health_check(db_path=db_path)
+    print(f"dataset-health-check {result.status}")
+    for item in result.datasets:
+        latest = ", ".join(
+            f"{market}:{period or '-'}" for market, period in item["latest"].items()
+        )
+        print(
+            f"  {item['status']:<5} {item['dataset']:<18} rows={item['row_count']} "
+            f"duplicates={item['duplicate_keys']} gaps={item['gap']['missing_count']} "
+            f"errors={item['recent_error_count']}"
+        )
+        print(f"        latest={latest}")
+        if item["status"] != "OK":
+            print(f"        {item['message']}")
+            if item["gap"]["samples"]:
+                sample = ", ".join(
+                    f"{row['market']}:{row['period']}" for row in item["gap"]["samples"][:8]
+                )
+                print(f"        gap_samples={sample}")
+            for error in item["recent_errors"][:3]:
+                print(
+                    f"        error={error['period']} {error['market']} "
+                    f"{error['code']} {error['message']}"
+                )
     return 2 if result.status == "ERROR" else 0
 
 

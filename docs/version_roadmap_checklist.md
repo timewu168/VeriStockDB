@@ -1,6 +1,6 @@
 # VeriStockDB 版本路線與檢查清單
 
-狀態：已對齊 `v0.6.4` 實際完成範圍。
+狀態：已對齊 `v0.6.5` 實際完成範圍。
 
 更新日期：2026-07-01
 
@@ -55,6 +55,7 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 | `v0.6.2` | 文件邊界整理 | 完成 |
 | `v0.6.3` | 備份/還原演練文件 | 完成 |
 | `v0.6.4` | 新增資料表 SOP | 完成 |
+| `v0.6.5` | 全資料集健康檢查 | 完成 |
 
 ## 目前已接受的 canonical datasets
 
@@ -219,7 +220,7 @@ Deferred：
 
 目標：一次檢查所有 canonical datasets。
 
-候選項目：
+範圍：
 
 - row count。
 - duplicate key。
@@ -227,6 +228,16 @@ Deferred：
 - gap count。
 - recent non-OK batches。
 - recent errors/events。
+
+完成條件：
+
+- [x] 新增 `dataset-health-check` CLI。
+- [x] 新增 `GET /api/v1/ops/dataset-health-check`。
+- [x] PWA 系統頁加入全資料集健康檢查表格。
+- [x] dense daily datasets 以 canonical distinct trade_date 對 `trading_days` 檢查 gap。
+- [x] monthly revenue 以 canonical distinct revenue_month 對已公開月份檢查 gap。
+- [x] 注意/處置公告標示為 sparse announcement dataset，不以每天必有 canonical row 誤判 gap。
+- [x] 正式 DB smoke 通過，七個 canonical datasets duplicate keys `0`、gaps `0`、recent errors `0`。
 
 ## 暫不做
 
@@ -239,10 +250,10 @@ Deferred：
 
 ## 目前下一步
 
-目前 `v0.6.4` 新增資料表 SOP 完成。
+目前 `v0.6.5` 全資料集健康檢查完成。
 
 後續功能 gate：
 
-1. 進入 `v0.6.5` 全資料集健康檢查。
-2. 補 row count、duplicate key、latest date/month、gap count、recent non-OK batches、recent errors/events 的一鍵報表。
-3. 更新 `CURRENT_STATE.md`、`CHANGELOG.md`、README 或相關 docs。
+1. 進入長時間運行觀察。
+2. 觀察排程、官方格式、資料缺口與 PWA 手動修復流程。
+3. 若出現穩定問題，再決定是否新增自動 self-healing retry 或下一階段功能。

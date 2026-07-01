@@ -304,6 +304,7 @@ require_quality=any
 | `GET` | `/api/v1/events` | read | 第一版實作 | data_events 查詢 |
 | `GET` | `/api/v1/ops/summary` | ops | 第一版實作 | ops-check 摘要 |
 | `GET` | `/api/v1/ops/schedule-health` | ops | `v0.6.1` 實作 | 排程、log、資料更新健康報表 |
+| `GET` | `/api/v1/ops/dataset-health-check` | ops | `v0.6.5` 實作 | 全 canonical dataset DB 健康報表 |
 | `POST` | `/api/v1/jobs/update-dataset` | ops | `v0.5.0` 實作 | 觸發 allow-listed dataset 更新 |
 | `GET` | `/api/v1/jobs` | ops | `v0.5.1` 實作 | 查詢手動更新 job 歷史 |
 | `GET` | `/api/v1/jobs/{job_id}` | ops | `v0.5.1` 實作 | 查詢單一手動更新 job |
@@ -983,6 +984,52 @@ Query：
 ```text
 GET /api/v1/ops/schedule-health
 GET /api/v1/ops/schedule-health?skip_systemd=true
+```
+
+### 13.11b `GET /api/v1/ops/dataset-health-check`
+
+用途：一次檢查所有 SQLite canonical datasets 的 DB 層健康狀態。
+
+權限：`ops`。
+
+檢查項目：
+
+- row count。
+- duplicate key count。
+- latest date/month by market。
+- gap count。
+- recent import errors。
+- recent non-OK batches。
+
+Gap 規則：
+
+- Close、法人、資券、當沖：以 canonical table distinct `trade_date` 對 `trading_days` open days 檢查。
+- 月營收：以 canonical table distinct `revenue_month` 對已公開月份檢查。
+- 注意/處置：屬稀疏公告資料，不以每天必有 canonical row 判斷 gap；仍檢查 latest、duplicate、recent errors 與 recent non-OK batches。
+
+範例 request：
+
+```text
+GET /api/v1/ops/dataset-health-check
+```
+
+範例 data：
+
+```json
+{
+  "status": "OK",
+  "datasets": [
+    {
+      "dataset": "daily_close",
+      "status": "OK",
+      "row_count": 8715496,
+      "duplicate_keys": 0,
+      "latest": {"TWSE": "2026-07-01", "TPEX": "2026-07-01"},
+      "gap": {"missing_count": 0, "samples": []},
+      "recent_error_count": 0
+    }
+  ]
+}
 ```
 
 ### 13.12 `POST /api/v1/jobs/update-dataset`

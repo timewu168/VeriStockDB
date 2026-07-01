@@ -130,6 +130,7 @@ function bindActions() {
   $("#reload-events").addEventListener("click", loadEvents);
   $("#reload-jobs").addEventListener("click", loadJobs);
   $("#reload-schedule-health").addEventListener("click", loadScheduleHealth);
+  $("#reload-dataset-health-check").addEventListener("click", loadDatasetHealthCheck);
   $("#reload-dataset-detail").addEventListener("click", () => {
     if (state.selectedDataset) loadDatasetHealth(state.selectedDataset);
   });
@@ -171,11 +172,21 @@ function refreshCurrentView() {
   } else if (active === "system") {
     loadInfo();
     loadScheduleHealth();
+    loadDatasetHealthCheck();
   } else refreshAll();
 }
 
 async function refreshAll() {
-  await Promise.allSettled([loadInfo(), loadDatasets(), loadBatches(), loadErrors(), loadEvents(), loadJobs(), loadScheduleHealth()]);
+  await Promise.allSettled([
+    loadInfo(),
+    loadDatasets(),
+    loadBatches(),
+    loadErrors(),
+    loadEvents(),
+    loadJobs(),
+    loadScheduleHealth(),
+    loadDatasetHealthCheck(),
+  ]);
 }
 
 async function loadInfo() {
@@ -654,6 +665,44 @@ async function loadScheduleHealth() {
   } catch (error) {
     table.innerHTML = rowMessage(`讀取排程健康失敗：${escapeHtml(error.message)}`, 9);
   }
+}
+
+async function loadDatasetHealthCheck() {
+  const table = $("#dataset-health-check-table");
+  if (!table) return;
+  try {
+    const response = await api("/api/v1/ops/dataset-health-check");
+    table.innerHTML = response.data.datasets.map(renderDatasetHealthCheckRow).join("") || rowMessage("沒有資料", 8);
+  } catch (error) {
+    table.innerHTML = rowMessage(`讀取全資料集健康檢查失敗：${escapeHtml(error.message)}`, 8);
+  }
+}
+
+function renderDatasetHealthCheckRow(item) {
+  const latest = item.latest || {};
+  const latestText = Object.entries(latest)
+    .map(([market, period]) => `${market}:${period || "-"}`)
+    .join(" ");
+  const gapSamples = (item.gap?.samples || [])
+    .slice(0, 4)
+    .map((row) => `${row.market}:${row.period}`)
+    .join(", ");
+  const message = gapSamples ? `${item.message} · ${gapSamples}` : item.message;
+  return `
+    <tr>
+      <td>
+        <strong>${labelDataset(item.dataset)}</strong>
+        <div class="subtle">${escapeHtml(item.table || "-")}</div>
+      </td>
+      <td>${pill(item.status)}</td>
+      <td>${item.row_count ?? "-"}</td>
+      <td>${item.duplicate_keys ?? "-"}</td>
+      <td>${item.gap?.missing_count ?? "-"}</td>
+      <td>${item.recent_error_count ?? "-"}</td>
+      <td>${escapeHtml(latestText || "-")}</td>
+      <td>${escapeHtml(message || "-")}</td>
+    </tr>
+  `;
 }
 
 function renderScheduleRow(item) {

@@ -2,11 +2,11 @@
 
 ## Current Stage
 
-- Latest release target: `v0.6.4` new dataset SOP.
-- Latest pushed release before this update: `v0.6.3`.
+- Latest release target: `v0.6.5` all-dataset health check.
+- Latest pushed release before this update: `v0.6.4`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
-- Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
+- Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, dataset health, all-dataset health check, batches, errors, events, ops summary, schedule health, and jobs.
 - Local Management PWA MVP is implemented under `web/` and served by FastAPI static mount at `/`.
 - PWA dataset status page includes manual update buttons backed by allow-listed job API commands.
 - Manual update job API persists job records in `ops_jobs`; one active job at a time and no arbitrary command execution remain required.
@@ -17,6 +17,7 @@
 - `v0.6.2` marks `docs/pm_handoff/` as historical archive and adds `docs/README.md` as the documentation entry point.
 - `v0.6.3` adds DB backup/restore SOP and validates a non-destructive restore drill from latest backup.
 - `v0.6.4` adds `docs/new_dataset_sop.md` for future dataset additions from source discovery through PWA/API/release.
+- `v0.6.5` adds all-dataset health check CLI/API/PWA for row count, duplicate key, latest, gap, recent errors, and recent non-OK batches.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -120,6 +121,14 @@
 - `v0.6.4` documentation baseline accepted:
   - `docs/new_dataset_sop.md` defines the required future dataset flow: source discovery, downloader, inspect, field mapping, date/period validation, parser/cleaner, schema, dry-run, full validation, formal import, update command, schedule, API, PWA, docs, release, and handoff.
   - all-dataset health check was intentionally moved to `v0.6.5`.
+- `v0.6.5` all-dataset health check accepted on 2026-07-02:
+  - `dataset-health-check` CLI added.
+  - `GET /api/v1/ops/dataset-health-check` added.
+  - PWA system page includes all-dataset health check table.
+  - production DB smoke returned `dataset-health-check OK`.
+  - latest production smoke row counts: daily_close `8715496`, attention_notices `102605`, disposal_notices `7716`, legal_investors `5832010`, margin_trading `8146089`, day_trading `4037752`, monthly_revenue `280711`.
+  - latest production smoke latest periods: daily_close `2026-07-01`, legal_investors `2026-07-01`, margin_trading `2026-07-01`, day_trading `2026-07-01`, monthly_revenue `2026-05`.
+  - duplicate keys `0`, gaps `0`, recent errors `0` for all seven canonical datasets in latest smoke.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -134,6 +143,8 @@
   - `disposal_notices`
   - `legal_investors`
   - `margin_trading`
+  - `day_trading`
+  - `monthly_revenue`
   - `trading_days`
   - `import_batches`, `import_errors`, `data_events`, `settings`
 - ClickHouse is not touched in this stage.
@@ -179,7 +190,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.6.4`.
+- Current code version in `config.py`: `APP_VERSION=0.6.5`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -194,14 +205,20 @@
 
 ## Modified Files
 
-- `v0.6.4` working tree changes before commit:
+- `v0.6.5` working tree changes before commit:
   - `CURRENT_STATE.md`
   - `CHANGELOG.md`
   - `README.md`
+  - `api/routes/ops.py`
   - `config.py`
-  - `docs/README.md`
-  - `docs/new_dataset_sop.md`
+  - `docs/local_truth_api_spec.md`
   - `docs/version_roadmap_checklist.md`
+  - `main.py`
+  - `services/dataset_health_check.py`
+  - `tests/test_dataset_health_check.py`
+  - `web/app.js`
+  - `web/index.html`
+  - `web/service-worker.js`
 
 Previously committed `v0.5.1` files:
 
@@ -224,8 +241,8 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: validate `v0.6.4` new dataset SOP and release with commit/tag/push after user approval.
-- After `v0.6.4`, next planned `v0.6.x` item is `v0.6.5` all-dataset health check.
+- Current gate: validate `v0.6.5` all-dataset health check and release with commit/tag/push after user approval.
+- After `v0.6.5`, planned `v0.6.x` close-out items are complete; next phase is long-running observation unless reprioritized.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 

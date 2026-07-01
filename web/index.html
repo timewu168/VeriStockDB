@@ -321,6 +321,32 @@
               </table>
             </div>
           </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>全資料集健康檢查</h2>
+                <span class="muted">一次檢查 row count、duplicate key、latest、gap、recent errors</span>
+              </div>
+              <button class="text-button" id="reload-dataset-health-check">重新整理</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>資料集</th>
+                    <th>狀態</th>
+                    <th>Rows</th>
+                    <th>Duplicate</th>
+                    <th>Gap</th>
+                    <th>Recent Errors</th>
+                    <th>Latest</th>
+                    <th>摘要</th>
+                  </tr>
+                </thead>
+                <tbody id="dataset-health-check-table"></tbody>
+              </table>
+            </div>
+          </section>
         </section>
       </main>
     </div>

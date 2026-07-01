@@ -1,5 +1,24 @@
 # 版本紀錄
 
+## v0.6.5 - 2026-07-02
+
+### 新增
+
+- 新增 `dataset-health-check` CLI，一次檢查所有 canonical datasets 的 row count、duplicate key、latest period、gap count、recent errors 與 recent non-OK batches。
+- 新增 `GET /api/v1/ops/dataset-health-check`，提供 PWA 使用的結構化全資料集健康報表。
+- PWA「系統」頁新增「全資料集健康檢查」表格。
+- 新增 `tests/test_dataset_health_check.py`，覆蓋 duplicate、gap、recent error 與 API route response。
+
+### 變更
+
+- 將 app version bump 至 `0.6.5`。
+- 修正 `GET /api/v1/ops/summary` 回傳格式，移除同 route 內 unreachable response。
+- 更新 PWA service worker cache。
+
+### 驗證
+
+- 正式 DB smoke：`dataset-health-check OK`，七個 canonical datasets duplicate keys `0`、gaps `0`、recent errors `0`。
+
 ## v0.6.4 - 2026-07-01
 
 ### 新增
