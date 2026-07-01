@@ -89,8 +89,10 @@
   - Failed jobs are highlighted and show error summaries.
   - API smoke tests cover jobs list/detail and PWA query table contract.
 - Documentation cleanup after `v0.5.2`:
-  - README version and current scope are being aligned to `v0.5.2`.
-  - `CHANGELOG.md` is the canonical release history file and is being backfilled for missing tags.
+  - README version and current scope are aligned to `v0.5.2`.
+  - `CHANGELOG.md` is the canonical release history file and has been backfilled for tracked tags.
+  - `CHANGELOG.md` is being localized to Chinese.
+  - `docs/local_truth_api_spec.md` and `docs/version_roadmap_checklist.md` are being aligned to the accepted `v0.5.2` PWA/API state.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -168,7 +170,9 @@
 - Documentation cleanup working tree changes before commit:
   - `CURRENT_STATE.md`
   - `CHANGELOG.md`
-  - `README.md`
+  - `docs/local_truth_api_spec.md`
+  - `docs/pwa_cli_i18n_boundary_note.md`
+  - `docs/version_roadmap_checklist.md`
 
 Previously committed `v0.5.1` files:
 
@@ -188,13 +192,11 @@ Previously committed `v0.5.0` files:
 - Current local untracked files/directories not intended for Git:
   - `.venv/`
   - `reports/`
-  - `e --to 2026-06-04`
-  - `udo systemctl daemon-reload`
 
 ## Next Gate
 
 - Current gate: validate documentation cleanup and commit without creating a new release tag unless explicitly requested.
-- After `v0.5.2`, next functional gate is optional job log refresh UX or broader PWA smoke coverage.
+- After documentation cleanup, next functional gate should be selected from `docs/version_roadmap_checklist.md` `v0.6.0` candidates.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 

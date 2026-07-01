@@ -1,6 +1,6 @@
 # Local Truth API 規格文件
 
-狀態：read-only Local Truth API 已完成至 `v0.4.2 public-preview`，涵蓋 Close、注意、處置、法人、資券、交易日、批次、錯誤、事件與 ops summary；後續寫入型/admin endpoint 保留規劃。
+狀態：Local Truth API 已完成至 `v0.5.2`，涵蓋 Close、注意、處置、法人、資券、當沖、月營收、交易日、批次、錯誤、事件、ops summary、dataset status summary 與 PWA 手動更新 jobs。PWA jobs 僅能執行 allow-listed `update-*` 命令，不提供任意 shell command。
 
 建立日期：2026-06-04
 
@@ -28,8 +28,9 @@ Local Truth API 是 VeriStockDB 的本地真理資料庫 API。
    - 每個 dataset 都應能追到 `import_batches`、`import_errors`、`data_events`。
 
 3. 讀取與管理分層。
-   - 目前已完成 read-only API；寫入型/admin endpoint 仍保留規劃。
-   - 更新、回滾、備份、策略運算等寫入或長任務，先保留設計，不在第一版開放。
+   - 資料查詢 endpoint 仍維持 read-only。
+   - PWA 手動更新 endpoint 屬於 ops 管理功能，只能觸發 allow-listed `main.py update-*` commands。
+   - 回滾、備份、archive、schema migration、任意 SQL、任意 shell command 不開放。
 
 4. PWA 不解析 CLI stdout。
    - CLI 負責命令列文字。
@@ -49,7 +50,7 @@ Local Truth API 是 VeriStockDB 的本地真理資料庫 API。
 
 ## 3. 非目標
 
-目前 read-only API 不做以下功能：
+目前 Local Truth API 不做以下功能：
 
 - 不實作雲端 Edge API。
 - 不實作雲端多用戶 PWA。
@@ -60,7 +61,7 @@ Local Truth API 是 VeriStockDB 的本地真理資料庫 API。
 - 不提供任意 SQL 查詢 endpoint。
 - 不提供任意 shell command endpoint。
 - 不提供任意檔案讀取 endpoint。
-- 不觸發 `update-close`、`rollback-close`、`backup` 等任務。
+- 不觸發 `rollback-close`、`backup`、archive、schema migration 或任意 shell command。
 - 不實作 Telegram 手機控制 server。
 
 ## 4. 網路與啟動設定
@@ -198,6 +199,7 @@ Authorization: Bearer <token>
 | `INVALID_DATASET` | 400 | dataset 不存在或尚未支援 |
 | `INVALID_FIELD` | 400 | 欄位不存在或不可查 |
 | `INVALID_PAGINATION` | 400 | limit / offset 錯誤 |
+| `JOB_ALREADY_RUNNING` | 409 | 已有手動更新 job 執行中 |
 | `AUTH_REQUIRED` | 401 | 需要 token |
 | `AUTH_INVALID` | 401 | token 錯誤 |
 | `PERMISSION_DENIED` | 403 | 權限不足 |
@@ -278,7 +280,7 @@ require_quality=any
 
 ## 12. Endpoint 總覽
 
-目前 read-only API 已落地以下 endpoint。
+目前 Local Truth API 已落地以下 endpoint。
 
 | Method | Path | 權限 | 狀態 | 說明 |
 | --- | --- | --- | --- | --- |
@@ -286,26 +288,30 @@ require_quality=any
 | `GET` | `/api/v1/info` | read | 第一版實作 | app/schema/API 版本 |
 | `GET` | `/api/v1/datasets` | read | 第一版實作 | dataset 清單 |
 | `GET` | `/api/v1/datasets/{dataset}/status` | read | 第一版實作 | dataset 批次狀態 |
+| `GET` | `/api/v1/datasets/status-summary` | read | `v0.5.0` 實作 | PWA dataset 狀態摘要 |
 | `GET` | `/api/v1/daily-close` | read | 第一版實作 | Close 查詢 |
 | `GET` | `/api/v1/attention-notices` | read | `v0.3.1` 實作 | 注意股公告查詢 |
 | `GET` | `/api/v1/disposal-notices` | read | `v0.3.2` 實作 | 處置股公告查詢 |
 | `GET` | `/api/v1/legal-investors` | read | `v0.3.4` 實作 | 三大法人查詢 |
 | `GET` | `/api/v1/margin-trading` | read | `v0.3.5` 實作 | 資券查詢 |
+| `GET` | `/api/v1/day-trading` | read | `v0.4.5` 實作 | 當沖查詢 |
+| `GET` | `/api/v1/monthly-revenue` | read | `v0.4.5` 實作 | 月營收查詢 |
 | `GET` | `/api/v1/trading-days` | read | 第一版實作 | 交易日查詢 |
 | `GET` | `/api/v1/batches` | read | 第一版實作 | batch 查詢 |
 | `GET` | `/api/v1/batches/{batch_id}` | read | 第一版實作 | batch 單筆查詢 |
 | `GET` | `/api/v1/errors` | read | 第一版實作 | import_errors 查詢 |
 | `GET` | `/api/v1/events` | read | 第一版實作 | data_events 查詢 |
 | `GET` | `/api/v1/ops/summary` | ops | 第一版實作 | ops-check 摘要 |
+| `POST` | `/api/v1/jobs/update-dataset` | ops | `v0.5.0` 實作 | 觸發 allow-listed dataset 更新 |
+| `GET` | `/api/v1/jobs` | ops | `v0.5.1` 實作 | 查詢手動更新 job 歷史 |
+| `GET` | `/api/v1/jobs/{job_id}` | ops | `v0.5.1` 實作 | 查詢單一手動更新 job |
 
-以下 endpoint 僅預留，不在目前 read-only API 實作：
+以下 endpoint 僅預留，不在目前 API 實作：
 
 | Method | Path | 權限 | 說明 |
 | --- | --- | --- | --- |
-| `POST` | `/api/v1/jobs/update-close` | admin | 觸發日常更新 |
 | `POST` | `/api/v1/jobs/rollback-close` | admin | 觸發三日回滾 |
 | `POST` | `/api/v1/jobs/backup` | admin | 觸發 backup |
-| `GET` | `/api/v1/jobs/{job_id}` | ops | 查長任務狀態 |
 | `POST` | `/api/v1/exports/pwa-results` | admin | 產出給雲端私有專案的 JSON |
 
 ## 13. Endpoint 詳細規格
@@ -338,8 +344,8 @@ require_quality=any
 ```json
 {
   "app_name": "VeriStockDB",
-  "app_version": "0.3.0",
-  "schema_version": "0.2-human-first",
+  "app_version": "0.5.2",
+  "schema_version": "0.4-monthly-revenue",
   "api_version": "v1",
   "mode": "local_truth"
 }
@@ -363,18 +369,15 @@ require_quality=any
 ]
 ```
 
-目前已包含並預計持續擴充：
+目前已包含：
 
 - `daily_close`
 - `attention_notice`
 - `disposal_notice`
 - `legal_investor`
 - `margin`
-
-未來預計加入：
-
-- `daily_day_trading`
-- `monthly_revenue`
+- `day_trading`
+- `revenue`
 
 ### 13.4 `GET /api/v1/datasets/{dataset}/status`
 
@@ -407,6 +410,42 @@ Query：
   }
 }
 ```
+
+### 13.4a `GET /api/v1/datasets/status-summary`
+
+用途：PWA 首頁與資料集狀態頁使用的全資料集摘要。
+
+回傳內容以目前支援的 datasets 為單位，摘要每個資料集的最新期間、品質狀態與問題批次數。此 endpoint 是 read-only，不觸發下載或入庫。
+
+目前涵蓋：
+
+- `daily_close`
+- `attention_notice`
+- `disposal_notice`
+- `legal_investor`
+- `margin`
+- `day_trading`
+- `revenue`
+
+範例 request：
+
+```text
+GET /api/v1/datasets/status-summary
+```
+
+### 13.4b PWA 查詢共通規則
+
+PWA 查詢畫面使用既有資料查詢 API，不直接讀 SQLite。
+
+規則：
+
+- 日資料使用 `YYYY-MM-DD`。
+- 月營收使用 `YYYY-MM`。
+- 股票代號空白時，查詢指定日期或月份區間內的所有股票。
+- 股票代號有值時，只查詢該股票。
+- 表格顯示使用 API 欄位資料加上 PWA 中文欄名對照，不改變 API 欄位名稱。
+- `daily_close` 的價格 API 欄位仍為 cents；PWA 顯示時將 `open_cents`、`high_cents`、`low_cents`、`close_cents` 除以 `100`。
+- PWA 目前不提供上一頁/下一頁按鈕與 CSV 匯出；使用 `limit` / `offset` 控制資料量。
 
 ### 13.5 `GET /api/v1/daily-close`
 
@@ -553,6 +592,80 @@ Query 與 `daily-close` 相同，支援 `from`、`to`、`stock_id`、`stock_ids`
 
 ```text
 GET /api/v1/margin-trading?stock_id=2330&from=2026-06-15&to=2026-06-15&market=TWSE&require_quality=ok
+```
+
+### 13.5c `GET /api/v1/day-trading`
+
+用途：查詢當沖資料。
+
+Query 與 `daily-close` 相同，支援 `from`、`to`、`stock_id`、`stock_ids`、`market`、`fields`、`require_quality`、`limit`、`offset`。
+
+允許欄位：
+
+- `trade_date`
+- `market`
+- `stock_id`
+- `stock_name`
+- `suspend_sell_note`
+- `day_trade_volume`
+- `day_trade_buy_amount`
+- `day_trade_sell_amount`
+
+回傳 meta：
+
+- `unit`: `shares`
+
+範例 request：
+
+```text
+GET /api/v1/day-trading?stock_id=2330&from=2026-06-30&to=2026-06-30&market=TWSE&require_quality=ok
+```
+
+### 13.5d `GET /api/v1/monthly-revenue`
+
+用途：查詢月營收資料。
+
+Query：
+
+| 參數 | 必填 | 說明 |
+| --- | --- | --- |
+| `from` | 是 | 開始月份，`YYYY-MM` |
+| `to` | 是 | 結束月份，`YYYY-MM` |
+| `stock_id` | 否 | 單一股票代號 |
+| `stock_ids` | 否 | 多股票代號，逗號分隔 |
+| `market` | 否 | `TWSE` / `TPEX` |
+| `fields` | 否 | 欄位清單，逗號分隔 |
+| `require_quality` | 否 | `ok` / `allow_recheck` / `any` |
+| `limit` | 否 | 預設 `1000`，最大 `10000` |
+| `offset` | 否 | 預設 `0` |
+
+允許欄位：
+
+- `revenue_month`
+- `market`
+- `stock_id`
+- `stock_name`
+- `industry`
+- `report_date`
+- `roc_period`
+- `current_month_revenue`
+- `previous_month_revenue`
+- `previous_year_month_revenue`
+- `month_over_month_pct`
+- `year_over_year_pct`
+- `cumulative_revenue`
+- `previous_year_cumulative_revenue`
+- `cumulative_growth_pct`
+- `note`
+
+回傳 meta：
+
+- `unit`: `thousand_twd`
+
+範例 request：
+
+```text
+GET /api/v1/monthly-revenue?stock_id=2330&from=2026-05&to=2026-05&market=TWSE&require_quality=ok
 ```
 
 ### 13.6 `GET /api/v1/trading-days`
@@ -817,22 +930,124 @@ Query：
 }
 ```
 
+### 13.12 `POST /api/v1/jobs/update-dataset`
+
+用途：由 PWA 觸發單一資料集的手動更新。
+
+權限：`ops`。
+
+Request body：
+
+```json
+{
+  "dataset": "daily_close"
+}
+```
+
+允許的 dataset：
+
+- `daily_close` -> `python3 main.py update-close`
+- `attention_notice` -> `python3 main.py update-attention`
+- `disposal_notice` -> `python3 main.py update-disposal`
+- `legal_investor` -> `python3 main.py update-legal`
+- `margin` -> `python3 main.py update-margin`
+- `day_trading` -> `python3 main.py update-day-trading`
+- `revenue` -> `python3 main.py update-revenue`
+
+規則：
+
+- 只允許上列 dataset，不接受任意 command。
+- subprocess 使用 list args，不透過 shell。
+- 同一時間只允許一個非 terminal job。
+- 若已有 job 執行中，回傳 `409 JOB_ALREADY_RUNNING`。
+- job 會寫入 `ops_jobs`，API 重啟後仍可查詢歷史紀錄。
+
+範例 data：
+
+```json
+{
+  "job_id": "job_20260701090000_1234abcd",
+  "dataset": "daily_close",
+  "command": ["python3", "main.py", "update-close"],
+  "status": "QUEUED",
+  "created_at": "2026-07-01T01:00:00Z",
+  "started_at": null,
+  "finished_at": null,
+  "returncode": null,
+  "stdout_tail": "",
+  "stderr_tail": "",
+  "error_message": null,
+  "messages": [
+    {
+      "code": "MANUAL_UPDATE_REQUESTED",
+      "level": "INFO",
+      "message": "manual dataset update queued"
+    }
+  ],
+  "terminal": false
+}
+```
+
+### 13.13 `GET /api/v1/jobs`
+
+用途：查詢手動更新 job 歷史。
+
+權限：`ops`。
+
+Query：
+
+| 參數 | 必填 | 說明 |
+| --- | --- | --- |
+| `limit` | 否 | 預設 `50`，範圍 `1..200` |
+
+回傳 meta：
+
+- `running_job_id`: 目前執行中或排隊中的 job id；沒有時為 `null`。
+
+### 13.14 `GET /api/v1/jobs/{job_id}`
+
+用途：查詢單一手動更新 job 詳細狀態。
+
+權限：`ops`。
+
+狀態值：
+
+- `QUEUED`
+- `RUNNING`
+- `DONE`
+- `FAILED`
+
+欄位：
+
+- `job_id`
+- `dataset`
+- `command`
+- `status`
+- `created_at`
+- `started_at`
+- `finished_at`
+- `returncode`
+- `stdout_tail`
+- `stderr_tail`
+- `error_message`
+- `messages`
+- `terminal`
+
+API 啟動時若發現重啟前未完成的 job，會標記為 `FAILED`，`error_message` 為 `API restarted before manual update completed`。
+
 ## 14. DB 連線與併發
 
-目前 read-only API 原則：
+目前 API 原則：
 
 - API 以 read-only 查詢為主。
 - 讀取 DB 時優先使用 SQLite read-only URI。
+- FastAPI read-only SQLite connections 使用 `check_same_thread=False`，避免 dependency enter/exit 落在不同 thread 時造成隨機 500/503。
 - 避免 API endpoint 長時間持有 DB connection。
 - 不提供任意 SQL endpoint。
-- 不在 request thread 中執行大量下載或匯入。
-
-未來若開放寫入或長任務：
-
-- 寫入任務必須集中到 single writer queue。
-- 每個任務回傳 `job_id`。
-- API 只查 job 狀態，不讓多個專案同時直接寫 DB。
-- 同一時間只能有一個高風險資料任務，例如 update、rollback、backup、archive。
+- PWA 手動更新透過 background task 執行 allow-listed `update-*` command。
+- 手動更新採 single-writer guard，同一時間只能有一個 `QUEUED` 或 `RUNNING` job。
+- 每個手動更新任務回傳 `job_id`，狀態保存在 `ops_jobs`。
+- 不開放 rollback、backup、archive、schema migration 或任意 command endpoint。
 
 ## 15. 本地管理 PWA 邊界
 
@@ -845,9 +1060,15 @@ VeriStockDB PWA 是本地管理控制台，不是雲端多用戶前台。
 - batch 狀態。
 - 錯誤與特殊事件。
 - 交易日曆。
-- Close 查詢。
+- Close、注意、處置、法人、資券、當沖、月營收查詢。
 - ops-check 摘要。
-- 未來 admin 任務狀態。
+- 手動更新 job 狀態。
+
+它可以透過 `POST /api/v1/jobs/update-dataset` 執行 allow-listed dataset 更新：
+
+- 使用者手動點擊資料集更新。
+- job 寫入 `ops_jobs`。
+- PWA 顯示最近 jobs、stdout/stderr tail、return code、error summary。
 
 它不應：
 
@@ -855,6 +1076,7 @@ VeriStockDB PWA 是本地管理控制台，不是雲端多用戶前台。
 - 直接連 SQLite。
 - 繞過 Local Truth API 讀寫資料。
 - 承擔雲端多用戶前台功能。
+- 提供任意 command、任意 SQL、回滾、備份、archive 或 schema migration 按鈕。
 
 ## 16. 雲端私有專案邊界
 
@@ -873,9 +1095,9 @@ VeriStockDB 只預留 export contract：
 
 雲端私有專案只讀這些精簡 JSON，不連接 VeriStockDB DB，不觸發本地任務，不保存敏感設定。
 
-## 17. 第一版實作建議
+## 17. 目前實作結構
 
-目前 FastAPI 第一版檔案：
+目前 FastAPI 檔案：
 
 ```text
 api/
@@ -888,38 +1110,58 @@ api/
   schemas.py
   routes/
     __init__.py
+    attention_notices.py
     health.py
     info.py
     datasets.py
     daily_close.py
+    legal_investors.py
+    margin_trading.py
+    day_trading.py
+    monthly_revenue.py
+    disposal_notices.py
     trading_days.py
+    table_query.py
     batches.py
     errors.py
     events.py
     ops.py
+    jobs.py
 ```
 
-後續可再加入：
+目前 PWA 靜態檔案：
 
 ```text
-api/
-  routes/
-    jobs.py
-    exports.py
+web/
+  index.html
+  app.js
+  styles.css
+  manifest.webmanifest
+  service-worker.js
+  icons/
 ```
 
-## 18. Read-only API 規格完成條件
+後續若需要雲端私有專案輸出，可另行加入：
 
-Read-only API 收斂時應確認：
+```text
+api/routes/exports.py
+```
+
+## 18. Local Truth API 規格完成條件
+
+Local Truth API 收斂時應確認：
 
 - [x] 本地 API 與雲端私有專案邊界清楚。
 - [x] VeriStockDB PWA 定位為本地管理控制台。
 - [x] response envelope 定案。
 - [x] 錯誤碼定案。
 - [x] 權限模型定案。
-- [x] 第一版 endpoint 清單定案。
+- [x] 已完成 dataset endpoint 清單定案。
 - [x] `daily_close` 價格欄位使用整數分定案。
 - [x] `require_quality` 行為定案。
-- [x] 第一版不開放寫入任務定案。
-- [x] FastAPI 第一版 read-only endpoint 已建立。
+- [x] 手動更新 jobs 只允許 allow-listed `update-*` commands。
+- [x] 手動更新 jobs 有 single-writer guard。
+- [x] 手動更新 jobs 持久化到 `ops_jobs`。
+- [x] PWA 查詢表格不直接讀 SQLite。
+- [x] FastAPI endpoint 已建立。
 - [x] `ops/summary` 已納入 ops 權限 endpoint。

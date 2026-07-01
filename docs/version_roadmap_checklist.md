@@ -1,329 +1,173 @@
-# VeriStockDB 版本切法與檢查清單
+# VeriStockDB 版本路線與檢查清單
 
-狀態：規劃中，從目前 `v0.2.7` 之後開始使用。
+狀態：已對齊 `v0.5.2` 實際完成範圍。
 
-建立日期：2026-06-04
+更新日期：2026-07-01
 
-## 核心順序
+## 核心原則
 
-先把 API 規範做完整，再新增其它資料表，最後做 PWA 前端。
+VeriStockDB 的版本推進順序以「資料可信度」優先：
 
-這裡的「API 規範完整」不是一次實作所有資料，而是先定好穩定契約：
+- SQLite canonical truth 先穩定。
+- 每個資料集必須有下載、驗證、dry-run、正式入庫、API、排程或明確 deferred 狀態。
+- API 與 PWA 必須使用結構化資料，不解析 CLI stdout。
+- PWA 是本機資料健康檢查與手動補救工具，不是選股前台。
+- 破壞性 DB 操作、schema migration、正式排程變更、ClickHouse 導入，都必須另行明確授權。
 
-- 路徑命名規則。
-- 回傳 JSON 格式。
-- 錯誤碼與狀態碼。
-- 日期區間、股票代號、市場別查詢規則。
-- 分頁與排序規則。
-- dataset 狀態查詢。
-- batch / error / event 查詢。
-- PWA 不解析 CLI stdout，而是使用 API / Core 結構化結果。
-
-## 版本總表
+## 已完成版本總表
 
 | 版本 | 主題 | 狀態 |
 | --- | --- | --- |
-| `v0.2.8` | Close 私有部署觀察與小修 | 未開始 |
-| `v0.3.0` | API 規範 + read-only API 基礎 + PWA/CLI 中文顯示邊界 | 待發版 |
+| `v0.2.0` | Close CLI、rollback、status、data_events 基礎 | 完成 |
+| `v0.2.1` | 本機歷史 Close 匯入 | 完成 |
+| `v0.2.2` | Close 月稽核與封存範圍化 | 完成 |
+| `v0.2.3` | 交易日補齊與休市略過 | 完成 |
+| `v0.2.4` | `update-close` | 完成 |
+| `v0.2.5` | Ubuntu 私有部署環境變數與冷熱儲存分離 | 完成 |
+| `v0.2.6` | systemd templates 與 rollback 自動日期 | 完成 |
+| `v0.2.7` | `ops-check` | 完成 |
+| `v0.3.0` | Local Truth API read-only 基礎 | 完成 |
 | `v0.3.1` | 注意股公告 | 完成 |
 | `v0.3.2` | 處置股公告 | 完成 |
-| `v0.3.3` | Telegram Bot API：更新後訊息通知 | 完成 |
-| `v0.3.4` | 三大法人 | 未開始 |
-| `v0.3.5` | 資券 | 未開始 |
-| `v0.3.6` | 當沖 | 延後 |
-| `v0.3.7` | 月營收 | 延後 |
-| `v0.3.8` | Close 月資料對帳 `reconcile-close-month` | 已實作，待發版 |
-| `v0.4.0-public-preview` | 開源前整理 | 未開始 |
-| `v0.5.0` | PWA 前端 | 未開始 |
+| `v0.3.3` | Telegram 更新通知 | 完成 |
+| `v0.3.3.1` | 通知中文化、交易日 fallback、週末防呆 | 完成 |
+| `v0.3.4.0` | 三大法人 canonical dataset | 完成 |
+| `v0.3.5.0` | 資券 canonical dataset | 完成 |
+| `v0.3.5.1` | 處置公告 update horizon 修正 | 完成 |
+| `v0.3.8.0` | Close 月資料對帳與法人/資券 API | 完成 |
+| `v0.3.8.1` | API 嚴格日期與核心 route tests | 完成 |
+| `v0.3.8.2` | 法人/資券/注意/處置三次重試 | 完成 |
+| `v0.3.8.3` | 法人/資券 Telegram 通知 | 完成 |
+| `v0.3.8.4` | errors API 日期 filter | 完成 |
+| `v0.4.0` | public-preview gate | 完成 |
+| `v0.4.1` | public repo path polish | 完成 |
+| `v0.4.2` | LICENSE、CONTRIBUTING、SECURITY、issue templates、CI | 完成 |
+| `v0.4.3` | public README 說明與公開 issues | 完成 |
+| `v0.4.4` | 當沖下載/驗證/入庫/API 基礎與月營收 groundwork | 完成 |
+| `v0.4.5` | 當沖與月營收 canonical import/update/API | 完成 |
+| `v0.4.6` | dataset latest-period canonical fallback | 完成 |
+| `v0.4.7` | 當沖與月營收 production schedule 文件狀態 | 完成 |
+| `v0.5.0` | Local Management PWA MVP 與手動更新 jobs API | 完成 |
+| `v0.5.1` | `ops_jobs` 持久化、PWA 表格查詢、jobs detail | 完成 |
+| `v0.5.2` | PWA 手動更新 job list、dashboard job 摘要、smoke tests | 完成 |
+
+## 目前已接受的 canonical datasets
+
+| Dataset | SQLite table | Period | API | 更新命令 |
+| --- | --- | --- | --- | --- |
+| Close | `daily_close` | 日 | `/api/v1/daily-close` | `update-close` |
+| 注意公告 | `attention_notices` | 日 | `/api/v1/attention-notices` | `update-attention` |
+| 處置公告 | `disposal_notices` | 公告日/處置期間 | `/api/v1/disposal-notices` | `update-disposal` |
+| 三大法人 | `legal_investors` | 日 | `/api/v1/legal-investors` | `update-legal` |
+| 資券 | `margin_trading` | 日 | `/api/v1/margin-trading` | `update-margin` |
+| 當沖 | `day_trading` | 日 | `/api/v1/day-trading` | `update-day-trading` |
+| 月營收 | `monthly_revenue` | 月 | `/api/v1/monthly-revenue` | `update-revenue` |
+| 交易日 | `trading_days` | 日 | `/api/v1/trading-days` | `backfill-trading-days` |
+
+`ops_jobs` 是 PWA/manual-update 營運資料表，不是 canonical market data。
+
+## v0.5.x 已完成範圍
+
+- `web/` 本地管理 PWA 已由 FastAPI 掛載在 `/`。
+- PWA 採暗色系，用於資料健康檢查與人工補救。
+- PWA 查詢使用表格顯示，空股票代號代表查詢整段全股資料。
+- Close 價格在 PWA 顯示層除以 `100`；API/DB 仍是 integer cents。
+- 手動更新只透過 `/api/v1/jobs/update-dataset` 觸發 allow-listed `update-*` commands。
+- 同一時間只允許一個 manual update job。
+- jobs 持久化於 `ops_jobs`，API 重啟後仍可查詢歷史 job。
+- PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command。
 
 ## 每版共同完成條件
 
-每推進一個版本，都先檢查以下項目：
+每個功能版本完成前至少確認：
 
 - [ ] 規格文件已更新。
-- [ ] CLI 或 API 行為已有明確範例。
-- [ ] schema 變更已寫入正式 migration 或 schema 文件。
-- [ ] 新資料集已接入共用 batch / error / event 管理。
-- [ ] 失敗時會留下可追查原因，不只顯示 `MISSING` 或 `BLOCKED`。
-- [ ] 測試已補上，至少涵蓋成功、缺參數、資料異常。
-- [ ] `python -m unittest discover -v` 通過。
 - [ ] README / CHANGELOG 視需要更新。
+- [ ] schema 變更已寫入 `db/schema.sql` 或明確 migration。
+- [ ] 新資料集已接入 batch / error / event 管理。
+- [ ] 失敗會留下可追查原因，不只顯示 `MISSING` 或 `BLOCKED`。
+- [ ] API 行為有測試或 smoke 覆蓋。
+- [ ] `python -m unittest discover -s tests` 通過。
+- [ ] 相關 Python 檔案 compile check 通過。
+- [ ] 前端變更需跑 `node --check web/app.js`。
+- [ ] `git diff --check` 通過。
+- [ ] 若改 public docs，需掃描私有路徑與 secret marker。
 - [ ] commit 完成。
 - [ ] 需要發版時 tag 完成。
 - [ ] push 到 GitHub。
-- [ ] 若影響 Ubuntu 部署，server 已 pull 並驗證。
-
-## v0.2.8 Close 私有部署觀察與小修
-
-目標：讓目前 Close 流程在 Ubuntu 私有部署上多跑幾個交易日，先穩住營運面。
-
-檢查清單：
-
-- [ ] `update-close` 排程正常。
-- [ ] `rollback-close` 排程正常。
-- [ ] `backup` 排程正常。
-- [ ] `ops-check` 為 `OK`。
-- [ ] `status --problems --details` 無異常。
-- [ ] Google Drive 異地備份正常。
-- [ ] GCP VPS 異地備份正常。
-- [ ] 若有小修，補測試與文件。
+- [ ] 若影響 Ubuntu 部署，server 已套用並驗證。
 
-## v0.3.0 API 規範與 read-only API 基礎
+## v0.6.0 候選方向
 
-目標：先建立未來 PWA 與其它專案可依賴的穩定 API 契約。
+`v0.6.0` 尚未定案。下一輪應先從以下候選挑一個做，不要同時展開：
 
-範圍：
+### 方向 A：PWA 資料健康儀表板強化
 
-- API 規格文件。
-- read-only API 第一版。
-- 健康檢查 endpoint。
-- Close 查詢 endpoint。
-- trading days 查詢 endpoint。
-- batch / status / error / event 查詢 endpoint。
-- ops summary endpoint。
-- PWA 與 CLI 中文顯示邊界落地到 API 規格。
-
-檢查清單：
-
-- [x] API 路徑命名定案。
-- [x] 回傳 JSON envelope 定案。
-- [x] 錯誤碼格式定案。
-- [x] 日期格式統一為 `YYYY-MM-DD`。
-- [x] month 格式統一為 `YYYY-MM`。
-- [x] 市場別統一使用 `TWSE` / `TPEX`。
-- [x] API 不直接回傳 CLI stdout。
-- [x] CLI formatter 與 API response 分離。
-- [x] 至少有 `/health`。
-- [x] 至少有 Close 查詢 endpoint。
-- [x] 至少有 dataset 狀態 endpoint。
-- [x] trading days 查詢 endpoint 已建立。
-- [x] batch / error / event 查詢 endpoint 已建立。
-- [x] ops summary endpoint 已建立。
-- [x] API smoke test 已涵蓋基本回應、auth、Close 查詢與 ops summary。
-
-## v0.3.1 注意股公告
-
-目標：優先提供另一個專案需要的注意股公告資料。
-
-資料性質：公告事件型資料。
-
-檢查清單：
-
-- [x] 官方來源 URL 與參數確認。
-- [x] schema 定案。
-- [x] import command 定案。
-- [x] API 查詢 endpoint 定案。
-- [x] 支援日期查詢。
-- [x] 支援股票代號查詢。
-- [x] 支援市場別查詢。
-- [x] 公告原因或注意條件可保存。
-- [x] 原始來源批次可追查。
-- [x] 異常公告格式會寫入 `import_errors` 或 `data_events`。
-
-## v0.3.2 處置股公告
-
-目標：提供另一個專案需要的處置股公告資料。
-
-資料性質：公告事件型資料。
-
-檢查清單：
-
-- [x] 官方來源 URL 與參數確認。
-- [x] schema 定案。
-- [x] import command 定案。
-- [x] update command 定案。
-- [x] API 查詢 endpoint 定案。
-- [x] 支援日期查詢。
-- [x] 支援股票代號查詢。
-- [x] 支援市場別查詢。
-- [x] 支援處置期間 `active_date` 查詢。
-- [x] 生效日、結束日若官方有提供，需要保存。
-- [x] 處置原因或處置條件可保存。
-- [x] 官方處置內容原文可保存。
-- [x] 原始來源批次可追查。
-- [x] 異常公告格式會寫入 `import_errors`。
-
-正式命令範例：
-
-```powershell
-python main.py import-disposal --twse-file tmp\disposal_notice_samples\punish.csv --tpex-file tmp\disposal_notice_samples\disposal_information_20030901_20260601.csv
-python main.py update-disposal
-python main.py query-disposal --stock-id 52811 --from 2018-10-01 --to 2018-10-31
-python main.py query-disposal --active-date 2026-06-05
-```
-
-API 查詢範例：
+目標：讓 PWA 更快定位資料問題。
 
-```text
-GET /api/v1/disposal-notices?from=2026-05-01&to=2026-06-05&stock_id=52811
-GET /api/v1/disposal-notices?from=2026-05-01&to=2026-06-05&active_date=2026-06-05
-```
+候選項目：
 
-## v0.3.3 Telegram Bot API 通知
+- dataset status drill-down。
+- 一鍵查看最近 `import_errors` / `data_events` 對應資料集。
+- 最近排程結果摘要。
+- 單一 dataset 的最新日期、缺口、最近 batch、最近 job 整合畫面。
 
-目標：先做更新後訊息通知，預留未來手機傳訊控制 server 的擴充空間。
+完成條件：
 
-第一版只做通知，不做遠端控制。
+- [ ] 只走 Local Truth API。
+- [ ] 不新增破壞性操作。
+- [ ] 補 API/PWA smoke tests。
+- [ ] 更新 `docs/local_truth_api_spec.md`。
 
-規格文件：
+### 方向 B：排程驗證與營運報表
 
-- `docs/telegram_notification_spec.md`
+目標：將目前靠人工確認的排程狀態整理成可查詢報表。
 
-檢查清單：
+候選項目：
 
-- [x] 通知規格文件已建立。
-- [x] 支援環境變數設定 bot token。
-- [x] 支援環境變數設定 chat id。
-- [x] `update-close` 完成後可通知。
-- [x] `rollback-close` 完成後可通知。
-- [x] `update-attention` 完成後可通知。
-- [x] `update-disposal` 完成後可通知。
-- [x] `backup` 完成後可通知。
-- [x] `ops-check` 異常時可通知。
-- [x] 通知內容包含狀態、日期範圍、統計數字與錯誤摘要。
-- [x] token 不寫入 repo。
-- [x] 測試不需要真實 Telegram token。
-- [x] 文件註明未來遠端控制需要白名單、權限、確認機制與危險命令限制。
-- [x] Telegram 手機通知中文化，並保留 `OK` / `BLOCKED` / `RECHECK` / `MISSING` / `ERROR` 狀態碼。
-- [x] Ubuntu server 已實測 Telegram 通知。
+- systemd timer expected/actual report。
+- 最近排程 log 摘要。
+- dataset 最新日期與 timer 最近執行時間對照。
+- Telegram 通知漏發檢查。
 
-預計命令範例：
+完成條件：
 
-```powershell
-python main.py notify-telegram --test
-python main.py notify-telegram --message "VeriStockDB test message"
-```
+- [ ] 不修改正式排程，除非另行授權。
+- [ ] 不讀任意路徑，只讀設定允許的 log path。
+- [ ] API 或 CLI 有穩定輸出。
 
-## v0.3.4 三大法人
+### 方向 C：文件與公開維護流程
 
-目標：加入三大法人資料，作為 Close 之外第一個主要交易資料集。
+目標：降低開源後接手成本。
 
-檢查清單：
+候選項目：
 
-- [ ] 官方來源 URL 與參數確認。
-- [ ] 資料表命名定案，建議避免使用容易誤解的 `legal`。
-- [ ] schema 定案。
-- [ ] import command 定案。
-- [ ] API 查詢 endpoint 定案。
-- [ ] 支援日期區間查詢。
-- [ ] 支援股票代號查詢。
-- [ ] 支援市場別查詢。
-- [ ] 買進、賣出、買賣超欄位單位確認。
-- [ ] 可與 `daily_close` 用日期與股票代號對齊。
+- 補 canonical SQLite architecture 文件。
+- 補 parser regression fixtures 規劃。
+- 補 release workflow 自動化。
+- 整理 `docs/pm_handoff/` 與目前文件的邊界，避免舊 handoff 被誤用為現況。
 
-## v0.3.5 資券
+完成條件：
 
-目標：加入資券資料。
+- [ ] 根目錄 `CHANGELOG.md` 持續作為唯一 release history。
+- [ ] `CURRENT_STATE.md` 只保留下一輪接手必要狀態。
+- [ ] 舊 handoff 文件標示 archive，不作為現況來源。
 
-檢查清單：
+## 暫不做
 
-- [ ] 官方來源 URL 與參數確認。
-- [ ] 資料表命名定案。
-- [ ] schema 定案。
-- [ ] import command 定案。
-- [ ] API 查詢 endpoint 定案。
-- [ ] 支援日期區間查詢。
-- [ ] 支援股票代號查詢。
-- [ ] 支援市場別查詢。
-- [ ] 融資、融券、借券或相關欄位定義確認。
-- [ ] 單位與正負號規則確認。
-
-## v0.3.6 當沖
-
-目標：加入當沖資料。
-
-檢查清單：
-
-- [ ] 官方來源 URL 與參數確認。
-- [ ] schema 定案。
-- [ ] import command 定案。
-- [ ] API 查詢 endpoint 定案。
-- [ ] 支援日期區間查詢。
-- [ ] 支援股票代號查詢。
-- [ ] 支援市場別查詢。
-- [ ] 當沖買進、賣出、成交股數、成交金額等欄位定義確認。
-- [ ] 可與 `daily_close` 對齊驗證。
-
-## v0.3.7 月營收
-
-目標：加入月營收資料。
-
-資料性質：月資料，不是每日資料。
-
-檢查清單：
-
-- [ ] 官方來源 URL 與參數確認。
-- [ ] month 欄位格式定案。
-- [ ] schema 定案。
-- [ ] import command 定案。
-- [ ] API 查詢 endpoint 定案。
-- [ ] 支援月份區間查詢。
-- [ ] 支援股票代號查詢。
-- [ ] 支援市場別查詢。
-- [ ] 當月營收、去年同月、月增率、年增率等欄位定義確認。
-- [ ] 公告日與資料月份分開保存。
-
-## v0.3.8 Close 月資料對帳
-
-目標：把 `docs/close_monthly_reconciliation_backlog.md` 轉成正式功能。
-
-狀態：已實作 `reconcile-close-month`，待 commit / tag / push。
-
-預計命令：
-
-```powershell
-python main.py reconcile-close-month --month YYYY-MM
-```
-
-檢查清單：
-
-- [x] 官方個股月資料 API 確認。
-- [x] 預設樣本股確認：TWSE `0050`、`1101`，TPEX `5483`。
-- [x] 支援使用者自選 `--stock-id`。
-- [x] 支援 `--market`。
-- [x] 第一版只比對 `close` 與 `volume`。
-- [x] 差異會標記 `RECHECK`。
-- [x] 差異訊息包含月份、市場、股票代號、日期、欄位、DB 值、官方值。
-- [x] 不取代 `audit-month`，只作為跨來源對帳。
-
-## v0.4.0-public-preview 開源前整理
-
-目標：準備公開預覽版本。
-
-檢查清單：
-
-- [ ] 確認 repo 不包含 `data/`。
-- [ ] 確認 repo 不包含 DB。
-- [ ] 確認 repo 不包含 token、私有路徑、server 設定。
-- [ ] README 更新到公開可讀狀態。
-- [ ] CHANGELOG 補齊。
-- [ ] 安裝與 quickstart 文件補齊。
-- [ ] API 文件補齊。
-- [ ] 範例資料策略確認。
-- [ ] license 確認。
-- [ ] git history 檢查敏感資料。
-
-## v0.5.0 PWA 前端
-
-目標：建立第一版 PWA 管理與查詢介面。
-
-檢查清單：
-
-- [ ] PWA 只使用 API，不解析 CLI stdout。
-- [ ] 中文顯示由 PWA/API i18n formatter 處理。
-- [ ] 提供 Close 查詢畫面。
-- [ ] 提供注意股公告查詢畫面。
-- [ ] 提供處置股公告查詢畫面。
-- [ ] 提供資料集狀態畫面。
-- [ ] 提供 batch / error / event 檢視。
-- [ ] 提供 ops-check 顯示。
-- [ ] 手機版可用。
-- [ ] 桌面版可用。
+- 不新增 ClickHouse canonical truth。
+- 不做雲端多用戶 PWA。
+- 不做選股策略與下單功能。
+- 不做任意 SQL / shell command endpoint。
+- 不做自動 self-healing retry；目前維持人工手動更新，待穩定後再討論。
+- 不做 PWA CSV 匯出與上一頁/下一頁分頁按鈕，除非使用者重新要求。
 
 ## 目前下一步
 
-目前 `v0.3.0` 收斂檢查已完成，下一步：
+目前 `v0.5.2` 功能已完成，下一步應先完成文件收斂並與 `CHANGELOG.md` 一起 commit/push。
 
-1. 確認 commit 時只 stage API、規格文件、README、設定範例與 requirements。
-2. 不追蹤 `data/`、`tests/`、暫存檔與 `docs/新增功能規劃書.txt`。
-3. commit / tag / push `v0.3.0`。
+建議下一個功能 gate：
+
+1. 從 `v0.6.0` 候選方向 A/B/C 中選一個。
+2. 更新 `CURRENT_STATE.md`。
+3. 實作前先確認是否涉及 DB、排程或 schema 變更。

@@ -1,10 +1,10 @@
 # PWA 與 CLI 中文顯示邊界備忘
 
-狀態：未實作，作為未來 PWA / API 開發時的架構決策備忘。
+狀態：已落地到 `v0.5.x` PWA/API。此文件保留為架構邊界備忘。
 
 ## 核心結論
 
-未來 PWA 可以把目前 CLI 的執行結果轉成中文顯示，但不建議直接解析 CLI stdout 再翻譯。
+PWA 可以把 API/Core 的結構化結果轉成中文顯示，但不應直接解析 CLI stdout 再翻譯。
 
 比較穩定的做法是：
 
@@ -47,9 +47,9 @@ Core function
   -> Chinese UI
 ```
 
-## 未來 API 回傳方向
+## API 回傳方向
 
-未來 API 可以回傳類似以下結構：
+API 或 Core 結構化結果可以回傳類似以下結構：
 
 ```json
 {
@@ -90,7 +90,7 @@ PWA 再根據 `code`、`status`、`stats` 與 `params` 顯示中文，例如：
 
 ## CLI 可保留原始 log
 
-短期若 PWA 只是做管理頁，可以保留一個「執行紀錄」區塊顯示原始 log。
+PWA 管理頁可以保留一個「執行紀錄」區塊顯示 job stdout/stderr tail。
 
 但正式操作狀態、錯誤提示、批次表格與使用者可判斷的結果，應使用結構化資料轉譯，不應依賴 CLI stdout。
 
