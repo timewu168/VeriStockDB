@@ -1,3 +1,9 @@
+# VeriStockDB 舊版 handoff 封存
+
+> 注意：此文件屬於 `docs/pm_handoff/` 歷史封存區，只作舊版脈絡參考，不是目前專案狀態來源。
+>
+> 目前權威文件請看根目錄 `CURRENT_STATE.md`、根目錄 `README.md`、根目錄 `CHANGELOG.md`，以及 `docs/README.md`。本目錄內版本號、路徑、API 範圍與任務狀態可能已過期。
+
 # VeriStockDB
 
 Version: v0.3.3.1

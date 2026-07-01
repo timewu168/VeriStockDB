@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Latest release target: `v0.6.1` schedule health report.
-- Latest pushed release before this update: `v0.6.0`.
+- Latest release target: `v0.6.2` documentation boundary cleanup.
+- Latest pushed release before this update: `v0.6.1`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
@@ -14,6 +14,7 @@
 - PWA manual update view now includes a full recent jobs table; selecting a row opens the job detail drawer with messages, stdout/stderr tail, and error summary.
 - `v0.6.0` adds a read-only dataset health endpoint and PWA dataset drill-down for latest period, quality, recent batches, problem batches, recent errors, recent events, and recent jobs.
 - `v0.6.1` adds schedule health reporting for production update timers, recent log tail markers, and dataset freshness.
+- `v0.6.2` marks `docs/pm_handoff/` as historical archive and adds `docs/README.md` as the documentation entry point.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -98,10 +99,15 @@
 - `v0.6.0` implementation accepted:
   - `GET /api/v1/datasets/{dataset}/health` added as a read-only PWA drill-down endpoint.
   - PWA dataset table rows open an inline health detail panel.
-- `v0.6.1` implementation in progress:
+- `v0.6.1` implementation accepted:
   - `schedule-health` CLI added.
   - `GET /api/v1/ops/schedule-health` added.
   - PWA system page includes a schedule health table.
+- `v0.6.2` documentation boundary accepted:
+  - root `CHANGELOG.md` remains the only release history.
+  - `CURRENT_STATE.md` remains the handoff state summary.
+  - `docs/README.md` documents current/archived documentation boundaries.
+  - `docs/pm_handoff/` is marked as historical archive only.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -161,7 +167,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.6.1`.
+- Current code version in `config.py`: `APP_VERSION=0.6.2`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -176,21 +182,18 @@
 
 ## Modified Files
 
-- `v0.6.1` working tree changes before commit:
+- `v0.6.2` working tree changes before commit:
   - `CURRENT_STATE.md`
   - `CHANGELOG.md`
   - `README.md`
   - `config.py`
-  - `api/routes/ops.py`
-  - `main.py`
-  - `services/schedule_health.py`
-  - `tests/test_schedule_health.py`
-  - `docs/local_truth_api_spec.md`
+  - `docs/README.md`
+  - `docs/pm_handoff/ARCHIVE_NOTICE.md`
+  - `docs/pm_handoff/README.md`
+  - `docs/pm_handoff/pm_handoff/PROJECT_HANDOFF.md`
+  - `docs/pm_handoff/pm_handoff/PROJECT_REVIEW_CHECKLIST.md`
+  - `docs/pm_handoff/pm_handoff/PROJECT_TASKS.md`
   - `docs/version_roadmap_checklist.md`
-  - `web/index.html`
-  - `web/app.js`
-  - `web/styles.css`
-  - `web/service-worker.js`
 
 Previously committed `v0.5.1` files:
 
@@ -213,8 +216,8 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: validate `v0.6.1` schedule health report and release with commit/tag/push after user approval.
-- After `v0.6.1`, next planned `v0.6.x` item is documentation boundary/archive cleanup unless reprioritized.
+- Current gate: validate `v0.6.2` documentation boundary cleanup and release with commit/tag/push after user approval.
+- After `v0.6.2`, next planned `v0.6.x` item is `v0.6.3` backup/restore drill SOP and verification unless reprioritized.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 

@@ -1,5 +1,9 @@
 # VeriStockDB Review Checklist
 
+> Archive notice: this is an old review checklist snapshot under `docs/pm_handoff/`.
+> It is retained only for history. Current release and validation rules must come from
+> root `CURRENT_STATE.md`, root `README.md`, root `CHANGELOG.md`, and `docs/README.md`.
+
 產出日期：2026-06-06  
 用途：PM 審核 worker 回報與 release 收斂時使用。
 

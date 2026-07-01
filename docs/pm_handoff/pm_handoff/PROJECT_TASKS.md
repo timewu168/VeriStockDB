@@ -1,5 +1,9 @@
 # VeriStockDB Project Tasks
 
+> Archive notice: this is an old `v0.3.3.1` task snapshot under `docs/pm_handoff/`.
+> It is retained only for history. Current tasks must come from root `CURRENT_STATE.md`,
+> root `README.md`, root `CHANGELOG.md`, and `docs/README.md`.
+
 產出日期：2026-06-06  
 狀態原則：未 commit / 未 tag / 未 server 驗證者，不列為完成。
 

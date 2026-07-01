@@ -1,6 +1,6 @@
 # VeriStockDB 版本路線與檢查清單
 
-狀態：已對齊 `v0.5.2` 實際完成範圍。
+狀態：已對齊 `v0.6.2` 實際完成範圍。
 
 更新日期：2026-07-01
 
@@ -51,7 +51,8 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 | `v0.5.1` | `ops_jobs` 持久化、PWA 表格查詢、jobs detail | 完成 |
 | `v0.5.2` | PWA 手動更新 job list、dashboard job 摘要、smoke tests | 完成 |
 | `v0.6.0` | PWA 資料健康 drill-down | 完成 |
-| `v0.6.1` | 排程健康報表 | 進行中 |
+| `v0.6.1` | 排程健康報表 | 完成 |
+| `v0.6.2` | 文件邊界整理 | 完成 |
 
 ## 目前已接受的 canonical datasets
 
@@ -151,18 +152,18 @@ Deferred：
 
 目標：降低開源後接手成本。
 
-候選項目：
+範圍：
 
-- 補 canonical SQLite architecture 文件。
-- 補 parser regression fixtures 規劃。
-- 補 release workflow 自動化。
 - 整理 `docs/pm_handoff/` 與目前文件的邊界，避免舊 handoff 被誤用為現況。
+- 補 `docs/README.md` 作為文件入口與判讀優先順序。
+- 明確標示根目錄 `CHANGELOG.md` 是唯一正式版本紀錄。
+- 明確標示 `CURRENT_STATE.md` 是下一輪接手唯一狀態摘要。
 
 完成條件：
 
-- [ ] 根目錄 `CHANGELOG.md` 持續作為唯一 release history。
-- [ ] `CURRENT_STATE.md` 只保留下一輪接手必要狀態。
-- [ ] 舊 handoff 文件標示 archive，不作為現況來源。
+- [x] 根目錄 `CHANGELOG.md` 持續作為唯一 release history。
+- [x] `CURRENT_STATE.md` 只保留下一輪接手必要狀態。
+- [x] 舊 handoff 文件標示 archive，不作為現況來源。
 
 ### v0.6.3：備份/還原演練文件
 
@@ -200,10 +201,10 @@ Deferred：
 
 ## 目前下一步
 
-目前 `v0.6.1` 正在進行排程健康報表。
+目前 `v0.6.2` 文件邊界整理完成。
 
 後續功能 gate：
 
-1. 完成 `v0.6.1` 驗證與 release。
-2. 更新 `CURRENT_STATE.md`。
-3. 進入 `v0.6.2` 文件邊界整理。
+1. 進入 `v0.6.3` 備份/還原演練文件。
+2. 完成 DB restore SOP 與一次非破壞性驗證。
+3. 更新 `CURRENT_STATE.md`、`CHANGELOG.md`、README 或相關 docs。

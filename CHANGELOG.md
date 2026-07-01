@@ -1,5 +1,18 @@
 # 版本紀錄
 
+## v0.6.2 - 2026-07-01
+
+### 新增
+
+- 新增 `docs/README.md`，定義目前有效文件、歷史封存文件與判讀優先順序。
+- 新增 `docs/pm_handoff/ARCHIVE_NOTICE.md`，明確標示舊 handoff 目錄只作歷史參考。
+
+### 變更
+
+- 將 `docs/pm_handoff/README.md` 加上封存警示，避免誤讀為目前狀態。
+- 更新 README 的文件邊界說明，明確指定 `CURRENT_STATE.md`、根目錄 `CHANGELOG.md` 與 `docs/README.md` 的角色。
+- 將 app version bump 至 `0.6.2`。
+
 ## v0.6.1 - 2026-07-01
 
 ### 新增

@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.6.1
+Version: v0.6.2
 
 VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
@@ -255,6 +255,13 @@ PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command�
 - Day trading：TWSE `TWTB4U`、TPEX `intraday/stat` CSV，canonical scope 從 `2014-01-06` 開始。
 - Monthly revenue：MOPS `t21sc03_{roc_month}.csv`，canonical scope 從 `2013-01` 開始，依每月 10 號公開規則更新。
 - Close monthly reconciliation：TWSE/TPEX 官方個股月資料 JSON，只對帳 `close` 與 `volume`，不覆寫 `daily_close`。
+
+## Documentation Boundary
+
+- `CURRENT_STATE.md` 是下一輪 Codex/PM/worker 接手的唯一狀態摘要。
+- `CHANGELOG.md` 是唯一正式版本紀錄。
+- `docs/README.md` 是文件入口與判讀優先順序。
+- `docs/pm_handoff/` 是舊版 handoff/archive，只作歷史參考，不可視為目前狀態來源。
 
 ## Paths
 

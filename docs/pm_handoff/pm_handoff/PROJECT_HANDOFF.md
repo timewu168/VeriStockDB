@@ -1,5 +1,9 @@
 # VeriStockDB Project Handoff
 
+> Archive notice: this is an old `v0.3.3.1` handoff snapshot under `docs/pm_handoff/`.
+> It is retained only for history. Current state must come from root `CURRENT_STATE.md`,
+> root `README.md`, root `CHANGELOG.md`, and `docs/README.md`.
+
 產出日期：2026-06-06  
 目前 repo：`D:\project\VeriStockDB`  
 目前 HEAD：`201bf41` / `v0.3.3.1` / `main` / `origin/main`  
