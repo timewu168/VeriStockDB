@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 import config
 from api.routes import (
@@ -16,6 +19,7 @@ from api.routes import (
     events,
     health,
     info,
+    jobs,
     legal_investors,
     margin_trading,
     monthly_revenue,
@@ -49,8 +53,12 @@ def create_app() -> FastAPI:
     app.include_router(errors.router, prefix="/api/v1")
     app.include_router(events.router, prefix="/api/v1")
     app.include_router(ops.router, prefix="/api/v1")
+    app.include_router(jobs.router, prefix="/api/v1")
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    web_dir = Path(config.ROOT_DIR) / "web"
+    if web_dir.exists():
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
     return app
 
 

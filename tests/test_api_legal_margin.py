@@ -6,7 +6,7 @@ import unittest
 try:
     from fastapi import HTTPException
     from api.dataset_registry import list_datasets
-    from api.routes.datasets import dataset_status
+    from api.routes.datasets import dataset_status, datasets_status_summary
     from api.routes.day_trading import day_trading
     from api.routes.legal_investors import legal_investors
     from api.routes.margin_trading import margin_trading
@@ -15,6 +15,7 @@ except ModuleNotFoundError as exc:
     HTTPException = None
     list_datasets = None
     dataset_status = None
+    datasets_status_summary = None
     day_trading = None
     legal_investors = None
     margin_trading = None
@@ -160,6 +161,16 @@ class LegalMarginApiTests(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.detail["code"], "INVALID_DATE")
 
+    def test_datasets_status_summary_returns_all_supported_datasets(self) -> None:
+        body = datasets_status_summary(conn=self.conn)
+
+        rows = {row["dataset"]: row for row in body["data"]}
+        self.assertIn("legal_investor", rows)
+        self.assertIn("margin", rows)
+        self.assertIn("day_trading", rows)
+        self.assertIn("revenue", rows)
+        self.assertEqual(rows["revenue"]["latest_period"], "2026-05")
+
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
@@ -170,6 +181,39 @@ class LegalMarginApiTests(unittest.TestCase):
     def _create_schema(self, conn: sqlite3.Connection) -> None:
         conn.executescript(
             """
+            CREATE TABLE daily_close (
+              trade_date TEXT NOT NULL,
+              stock_id TEXT NOT NULL,
+              stock_name TEXT,
+              market TEXT NOT NULL,
+              open INTEGER,
+              high INTEGER,
+              low INTEGER,
+              close INTEGER,
+              volume INTEGER,
+              amount INTEGER,
+              transactions INTEGER,
+              PRIMARY KEY(trade_date, stock_id, market)
+            );
+            CREATE TABLE attention_notices (
+              trade_date TEXT NOT NULL,
+              market TEXT NOT NULL,
+              stock_id TEXT NOT NULL,
+              stock_name TEXT NOT NULL,
+              notice_text TEXT NOT NULL,
+              PRIMARY KEY(trade_date, market, stock_id)
+            );
+            CREATE TABLE disposal_notices (
+              trade_date TEXT NOT NULL,
+              market TEXT NOT NULL,
+              stock_id TEXT NOT NULL,
+              stock_name TEXT NOT NULL,
+              disposal_start_date TEXT NOT NULL,
+              disposal_end_date TEXT NOT NULL,
+              reason_text TEXT NOT NULL,
+              disposal_text TEXT NOT NULL,
+              PRIMARY KEY(trade_date, market, stock_id, disposal_start_date, disposal_end_date)
+            );
             CREATE TABLE legal_investors (
               trade_date TEXT NOT NULL,
               market TEXT NOT NULL,

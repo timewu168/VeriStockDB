@@ -10,6 +10,7 @@ try:
     from api.routes.disposal_notices import disposal_notices
     from api.routes.trading_days import trading_days
     from api.routes.batches import batches
+    from api.routes.datasets import dataset_status
     from api.routes.errors import errors
     from api.routes.events import events
 except ModuleNotFoundError as exc:
@@ -19,6 +20,7 @@ except ModuleNotFoundError as exc:
     disposal_notices = None
     trading_days = None
     batches = None
+    dataset_status = None
     errors = None
     events = None
     FASTAPI_IMPORT_ERROR = exc
@@ -100,6 +102,25 @@ class CoreApiTests(unittest.TestCase):
 
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.detail["code"], "INVALID_DATE")
+
+    def test_dataset_status_prefers_canonical_latest_period(self) -> None:
+        self.conn.execute(
+            "INSERT INTO import_batches(batch_id, dataset, market, period, status, row_count, checked_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "daily_close:reconcile:2026-06:5483",
+                "daily_close",
+                None,
+                "2026-06:5483",
+                "OK",
+                1,
+                "2026-06-30T00:00:00Z",
+            ),
+        )
+
+        body = dataset_status("daily_close", start=None, end=None, conn=self.conn)
+
+        self.assertEqual(body["data"]["latest_period"], "2026-06-15")
 
     def test_errors_reject_invalid_date_filter(self) -> None:
         with self.assertRaises(HTTPException) as cm:

@@ -33,6 +33,38 @@ def datasets(_: None = Depends(require_permission("read"))) -> dict:
     return success_response([_dataset_to_dict(dataset) for dataset in list_datasets()])
 
 
+@router.get("/datasets/status-summary")
+def datasets_status_summary(
+    _: None = Depends(require_permission("read")),
+    conn: sqlite3.Connection = Depends(read_only_connection),
+) -> dict:
+    rows = []
+    try:
+        for definition in list_datasets():
+            summary = _status_summary(conn, definition.dataset, None, None, None)
+            latest_period = _latest_period(conn, definition.dataset, None, None, None)
+            rows.append(
+                {
+                    "dataset": definition.dataset,
+                    "title": definition.title,
+                    "period_type": definition.period_type,
+                    "markets": list(definition.markets),
+                    "summary": summary,
+                    "latest_period": latest_period,
+                    "quality": _quality_from_summary(summary),
+                    "filters": {"from": None, "to": None, "market": None},
+                }
+            )
+    except sqlite3.Error as exc:
+        raise _api_error(
+            "DB_UNAVAILABLE",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "dataset status summary is not readable",
+            {"reason": str(exc)},
+        ) from exc
+    return success_response(rows)
+
+
 @router.get("/datasets/{dataset}/status")
 def dataset_status(
     dataset: str,
@@ -180,6 +212,9 @@ def _latest_period(
     end: str | None,
     market: str | None,
 ) -> str | None:
+    canonical_period = _latest_canonical_period(conn, dataset, start, end, market)
+    if canonical_period:
+        return canonical_period
     where, params = _batch_filters(dataset, start, end, market)
     row = conn.execute(
         f"""
@@ -189,9 +224,7 @@ def _latest_period(
         """,
         params,
     ).fetchone()
-    if row and row["latest_period"]:
-        return row["latest_period"]
-    return _latest_canonical_period(conn, dataset, start, end, market)
+    return row["latest_period"] if row and row["latest_period"] else None
 
 
 def _latest_canonical_period(

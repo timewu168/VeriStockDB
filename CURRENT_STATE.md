@@ -2,11 +2,14 @@
 
 ## Current Stage
 
-- Latest release target: `v0.4.7` production schedule state release.
-- Latest pushed release before this update: `v0.4.6`.
+- Latest release target: `v0.5.0` Local Management PWA MVP.
+- Latest pushed release before this update: `v0.4.7`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
+- Local Management PWA MVP is implemented under `web/` and served by FastAPI static mount at `/`.
+- PWA dataset status page includes manual update buttons backed by allow-listed job API commands.
+- Manual update job API is MVP only: one in-memory job registry, one active job at a time, no arbitrary command execution, and job history is lost on API restart.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -63,6 +66,15 @@
   - `PYTHONPYCACHEPREFIX=/tmp/veristockdb_pycache_047 python3 -m py_compile config.py`: OK.
   - `git diff --check`: OK.
   - Public/private path scan: no tracked private deployment paths or private service-account references.
+- Latest `v0.5.0` PWA/API validation on 2026-07-01:
+  - `.venv/bin/python -m unittest discover -s tests`: `104` tests OK.
+  - `.venv/bin/python -m py_compile api/deps.py tests/test_api_jobs.py`: OK.
+  - `git diff --check`: OK.
+  - HTTP smoke passed for `/`, `/manifest.webmanifest`, `/health`, `/api/v1/info`, `/api/v1/jobs?limit=5`, `/api/v1/datasets/revenue/status?from=2026-05&to=2026-05`.
+  - Dataset status summary returned OK latest periods for `daily_close`, `attention_notice`, `disposal_notice`, `legal_investor`, `margin`, `day_trading`, and `revenue`.
+  - Parallel API smoke across health, datasets, status summary, batches, errors, events, and jobs returned 200 without SQLite thread errors.
+- Accepted runtime fix: FastAPI read-only SQLite connections use `check_same_thread=False` to avoid random 500/503 failures caused by threadpool dependency enter/exit running in different threads.
+- Accepted UI smoke: user confirmed PWA no longer has the initial blocking modal and random dataset-status errors after the fix.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -87,6 +99,8 @@
 
 - Daily close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, and trading days are canonicalized in SQLite.
 - API date query parameters for daily datasets must use strict `YYYY-MM-DD`; monthly revenue uses strict `YYYY-MM`; compact dates such as `20260615` are rejected and are not used as DB values.
+- PWA data source is Local Truth API only. It must not parse CLI stdout, directly read SQLite, or execute arbitrary shell commands.
+- Manual PWA update commands are allow-listed to the existing `main.py update-*` commands for completed datasets only.
 - Close monthly reconciliation source:
   - TWSE: `STOCK_DAY?response=json&date={YYYYMM01}&stockNo={stock_id}`.
   - TPEX: `tradingStock?date={YYYY%2FMM%2F01}&code={stock_id}&response=json`.
@@ -120,7 +134,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.4.7`.
+- Current code version in `config.py`: `APP_VERSION=0.5.0`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, and `settings`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -129,10 +143,20 @@
 - `monthly_revenue` canonical key: `PRIMARY KEY (revenue_month, market, stock_id)`.
 - No SQLite schema migration is pending.
 - `v0.4.7` includes accepted day trading and monthly revenue production schedule state in documentation; no SQLite schema migration is pending.
+- `v0.5.0` PWA/API work does not change canonical SQLite schema.
 
 ## Modified Files
 
-- Tracked working tree after `v0.4.7` commit/tag/push should be clean.
+- `v0.5.0` working tree changes before commit/tag/push:
+  - `api/app.py`
+  - `api/deps.py`
+  - `api/routes/datasets.py`
+  - `api/routes/jobs.py`
+  - `config.py`
+  - `tests/test_api_core.py`
+  - `tests/test_api_legal_margin.py`
+  - `tests/test_api_jobs.py`
+  - `web/`
 - Current local untracked files/directories not intended for Git:
   - `.venv/`
   - `reports/`
@@ -141,7 +165,9 @@
 
 ## Next Gate
 
-- Current gate: observe the first production day trading timer run and the next monthly revenue timer run; verify logs, batch state, DB latest period, duplicate keys, and API status afterward.
+- Current gate: finalize `v0.5.0` by running tests, then commit/tag/push the Local Management PWA MVP.
+- After `v0.5.0`, next functional gate is `v0.5.1`: persistent job history, log tail/last error display, and fuller PWA query page.
+- Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 
 ## Locked Actions
@@ -153,6 +179,8 @@ Do not perform any of these without explicit user approval:
 - Re-import or overwrite canonical `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, or `margin_trading` rows.
 - Apply another schema/version bump.
 - Enable, disable, or modify production systemd schedules.
+- Add new PWA destructive actions or arbitrary command execution.
+- Add automatic retry/self-healing jobs before manual-update behavior is stable and explicitly accepted.
 - Move SQLite canonical truth to ClickHouse.
 - Create or overwrite ClickHouse tables.
 - Run ClickHouse backfill or production sync.
@@ -171,6 +199,8 @@ Before accepting any future DB-changing work:
 - Schema validation against `db/schema.sql` and actual SQLite `sqlite_master`.
 - Source coverage report/dry-run for the affected dataset must have `BAD=0`, `MISSING=0`, and `problems=0` unless explicitly accepted as a known gap.
 - API changes must include route/query validation checks, strict `YYYY-MM-DD` date validation for daily datasets, strict `YYYY-MM` validation for monthly datasets, field allow-list checks, pagination checks, quality rejection checks, and formal DB route-level smoke tests where applicable.
+- PWA/job API changes must verify allow-listed commands only, one active job at a time, token/ops permission handling, route-level error formats, and no arbitrary shell execution.
+- FastAPI SQLite access must be tested under concurrent requests; random 500/503 SQLite thread errors are release blockers.
 - Close monthly reconciliation checks must verify official JSON parseability, ROC date conversion, price cents conversion, TWSE volume exactness, TPEX lot-to-share conversion, and TPEX volume rounding tolerance.
 - If ClickHouse is touched later:
   - table count check
@@ -183,6 +213,7 @@ Before accepting any future DB-changing work:
 
 - Repo example path: `/opt/veristockdb/app`
 - Current state file: `/opt/veristockdb/app/CURRENT_STATE.md`
+- PWA static app example path: `/opt/veristockdb/app/web`
 - SQLite DB example path: `/opt/veristockdb/app/data/db/veristock.db`
 - Hot CSV root example: `/opt/veristockdb/app/data/csv`
 - Legal investor CSV root example: `/opt/veristockdb/app/data/csv/legal_investor`

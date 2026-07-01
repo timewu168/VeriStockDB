@@ -1,0 +1,17 @@
+{
+  "name": "VeriStockDB 真理資料庫",
+  "short_name": "VeriStockDB",
+  "description": "Local management PWA for VeriStockDB.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1412",
+  "theme_color": "#0f1412",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f1412" />
+    <title>VeriStockDB 真理資料庫</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主要導覽">
+        <div class="brand">
+          <div class="brand-mark">V</div>
+          <div>
+            <div class="brand-title">VeriStockDB</div>
+            <div class="brand-subtitle">真理資料庫</div>
+          </div>
+        </div>
+        <nav class="nav-list">
+          <button class="nav-item active" data-view="dashboard">總覽</button>
+          <button class="nav-item" data-view="datasets">資料集</button>
+          <button class="nav-item" data-view="batches">批次</button>
+          <button class="nav-item" data-view="events">錯誤事件</button>
+          <button class="nav-item" data-view="query">查詢</button>
+          <button class="nav-item" data-view="system">系統</button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="page-title">總覽</h1>
+            <p id="page-subtitle">本地真理資料庫狀態與排程更新摘要</p>
+          </div>
+          <div class="topbar-actions">
+            <span class="status-chip" id="api-status">API 檢查中</span>
+            <span class="status-chip" id="version-chip">v-</span>
+            <button class="icon-button" id="refresh-view" title="重新整理" aria-label="重新整理">↻</button>
+          </div>
+        </header>
+
+        <section class="view active" id="view-dashboard">
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>API</span>
+              <strong id="metric-api">檢查中</strong>
+              <small id="metric-api-detail">-</small>
+            </article>
+            <article class="metric-card">
+              <span>資料集</span>
+              <strong id="metric-datasets">-</strong>
+              <small>Local Truth API</small>
+            </article>
+            <article class="metric-card">
+              <span>最近錯誤</span>
+              <strong id="metric-errors">-</strong>
+              <small>import_errors</small>
+            </article>
+            <article class="metric-card">
+              <span>手動更新</span>
+              <strong id="metric-job">待命</strong>
+              <small id="metric-job-detail">single writer guard</small>
+            </article>
+          </div>
+
+          <div class="split-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>資料集健康摘要</h2>
+                <button class="text-button" data-jump="datasets">查看全部</button>
+              </div>
+              <div class="compact-list" id="dashboard-datasets"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>最近批次</h2>
+                <button class="text-button" data-jump="batches">查看批次</button>
+              </div>
+              <div class="compact-list" id="dashboard-batches"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-datasets">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>資料集狀態</h2>
+              <span class="muted">手動更新只執行 allowlist update 流程</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>資料集</th>
+                    <th>最新資料</th>
+                    <th>狀態</th>
+                    <th>問題批次</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="dataset-table"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-batches">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>批次紀錄</h2>
+              <button class="text-button" id="reload-batches">重新整理</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>期間</th>
+                    <th>資料集</th>
+                    <th>市場</th>
+                    <th>狀態</th>
+                    <th>筆數</th>
+                    <th>檢查時間</th>
+                  </tr>
+                </thead>
+                <tbody id="batch-table"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-events">
+          <div class="split-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Import Errors</h2>
+                <button class="text-button" id="reload-errors">重新整理</button>
+              </div>
+              <div class="compact-list" id="error-list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Data Events</h2>
+                <button class="text-button" id="reload-events">重新整理</button>
+              </div>
+              <div class="compact-list" id="event-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-query">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>查詢入口</h2>
+              <span class="muted">v0.5.0 先提供查詢骨架，完整資料表查詢下一版擴充</span>
+            </div>
+            <form class="query-form" id="query-form">
+              <label>
+                資料集
+                <select id="query-dataset">
+                  <option value="daily-close">Close</option>
+                  <option value="attention-notices">注意公告</option>
+                  <option value="disposal-notices">處置公告</option>
+                </select>
+              </label>
+              <label>
+                起日
+                <input id="query-from" type="date" />
+              </label>
+              <label>
+                迄日
+                <input id="query-to" type="date" />
+              </label>
+              <label>
+                股號
+                <input id="query-stock" placeholder="2330" />
+              </label>
+              <label>
+                市場
+                <select id="query-market">
+                  <option value="">全部</option>
+                  <option value="TWSE">TWSE</option>
+                  <option value="TPEX">TPEX</option>
+                </select>
+              </label>
+              <button class="primary-button" type="submit">查詢</button>
+            </form>
+            <pre class="result-box" id="query-result">尚未查詢</pre>
+          </section>
+        </section>
+
+        <section class="view" id="view-system">
+          <div class="split-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>系統資訊</h2>
+              </div>
+              <dl class="info-list" id="system-info"></dl>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>API Token</h2>
+              </div>
+              <div class="token-box">
+                <input id="api-token" type="password" placeholder="Bearer token，未啟用驗證可留空" />
+                <button class="text-button" id="save-token">儲存</button>
+              </div>
+              <p class="muted token-note">Token 只存於此瀏覽器 localStorage，不寫入 repo 或 DB。</p>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <nav class="bottom-nav" aria-label="手機導覽">
+      <button class="bottom-item active" data-view="dashboard">總覽</button>
+      <button class="bottom-item" data-view="datasets">資料集</button>
+      <button class="bottom-item" data-view="events">錯誤</button>
+      <button class="bottom-item" data-view="query">查詢</button>
+      <button class="bottom-item" data-view="system">系統</button>
+    </nav>
+
+    <div class="modal-backdrop" id="update-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="update-title">
+        <h2 id="update-title">手動更新資料集</h2>
+        <p id="update-message"></p>
+        <div class="modal-note">
+          這會重新抓官方資料並通過既有驗證流程後入庫。若官方資料仍異常，流程會阻擋並留下錯誤紀錄。
+        </div>
+        <div class="modal-actions">
+          <button class="text-button" id="cancel-update">取消</button>
+          <button class="primary-button" id="confirm-update">開始更新</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="job-drawer" id="job-drawer" hidden>
+      <div class="panel-head">
+        <h2>手動更新狀態</h2>
+        <button class="icon-button" id="close-job" aria-label="關閉">×</button>
+      </div>
+      <div id="job-detail" class="job-detail"></div>
+    </aside>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

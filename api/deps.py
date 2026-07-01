@@ -81,7 +81,11 @@ def _auth_error(code: str, http_status: int, message: str) -> HTTPException:
 def read_only_connection():
     path = config.DB_PATH
     try:
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        conn = sqlite3.connect(
+            f"file:{path}?mode=ro",
+            uri=True,
+            check_same_thread=False,
+        )
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
     except sqlite3.Error as exc:
