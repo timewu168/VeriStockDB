@@ -1,12 +1,13 @@
 # VeriStockDB 文件入口
 
-此目錄分成「目前有效文件」與「歷史封存文件」。下一輪 Codex、PM 或 worker 接手時，請先讀根目錄 `CURRENT_STATE.md`，再依任務讀本目錄的有效文件。
+此目錄只保留目前有效文件。下一輪 Codex、PM 或 worker 接手時，請先讀根目錄 `CURRENT_STATE.md`，再依任務讀本目錄的有效文件。
 
 ## 目前有效文件
 
 - `../CURRENT_STATE.md`：唯一的下一輪接手狀態摘要。
 - `../README.md`：對外專案說明、CLI、API、PWA、資料來源與部署概覽。
 - `../CHANGELOG.md`：唯一正式版本紀錄；舊 handoff 內的 `CHANGELOG.md` 不再作為 release history。
+- `project_completion_inventory.md`：專案完成度總盤點，供 PM 或整合 owner 評估接入其他專案/服務。
 - `local_truth_api_spec.md`：Local Truth API 契約。
 - `version_roadmap_checklist.md`：版本路線、完成條件與 deferred 工作。
 - `data_ingestion_global_policy.md`：資料入庫防禦與驗證原則。
@@ -21,9 +22,9 @@
 
 ## 歷史封存文件
 
-- `pm_handoff/`：舊版交接包與規劃資料，只作歷史參考。
+舊版 `pm_handoff/` 交接包已移出 repo 工作樹，保留於冷封存區，只作歷史參考。
 
-`pm_handoff/` 內文件可能描述舊版本、舊路徑、已完成或已改變的規劃。不得用它取代 `CURRENT_STATE.md`、根目錄 `README.md` 或根目錄 `CHANGELOG.md`。
+舊交接包內文件可能描述舊版本、舊路徑、已完成或已改變的規劃。不得用它取代 `CURRENT_STATE.md`、根目錄 `README.md` 或根目錄 `CHANGELOG.md`。
 
 ## 判讀優先順序
 
@@ -33,4 +34,4 @@
 4. `docs/local_truth_api_spec.md`
 5. `docs/version_roadmap_checklist.md`
 6. 其他 `docs/` 目前有效文件
-7. `docs/pm_handoff/` 歷史封存文件
+7. 冷封存區中的舊交接包，只在追溯歷史決策時使用
