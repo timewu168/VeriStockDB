@@ -6,6 +6,7 @@ import unittest
 try:
     from fastapi import HTTPException
     from api.dataset_registry import list_datasets
+    from api.routes.datasets import dataset_status
     from api.routes.day_trading import day_trading
     from api.routes.legal_investors import legal_investors
     from api.routes.margin_trading import margin_trading
@@ -13,6 +14,7 @@ try:
 except ModuleNotFoundError as exc:
     HTTPException = None
     list_datasets = None
+    dataset_status = None
     day_trading = None
     legal_investors = None
     margin_trading = None
@@ -139,6 +141,24 @@ class LegalMarginApiTests(unittest.TestCase):
         self.assertIn("margin", datasets)
         self.assertIn("day_trading", datasets)
         self.assertIn("revenue", datasets)
+
+    def test_revenue_dataset_status_falls_back_to_canonical_table(self) -> None:
+        body = dataset_status(
+            "revenue",
+            start="2026-05",
+            end="2026-05",
+            conn=self.conn,
+        )
+
+        self.assertEqual(body["data"]["latest_period"], "2026-05")
+        self.assertEqual(body["data"]["period_type"], "month")
+
+    def test_revenue_dataset_status_rejects_compact_month(self) -> None:
+        with self.assertRaises(HTTPException) as cm:
+            dataset_status("revenue", start="202605", end="2026-05", conn=self.conn)
+
+        self.assertEqual(cm.exception.status_code, 400)
+        self.assertEqual(cm.exception.detail["code"], "INVALID_DATE")
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(":memory:")

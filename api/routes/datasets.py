@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import date
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -16,6 +17,15 @@ router = APIRouter(tags=["datasets"])
 
 STATUS_VALUES = ("OK", "FIXED", "BLOCKED", "RECHECK", "MISSING")
 PROBLEM_STATUS_VALUES = ("BLOCKED", "RECHECK", "MISSING")
+CANONICAL_PERIOD_COLUMNS = {
+    config.DATASET_DAILY_CLOSE: ("daily_close", "trade_date"),
+    config.DATASET_ATTENTION_NOTICE: ("attention_notices", "trade_date"),
+    config.DATASET_DISPOSAL_NOTICE: ("disposal_notices", "trade_date"),
+    config.DATASET_LEGAL_INVESTOR: ("legal_investors", "trade_date"),
+    config.DATASET_MARGIN: ("margin_trading", "trade_date"),
+    config.DATASET_DAY_TRADING: ("day_trading", "trade_date"),
+    config.DATASET_REVENUE: ("monthly_revenue", "revenue_month"),
+}
 
 
 @router.get("/datasets")
@@ -97,6 +107,16 @@ def _validate_filters(
                 "from must not be later than to",
                 {"from": start, "to": end},
             )
+    elif period_type == "month":
+        parsed_start = _validate_month_filter("from", start)
+        parsed_end = _validate_month_filter("to", end)
+        if parsed_start and parsed_end and parsed_start > parsed_end:
+            raise _api_error(
+                "INVALID_DATE",
+                status.HTTP_400_BAD_REQUEST,
+                "from must not be later than to",
+                {"from": start, "to": end},
+            )
     else:
         parsed_start = start
         parsed_end = end
@@ -115,6 +135,19 @@ def _validate_date_filter(name: str, value: str | None) -> str | None:
             f"{name} must use YYYY-MM-DD",
             {name: value},
         ) from exc
+
+
+def _validate_month_filter(name: str, value: str | None) -> str | None:
+    if value is None:
+        return None
+    if not re.fullmatch(r"20\d{2}-(0[1-9]|1[0-2])", value):
+        raise _api_error(
+            "INVALID_DATE",
+            status.HTTP_400_BAD_REQUEST,
+            f"{name} must use YYYY-MM",
+            {name: value},
+        )
+    return value
 
 
 def _status_summary(
@@ -154,6 +187,38 @@ def _latest_period(
         FROM import_batches
         WHERE {where}
         """,
+        params,
+    ).fetchone()
+    if row and row["latest_period"]:
+        return row["latest_period"]
+    return _latest_canonical_period(conn, dataset, start, end, market)
+
+
+def _latest_canonical_period(
+    conn: sqlite3.Connection,
+    dataset: str,
+    start: str | None,
+    end: str | None,
+    market: str | None,
+) -> str | None:
+    scope = CANONICAL_PERIOD_COLUMNS.get(dataset)
+    if scope is None:
+        return None
+    table, period_column = scope
+    clauses: list[str] = []
+    params: list[str] = []
+    if start:
+        clauses.append(f"{period_column} >= ?")
+        params.append(start)
+    if end:
+        clauses.append(f"{period_column} <= ?")
+        params.append(end)
+    if market:
+        clauses.append("market = ?")
+        params.append(market)
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    row = conn.execute(
+        f"SELECT MAX({period_column}) AS latest_period FROM {table} {where}",
         params,
     ).fetchone()
     return row["latest_period"] if row and row["latest_period"] else None

@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.4.6 - 2026-07-01
+
+### Changed
+
+- Added canonical-table fallback for dataset `latest_period` status when a dataset has accepted rows but no `import_batches` rows for the queried scope.
+- Added strict `YYYY-MM` validation for month-type dataset status filters.
+
+### Verified
+
+- `GET /api/v1/datasets/revenue/status?from=2026-05&to=2026-05` returns `latest_period=2026-05`.
+- `GET /api/v1/datasets/day_trading/status?from=2026-06-30&to=2026-06-30` returns `latest_period=2026-06-30`.
+- FastAPI route tests passed in the project virtualenv: 97 tests OK.
+- System Python unit tests passed: 97 tests OK, 15 skipped.
+- Diff whitespace check passed.
+
 ## v0.4.5 - 2026-07-01
 
 ### Added
