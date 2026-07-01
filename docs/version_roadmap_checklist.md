@@ -1,6 +1,6 @@
 # VeriStockDB 版本路線與檢查清單
 
-狀態：已對齊 `v0.6.2` 實際完成範圍。
+狀態：已對齊 `v0.6.3` 實際完成範圍。
 
 更新日期：2026-07-01
 
@@ -53,6 +53,7 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 | `v0.6.0` | PWA 資料健康 drill-down | 完成 |
 | `v0.6.1` | 排程健康報表 | 完成 |
 | `v0.6.2` | 文件邊界整理 | 完成 |
+| `v0.6.3` | 備份/還原演練文件 | 完成 |
 
 ## 目前已接受的 canonical datasets
 
@@ -169,13 +170,21 @@ Deferred：
 
 目標：確保 DB 出問題時能依照 SOP 回復。
 
-候選項目：
+範圍：
 
 - 停服務流程。
 - 保留事故當下 DB。
 - 指定 backup restore。
 - `PRAGMA integrity_check` 驗證。
 - row count / latest period smoke check。
+
+完成條件：
+
+- [x] 補 DB restore SOP。
+- [x] 使用 `/tmp` restore copy 做非破壞性驗證。
+- [x] backup integrity check 通過。
+- [x] row count / latest period 與正式 DB 一致。
+- [x] restore copy 驗證後移除。
 
 ### v0.6.4：全資料集健康檢查
 
@@ -201,10 +210,10 @@ Deferred：
 
 ## 目前下一步
 
-目前 `v0.6.2` 文件邊界整理完成。
+目前 `v0.6.3` 備份/還原演練文件完成。
 
 後續功能 gate：
 
-1. 進入 `v0.6.3` 備份/還原演練文件。
-2. 完成 DB restore SOP 與一次非破壞性驗證。
+1. 進入 `v0.6.4` 全資料集健康檢查。
+2. 補 row count、duplicate key、latest date/month、gap count、recent non-OK batches、recent errors/events 的一鍵報表。
 3. 更新 `CURRENT_STATE.md`、`CHANGELOG.md`、README 或相關 docs。

@@ -12,6 +12,7 @@
 - `data_ingestion_global_policy.md`：資料入庫防禦與驗證原則。
 - `URL.txt`：官方資料來源 URL 參考。
 - `ubuntu_private_deployment.md`：私有部署範例與 systemd 設定參考。
+- `backup_restore_sop.md`：SQLite DB backup/restore SOP 與最新演練結果。
 - `telegram_notification_spec.md`：Telegram 通知規格。
 - `pwa_cli_i18n_boundary_note.md`：PWA、CLI、i18n 邊界。
 - `close_monthly_reconciliation_backlog.md`：Close 月資料對帳後續事項。

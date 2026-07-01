@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Latest release target: `v0.6.2` documentation boundary cleanup.
-- Latest pushed release before this update: `v0.6.1`.
+- Latest release target: `v0.6.3` backup/restore drill SOP.
+- Latest pushed release before this update: `v0.6.2`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
@@ -15,6 +15,7 @@
 - `v0.6.0` adds a read-only dataset health endpoint and PWA dataset drill-down for latest period, quality, recent batches, problem batches, recent errors, recent events, and recent jobs.
 - `v0.6.1` adds schedule health reporting for production update timers, recent log tail markers, and dataset freshness.
 - `v0.6.2` marks `docs/pm_handoff/` as historical archive and adds `docs/README.md` as the documentation entry point.
+- `v0.6.3` adds DB backup/restore SOP and validates a non-destructive restore drill from latest backup.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -108,6 +109,13 @@
   - `CURRENT_STATE.md` remains the handoff state summary.
   - `docs/README.md` documents current/archived documentation boundaries.
   - `docs/pm_handoff/` is marked as historical archive only.
+- `v0.6.3` restore drill accepted on 2026-07-01:
+  - initial `veristock_latest_backup.db` was readable and integrity `ok` but stale to `2026-06-30` and missing `monthly_revenue`/`ops_jobs`.
+  - timestamp backup created: `$VERISTOCK_BACKUP_DIR/veristock_restore_drill_v063_20260701_212107.db`.
+  - `veristock_latest_backup.db` rebuilt from current DB.
+  - latest backup restore copy `/tmp/veristock_restore_drill_v063_latest.db` returned `PRAGMA integrity_check=ok`.
+  - restore copy row counts/latest periods matched current DB for daily close, attention, disposal, legal investors, margin, day trading, monthly revenue, trading days, and ops jobs.
+  - restore copy was removed after verification.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -167,7 +175,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.6.2`.
+- Current code version in `config.py`: `APP_VERSION=0.6.3`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -182,17 +190,13 @@
 
 ## Modified Files
 
-- `v0.6.2` working tree changes before commit:
+- `v0.6.3` working tree changes before commit:
   - `CURRENT_STATE.md`
   - `CHANGELOG.md`
   - `README.md`
   - `config.py`
   - `docs/README.md`
-  - `docs/pm_handoff/ARCHIVE_NOTICE.md`
-  - `docs/pm_handoff/README.md`
-  - `docs/pm_handoff/pm_handoff/PROJECT_HANDOFF.md`
-  - `docs/pm_handoff/pm_handoff/PROJECT_REVIEW_CHECKLIST.md`
-  - `docs/pm_handoff/pm_handoff/PROJECT_TASKS.md`
+  - `docs/backup_restore_sop.md`
   - `docs/version_roadmap_checklist.md`
 
 Previously committed `v0.5.1` files:
@@ -216,8 +220,8 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: validate `v0.6.2` documentation boundary cleanup and release with commit/tag/push after user approval.
-- After `v0.6.2`, next planned `v0.6.x` item is `v0.6.3` backup/restore drill SOP and verification unless reprioritized.
+- Current gate: validate `v0.6.3` backup/restore drill SOP and release with commit/tag/push after user approval.
+- After `v0.6.3`, next planned `v0.6.x` item is `v0.6.4` all-dataset health check unless reprioritized.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 
@@ -272,6 +276,7 @@ Before accepting any future DB-changing work:
 - Reports root example: `/opt/veristockdb/app/reports`
 - Logs example path: `/var/log/veristockdb`
 - Backup root example: `/mnt/veristockdb-cold/veristockdb/backup`
+- Latest verified backup on 2026-07-01: `$VERISTOCK_BACKUP_DIR/veristock_latest_backup.db`, bytes `4383870976`, restore-copy integrity `ok`.
 - Archive root example: `/mnt/veristockdb-cold/veristockdb/archive`
 - Legal investor service/timer examples:
   - `/etc/systemd/system/veristockdb-update-legal.service`

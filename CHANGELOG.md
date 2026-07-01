@@ -1,5 +1,26 @@
 # 版本紀錄
 
+## v0.6.3 - 2026-07-01
+
+### 新增
+
+- 新增 `docs/backup_restore_sop.md`，明確記錄 DB restore SOP：停服務、保留事故 DB、選擇 backup、`/tmp` restore drill、integrity check、row count/latest period smoke、正式 restore、恢復服務。
+- 在 `docs/README.md` 補入 backup/restore SOP 文件入口。
+
+### 變更
+
+- 將 app version bump 至 `0.6.3`。
+- 更新 `veristock_latest_backup.db`，修正原 latest backup 落後且缺 `monthly_revenue`、`ops_jobs` 的問題。
+
+### 驗證
+
+- 建立時間戳備份 `$VERISTOCK_BACKUP_DIR/veristock_restore_drill_v063_20260701_212107.db`。
+- 重建 `$VERISTOCK_BACKUP_DIR/veristock_latest_backup.db`，bytes `4383870976`。
+- 將 latest backup 複製到 `/tmp/veristock_restore_drill_v063_latest.db` 做非破壞性 restore drill。
+- restore copy `PRAGMA integrity_check` 回傳 `ok`。
+- restore copy 的核心 row count 與 latest period 已與正式 DB 一致。
+- restore copy 已刪除。
+
 ## v0.6.2 - 2026-07-01
 
 ### 新增
