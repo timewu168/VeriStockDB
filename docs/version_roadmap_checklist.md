@@ -1,6 +1,6 @@
 # VeriStockDB 版本路線與檢查清單
 
-狀態：已對齊 `v0.6.3` 實際完成範圍。
+狀態：已對齊 `v0.6.4` 實際完成範圍。
 
 更新日期：2026-07-01
 
@@ -54,6 +54,7 @@ VeriStockDB 的版本推進順序以「資料可信度」優先：
 | `v0.6.1` | 排程健康報表 | 完成 |
 | `v0.6.2` | 文件邊界整理 | 完成 |
 | `v0.6.3` | 備份/還原演練文件 | 完成 |
+| `v0.6.4` | 新增資料表 SOP | 完成 |
 
 ## 目前已接受的 canonical datasets
 
@@ -186,7 +187,35 @@ Deferred：
 - [x] row count / latest period 與正式 DB 一致。
 - [x] restore copy 驗證後移除。
 
-### v0.6.4：全資料集健康檢查
+### v0.6.4：新增資料表 SOP
+
+目標：把未來新增官方資料表時要做的動作固定成流程，避免隔一段時間後重新摸索下載、驗證、入庫、排程、API 與 PWA 接入規則。
+
+範圍：
+
+- 官方來源與歷史格式盤點。
+- 下載器設計與原始檔留存。
+- inspect 工具。
+- 欄位對應表。
+- 日期/期間驗證。
+- parser/cleaner 與測試。
+- schema 設計。
+- dry-run 與全量驗證。
+- 正式入庫。
+- update 命令。
+- 排程。
+- API。
+- PWA。
+- 文件、發版與交接。
+
+完成條件：
+
+- [x] 新增 `docs/new_dataset_sop.md`。
+- [x] SOP 明確列出 destructive DB operation、schema migration、production timer change 必須另行授權。
+- [x] SOP 明確要求日期驗證、欄位驗證、全量驗證、dry-run、入庫後 DB checks。
+- [x] SOP 明確要求新增資料集接入 API、PWA、文件、CHANGELOG 與 release checklist。
+
+### v0.6.5：全資料集健康檢查
 
 目標：一次檢查所有 canonical datasets。
 
@@ -210,10 +239,10 @@ Deferred：
 
 ## 目前下一步
 
-目前 `v0.6.3` 備份/還原演練文件完成。
+目前 `v0.6.4` 新增資料表 SOP 完成。
 
 後續功能 gate：
 
-1. 進入 `v0.6.4` 全資料集健康檢查。
+1. 進入 `v0.6.5` 全資料集健康檢查。
 2. 補 row count、duplicate key、latest date/month、gap count、recent non-OK batches、recent errors/events 的一鍵報表。
 3. 更新 `CURRENT_STATE.md`、`CHANGELOG.md`、README 或相關 docs。

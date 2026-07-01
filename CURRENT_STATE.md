@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Latest release target: `v0.6.3` backup/restore drill SOP.
-- Latest pushed release before this update: `v0.6.2`.
+- Latest release target: `v0.6.4` new dataset SOP.
+- Latest pushed release before this update: `v0.6.3`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
@@ -16,6 +16,7 @@
 - `v0.6.1` adds schedule health reporting for production update timers, recent log tail markers, and dataset freshness.
 - `v0.6.2` marks `docs/pm_handoff/` as historical archive and adds `docs/README.md` as the documentation entry point.
 - `v0.6.3` adds DB backup/restore SOP and validates a non-destructive restore drill from latest backup.
+- `v0.6.4` adds `docs/new_dataset_sop.md` for future dataset additions from source discovery through PWA/API/release.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -116,6 +117,9 @@
   - latest backup restore copy `/tmp/veristock_restore_drill_v063_latest.db` returned `PRAGMA integrity_check=ok`.
   - restore copy row counts/latest periods matched current DB for daily close, attention, disposal, legal investors, margin, day trading, monthly revenue, trading days, and ops jobs.
   - restore copy was removed after verification.
+- `v0.6.4` documentation baseline accepted:
+  - `docs/new_dataset_sop.md` defines the required future dataset flow: source discovery, downloader, inspect, field mapping, date/period validation, parser/cleaner, schema, dry-run, full validation, formal import, update command, schedule, API, PWA, docs, release, and handoff.
+  - all-dataset health check was intentionally moved to `v0.6.5`.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -175,7 +179,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.6.3`.
+- Current code version in `config.py`: `APP_VERSION=0.6.4`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -190,13 +194,13 @@
 
 ## Modified Files
 
-- `v0.6.3` working tree changes before commit:
+- `v0.6.4` working tree changes before commit:
   - `CURRENT_STATE.md`
   - `CHANGELOG.md`
   - `README.md`
   - `config.py`
   - `docs/README.md`
-  - `docs/backup_restore_sop.md`
+  - `docs/new_dataset_sop.md`
   - `docs/version_roadmap_checklist.md`
 
 Previously committed `v0.5.1` files:
@@ -220,8 +224,8 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: validate `v0.6.3` backup/restore drill SOP and release with commit/tag/push after user approval.
-- After `v0.6.3`, next planned `v0.6.x` item is `v0.6.4` all-dataset health check unless reprioritized.
+- Current gate: validate `v0.6.4` new dataset SOP and release with commit/tag/push after user approval.
+- After `v0.6.4`, next planned `v0.6.x` item is `v0.6.5` all-dataset health check.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 
@@ -255,6 +259,7 @@ Before accepting any future DB-changing work:
 - Source coverage report/dry-run for the affected dataset must have `BAD=0`, `MISSING=0`, and `problems=0` unless explicitly accepted as a known gap.
 - API changes must include route/query validation checks, strict `YYYY-MM-DD` date validation for daily datasets, strict `YYYY-MM` validation for monthly datasets, field allow-list checks, pagination checks, quality rejection checks, and formal DB route-level smoke tests where applicable.
 - PWA/job API changes must verify allow-listed commands only, one active job at a time, token/ops permission handling, route-level error formats, and no arbitrary shell execution.
+- Future new datasets must follow `docs/new_dataset_sop.md` before being accepted into canonical SQLite.
 - FastAPI SQLite access must be tested under concurrent requests; random 500/503 SQLite thread errors are release blockers.
 - Close monthly reconciliation checks must verify official JSON parseability, ROC date conversion, price cents conversion, TWSE volume exactness, TPEX lot-to-share conversion, and TPEX volume rounding tolerance.
 - If ClickHouse is touched later:

@@ -1,6 +1,6 @@
 # VeriStockDB
 
-Version: v0.6.3
+Version: v0.6.4
 
 VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
@@ -263,6 +263,7 @@ PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command�
 - `CURRENT_STATE.md` 是下一輪 Codex/PM/worker 接手的唯一狀態摘要。
 - `CHANGELOG.md` 是唯一正式版本紀錄。
 - `docs/README.md` 是文件入口與判讀優先順序。
+- `docs/new_dataset_sop.md` 是未來新增官方資料表時的標準流程。
 - `docs/pm_handoff/` 是舊版 handoff/archive，只作歷史參考，不可視為目前狀態來源。
 
 ## Paths
@@ -308,4 +309,4 @@ PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command�
 ## Deferred Work
 
 - `v0.4.0 public-preview` release gate 已完成；後續新增資料集仍需重新通過 DB/API/docs/repo safety gate。
-- 月營收尚未啟用正式 systemd 排程。
+- 全資料集健康檢查一鍵報表移至 `v0.6.5`。

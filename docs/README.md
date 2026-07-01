@@ -10,6 +10,7 @@
 - `local_truth_api_spec.md`：Local Truth API 契約。
 - `version_roadmap_checklist.md`：版本路線、完成條件與 deferred 工作。
 - `data_ingestion_global_policy.md`：資料入庫防禦與驗證原則。
+- `new_dataset_sop.md`：未來新增官方資料表時，從爬蟲、驗證、入庫、排程、API 到 PWA 的標準流程。
 - `URL.txt`：官方資料來源 URL 參考。
 - `ubuntu_private_deployment.md`：私有部署範例與 systemd 設定參考。
 - `backup_restore_sop.md`：SQLite DB backup/restore SOP 與最新演練結果。
