@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.4.3"
-SCHEMA_VERSION = "0.3-margin-trading"
+APP_VERSION = "0.4.4"
+SCHEMA_VERSION = "0.4-day-trading"
 
 
 def _path_from_env(name: str, default: Path) -> Path:
@@ -51,6 +51,8 @@ DATASET_ATTENTION_NOTICE = "attention_notice"
 DATASET_DISPOSAL_NOTICE = "disposal_notice"
 DATASET_LEGAL_INVESTOR = "legal_investor"
 DATASET_MARGIN = "margin"
+DATASET_DAY_TRADING = "day_trading"
+DATASET_REVENUE = "revenue"
 MARKETS = ("TWSE", "TPEX")
 
 API_HOST = os.environ.get("VERISTOCK_API_HOST", "127.0.0.1")
@@ -127,6 +129,25 @@ URL_TPEX_MARGIN_BALANCE = (
     "https://www.tpex.org.tw/www/zh-tw/margin/balance"
     "?date={date_url}&id=&response=csv"
 )
+URL_TWSE_DAY_TRADING = (
+    "https://www.twse.com.tw/rwd/zh/dayTrading/TWTB4U"
+    "?date={date_yyyymmdd}&selectType=All&response=csv"
+)
+URL_TPEX_DAY_TRADING = (
+    "https://www.tpex.org.tw/www/zh-tw/intraday/stat"
+    "?type=Daily&date={date_url}&id=&response=csv"
+)
+URL_TWSE_REVENUE = (
+    "https://mopsov.twse.com.tw/server-java/FileDownLoad"
+    "?step=9&functionName=show_file2&filePath=%2Ft21%2Fsii%2F"
+    "&fileName=t21sc03_{roc_month}.csv"
+)
+URL_TPEX_REVENUE = (
+    "https://mopsov.twse.com.tw/server-java/FileDownLoad"
+    "?step=9&functionName=show_file2&filePath=%2Ft21%2Fotc%2F"
+    "&fileName=t21sc03_{roc_month}.csv"
+)
+URL_MOPS_REVENUE_REFERER = "https://mops.twse.com.tw/mops/web/t21sc03_bootstrap"
 URL_TWSE_DISPOSAL_NOTICE = (
     "https://www.twse.com.tw/rwd/zh/announcement/punish"
     "?response=csv&startDate={start_date_yyyymmdd}&endDate={end_date_yyyymmdd}"

@@ -50,6 +50,13 @@ SUPPORTED_DATASETS = {
         markets=config.MARKETS,
         status_endpoint=f"/api/v1/datasets/{config.DATASET_MARGIN}/status",
     ),
+    config.DATASET_DAY_TRADING: DatasetDefinition(
+        dataset=config.DATASET_DAY_TRADING,
+        title="Day Trading",
+        period_type="date",
+        markets=config.MARKETS,
+        status_endpoint=f"/api/v1/datasets/{config.DATASET_DAY_TRADING}/status",
+    ),
 }
 
 

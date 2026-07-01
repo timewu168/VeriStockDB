@@ -6,11 +6,13 @@ import unittest
 try:
     from fastapi import HTTPException
     from api.dataset_registry import list_datasets
+    from api.routes.day_trading import day_trading
     from api.routes.legal_investors import legal_investors
     from api.routes.margin_trading import margin_trading
 except ModuleNotFoundError as exc:
     HTTPException = None
     list_datasets = None
+    day_trading = None
     legal_investors = None
     margin_trading = None
     FASTAPI_IMPORT_ERROR = exc
@@ -63,6 +65,29 @@ class LegalMarginApiTests(unittest.TestCase):
         self.assertTrue(body["meta"]["pagination"]["has_more"])
         self.assertEqual(body["data"][0]["stock_id"], "5483")
 
+    def test_day_trading_query_fields_and_pagination(self) -> None:
+        body = day_trading(
+            start="2026-06-30",
+            end="2026-06-30",
+            stock_ids="2330,5483",
+            fields="trade_date,market,stock_id,day_trade_volume,day_trade_buy_amount",
+            limit=1,
+            conn=self.conn,
+        )
+        self.assertTrue(body["ok"])
+        self.assertEqual(len(body["data"]), 1)
+        self.assertTrue(body["meta"]["pagination"]["has_more"])
+        self.assertEqual(
+            body["data"][0],
+            {
+                "trade_date": "2026-06-30",
+                "market": "TPEX",
+                "stock_id": "5483",
+                "day_trade_volume": 2000,
+                "day_trade_buy_amount": 100000,
+            },
+        )
+
     def test_quality_rejected_for_problem_batch(self) -> None:
         self.conn.execute(
             "UPDATE import_batches SET status = 'RECHECK', error_summary = 'sample issue' "
@@ -84,6 +109,7 @@ class LegalMarginApiTests(unittest.TestCase):
         datasets = {row.dataset for row in list_datasets()}
         self.assertIn("legal_investor", datasets)
         self.assertIn("margin", datasets)
+        self.assertIn("day_trading", datasets)
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(":memory:")
@@ -133,6 +159,17 @@ class LegalMarginApiTests(unittest.TestCase):
               short_limit INTEGER NOT NULL,
               offsetting INTEGER NOT NULL,
               note TEXT NOT NULL DEFAULT '',
+              PRIMARY KEY (trade_date, market, stock_id)
+            );
+            CREATE TABLE day_trading (
+              trade_date TEXT NOT NULL,
+              market TEXT NOT NULL,
+              stock_id TEXT NOT NULL,
+              stock_name TEXT NOT NULL,
+              suspend_sell_note TEXT,
+              day_trade_volume INTEGER NOT NULL,
+              day_trade_buy_amount INTEGER NOT NULL,
+              day_trade_sell_amount INTEGER NOT NULL,
               PRIMARY KEY (trade_date, market, stock_id)
             );
             CREATE TABLE import_batches (
@@ -224,10 +261,38 @@ class LegalMarginApiTests(unittest.TestCase):
                 "X",
             ),
         )
+        conn.execute(
+            "INSERT INTO day_trading VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "2026-06-30",
+                "TWSE",
+                "2330",
+                "台積電",
+                None,
+                1000,
+                500000,
+                501000,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO day_trading VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "2026-06-30",
+                "TPEX",
+                "5483",
+                "中美晶",
+                "Y",
+                2000,
+                100000,
+                101000,
+            ),
+        )
         batches = [
             ("legal_investor:TWSE:2026-06-15", "legal_investor", "TWSE", "2026-06-15", "OK", 1),
             ("margin:TWSE:2026-06-15", "margin", "TWSE", "2026-06-15", "OK", 1),
             ("margin:TPEX:2026-06-15", "margin", "TPEX", "2026-06-15", "OK", 1),
+            ("day_trading:TWSE:2026-06-30", "day_trading", "TWSE", "2026-06-30", "OK", 1),
+            ("day_trading:TPEX:2026-06-30", "day_trading", "TPEX", "2026-06-30", "OK", 1),
         ]
         for batch in batches:
             conn.execute(

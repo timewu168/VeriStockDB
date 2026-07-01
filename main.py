@@ -11,8 +11,10 @@ from db import connection as db_connection
 from ingest import attention_notice
 from ingest import close_importer
 from ingest import disposal_notice
+from ingest import day_trading
 from ingest import legal_investor
 from ingest import margin
+from ingest import revenue
 from ingest.downloader import CooldownController
 from ingest import trading_calendar
 from ingest.trading_calendar import validate_iso_date
@@ -103,6 +105,52 @@ def build_parser() -> argparse.ArgumentParser:
     download_margin.add_argument("--market", choices=config.MARKETS)
     download_margin.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
     download_margin.add_argument("--overwrite", action="store_true", help="redownload and overwrite existing margin CSV files")
+
+    download_day_trading = subparsers.add_parser(
+        "download-day-trading", help="download official day-trading CSV files without importing"
+    )
+    download_day_trading.add_argument("--date", help="target date YYYY-MM-DD")
+    download_day_trading.add_argument("--from", dest="start", help="range start YYYY-MM-DD")
+    download_day_trading.add_argument("--to", dest="end", help="range end YYYY-MM-DD")
+    download_day_trading.add_argument("--market", choices=config.MARKETS)
+    download_day_trading.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+    download_day_trading.add_argument("--overwrite", action="store_true", help="redownload and overwrite existing day-trading CSV files")
+
+    download_revenue = subparsers.add_parser(
+        "download-revenue", help="download official monthly revenue CSV files without importing"
+    )
+    download_revenue.add_argument("--month", help="target data month YYYY-MM")
+    download_revenue.add_argument("--from", dest="start", help="range start month YYYY-MM")
+    download_revenue.add_argument("--to", dest="end", help="range end month YYYY-MM, default latest published month")
+    download_revenue.add_argument("--market", choices=config.MARKETS)
+    download_revenue.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+    download_revenue.add_argument("--overwrite", action="store_true", help="redownload and overwrite existing revenue CSV files")
+
+    inspect_day_trading = subparsers.add_parser(
+        "inspect-day-trading", help="inspect local day-trading CSV files without importing"
+    )
+    inspect_day_trading.add_argument("--file", help="single local day-trading CSV file")
+    inspect_day_trading.add_argument("--market", choices=config.MARKETS)
+    inspect_day_trading.add_argument("--date", help="inspect standard saved CSV for YYYY-MM-DD")
+    inspect_day_trading.add_argument("--sample-size", type=int, default=3, help="sample rows to print, default 3")
+
+    import_day_trading = subparsers.add_parser(
+        "import-day-trading", help="dry-run or import day-trading CSV normalization"
+    )
+    import_day_trading_mode = import_day_trading.add_mutually_exclusive_group(required=True)
+    import_day_trading_mode.add_argument("--dry-run", action="store_true", help="parse and validate only")
+    import_day_trading_mode.add_argument("--execute", action="store_true", help="write parsed rows to SQLite after dry-run validation")
+    import_day_trading.add_argument("--from", dest="start", required=True, help="range start YYYY-MM-DD")
+    import_day_trading.add_argument("--to", dest="end", required=True, help="range end YYYY-MM-DD")
+    import_day_trading.add_argument("--market", choices=config.MARKETS)
+    import_day_trading.add_argument("--report-dir", default=str(config.ROOT_DIR / "reports"))
+
+    update_day_trading = subparsers.add_parser(
+        "update-day-trading", help="update missing day-trading open dates through the target date without overwriting existing rows"
+    )
+    update_day_trading.add_argument("--date", help="target date YYYY-MM-DD, default today")
+    update_day_trading.add_argument("--market", choices=config.MARKETS)
+    update_day_trading.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
 
     inspect_margin = subparsers.add_parser(
         "inspect-margin", help="inspect downloaded margin trading CSV files without importing"
@@ -350,6 +398,30 @@ def main(argv: list[str] | None = None) -> int:
             finally:
                 conn.close()
             return _cmd_download_margin_from_dates(args, start, end, markets, open_dates)
+        if args.command == "download-day-trading":
+            db_connection.init_db(db_path)
+            conn = db_connection.connect(db_path)
+            try:
+                start, end, markets, open_dates = _prepare_day_trading_download(conn, args)
+            finally:
+                conn.close()
+            return _cmd_download_day_trading_from_dates(args, start, end, markets, open_dates)
+        if args.command == "download-revenue":
+            return _cmd_download_revenue(args)
+        if args.command == "inspect-day-trading":
+            return _cmd_inspect_day_trading(args)
+        if args.command == "import-day-trading":
+            db_connection.init_db(db_path)
+            conn = db_connection.connect(db_path)
+            try:
+                result = _cmd_import_day_trading(conn, args)
+                conn.commit()
+                return result
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
         if args.command == "inspect-margin":
             db_connection.init_db(db_path)
             conn = db_connection.connect(db_path)
@@ -399,6 +471,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_update_legal(conn, args)
             elif args.command == "update-margin":
                 result = _cmd_update_margin(conn, args)
+            elif args.command == "update-day-trading":
+                result = _cmd_update_day_trading(conn, args)
             elif args.command == "status":
                 result = _cmd_status(conn, args)
             elif args.command == "query-close":
@@ -839,6 +913,177 @@ def _cmd_download_margin_from_dates(
         print(f"  {result.trade_date} {result.market} {result.status} {result.error}")
     return 0 if not failed else 2
 
+
+def _prepare_day_trading_download(conn, args: argparse.Namespace) -> tuple[str, str, tuple[str, ...], list[str]]:
+    if args.date:
+        if args.start or args.end:
+            raise ValueError("download-day-trading accepts --date or --from/--to, not both")
+        start = end = validate_iso_date(args.date)
+    else:
+        if not args.start or not args.end:
+            raise ValueError("download-day-trading requires --date or both --from and --to")
+        start = validate_iso_date(args.start)
+        end = validate_iso_date(args.end)
+    markets = (args.market,) if args.market else config.MARKETS
+    open_dates = trading_calendar.trading_days_between(conn, start, end)
+    return start, end, markets, open_dates
+
+
+def _cmd_download_day_trading_from_dates(
+    args: argparse.Namespace,
+    start: str,
+    end: str,
+    markets: tuple[str, ...],
+    open_dates: list[str],
+) -> int:
+    cooldowns = {
+        market: CooldownController(enabled=not args.no_cooldown)
+        for market in markets
+    }
+    results = day_trading.download_day_trading_dates(
+        open_dates,
+        start=start,
+        end=end,
+        markets=markets,
+        cooldowns=cooldowns,
+        overwrite=args.overwrite,
+        parallel_markets=args.market is None,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == "OK")
+    skipped = sum(1 for result in results if result.status == "SKIP")
+    failed = [result for result in results if result.status not in {"OK", "SKIP"}]
+    print(f"day-trading download OK={ok} SKIP={skipped} MISSING={len(failed)}")
+    for result in failed[:10]:
+        print(f"  {result.trade_date} {result.market} {result.status} {result.error}")
+    return 0 if not failed else 2
+
+
+def _cmd_download_revenue(args: argparse.Namespace) -> int:
+    if args.month:
+        if args.start or args.end:
+            raise ValueError("download-revenue accepts --month or --from/--to, not both")
+        start = end = args.month
+    else:
+        if not args.start:
+            raise ValueError("download-revenue requires --month or --from")
+        start = args.start
+        end = args.end or revenue.latest_published_revenue_month()
+    months = revenue.revenue_months_between(start, end)
+    latest = revenue.latest_published_revenue_month()
+    if months and months[-1] > latest:
+        raise ValueError(f"download-revenue --to is after latest published month {latest}")
+    markets = (args.market,) if args.market else config.MARKETS
+    cooldowns = {
+        market: CooldownController(enabled=not args.no_cooldown)
+        for market in markets
+    }
+    results = revenue.download_revenue_months(
+        months,
+        markets=markets,
+        cooldowns=cooldowns,
+        overwrite=args.overwrite,
+        parallel_markets=args.market is None,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == "OK")
+    skipped = sum(1 for result in results if result.status == "SKIP")
+    failed = [result for result in results if result.status not in {"OK", "SKIP"}]
+    print(f"revenue download OK={ok} SKIP={skipped} MISSING={len(failed)}")
+    for result in failed[:10]:
+        print(f"  {result.month} {result.market} {result.status} {result.error}")
+    return 0 if not failed else 2
+
+
+def _cmd_inspect_day_trading(args: argparse.Namespace) -> int:
+    if args.sample_size < 0:
+        raise ValueError("--sample-size must be >= 0")
+    if args.file:
+        if not args.market or not args.date:
+            raise ValueError("inspect-day-trading --file requires --market and --date")
+        path = Path(args.file)
+        trade_date = validate_iso_date(args.date)
+    elif args.date:
+        if not args.market:
+            raise ValueError("inspect-day-trading --date requires --market")
+        trade_date = validate_iso_date(args.date)
+        path = day_trading.day_trading_file_path(args.market, trade_date)
+    else:
+        raise ValueError("inspect-day-trading requires --file or --date")
+
+    inspection = day_trading.inspect_day_trading_file(
+        path,
+        args.market,
+        trade_date,
+        sample_size=args.sample_size,
+    )
+    print("day_trading inspect")
+    print(f"  file: {inspection.path}")
+    print(f"  status: {inspection.status}")
+    print(f"  market: {inspection.market}")
+    print(f"  trade_date: {inspection.trade_date}")
+    print(f"  encoding: {inspection.encoding}")
+    print(f"  bytes: {inspection.bytes_size}")
+    print(f"  header_index: {inspection.header_index}")
+    print(f"  columns[{len(inspection.columns)}]: {', '.join(inspection.columns)}")
+    print(f"  row_count: {inspection.row_count}")
+    if inspection.error:
+        print(f"  error: {inspection.error}")
+    if inspection.sample_rows:
+        print("  samples:")
+        for row in inspection.sample_rows:
+            print(f"    {list(row)}")
+    return 0 if inspection.status == "OK" else 2
+
+
+def _cmd_import_day_trading(conn, args: argparse.Namespace) -> int:
+    start = validate_iso_date(args.start)
+    end = validate_iso_date(args.end)
+    markets = (args.market,) if args.market else None
+    report_dir = Path(args.report_dir)
+    if args.dry_run:
+        report = day_trading.dry_run_day_trading_import(
+            conn,
+            start=start,
+            end=end,
+            markets=markets,
+            report_dir=report_dir,
+            log=print,
+        )
+        print(
+            "day_trading dry-run "
+            f"expected={report.expected_files} parsed={report.parsed_files} "
+            f"missing={report.missing_files} bad={report.bad_files} "
+            f"duplicates={report.duplicate_keys} rows={report.total_rows} "
+            f"problems={len(report.problems)}"
+        )
+        print(f"  report={report.summary_path}")
+        for problem in report.problems[:20]:
+            print(
+                f"  {problem.trade_date} {problem.market} {problem.problem} "
+                f"stock={problem.stock_id or '-'} detail={problem.detail} file={problem.path}"
+            )
+        return 0 if not report.problems and not report.duplicate_keys and not report.missing_files and not report.bad_files else 2
+
+    results = day_trading.import_day_trading_range(
+        conn,
+        start=start,
+        end=end,
+        markets=markets,
+        report_dir=report_dir,
+        log=print,
+    )
+    total_days = sum(result.open_days for result in results)
+    total_rows = sum(result.row_count for result in results)
+    print(f"day_trading import OK markets={len(results)} open_days={total_days} rows={total_rows}")
+    for result in results:
+        print(
+            f"  {result.market} range={result.start} -> {result.end} "
+            f"open_days={result.open_days} rows={result.row_count}"
+        )
+    return 0
+
+
 def _cmd_inspect_legal(args: argparse.Namespace, db_path: Path) -> int:
     if args.sample_size < 0:
         raise ValueError("--sample-size must be >= 0")
@@ -1027,6 +1272,50 @@ def _cmd_update_margin(conn, args: argparse.Namespace) -> int:
     return 0 if blocked == 0 else 2
 
 
+def _cmd_update_day_trading(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    target_date = validate_iso_date(args.date or date.today().isoformat())
+    markets = (args.market,) if args.market else None
+    latest_before = _latest_table_dates_by_market(conn, "day_trading", markets)
+    results = _update_day_trading_range_from_latest(
+        conn,
+        target_date=target_date,
+        markets=markets,
+        cooldown=cooldown,
+        log=print,
+    )
+    ok = sum(1 for result in results if result.status == "OK")
+    exists = sum(1 for result in results if result.status == "EXISTS")
+    closed = sum(1 for result in results if result.status == "CLOSED")
+    blocked = sum(1 for result in results if result.status == "BLOCKED")
+    print(f"day_trading update OK={ok} EXISTS={exists} CLOSED={closed} BLOCKED={blocked}")
+    errors: list[str] = []
+    for result in results:
+        source = result.source_file or "-"
+        line = (
+            f"  {result.trade_date} {result.market} {result.status} "
+            f"rows={result.row_count} file={source}"
+        )
+        if result.error:
+            line += f" error={result.error}"
+            if result.status == "BLOCKED":
+                errors.append(f"{result.trade_date} {result.market}: {result.error}")
+        print(line)
+    stats = _single_day_update_stats(ok=ok, exists=exists, closed=closed, blocked=blocked)
+    _emit_stats_notification(
+        "update-day-trading",
+        stats,
+        lines=_range_update_lines(
+            target_date=target_date,
+            markets=markets,
+            latest_before=latest_before,
+            latest_after=_latest_table_dates_by_market(conn, "day_trading", markets),
+        ),
+        errors=errors,
+    )
+    return 0 if blocked == 0 else 2
+
+
 
 def _update_legal_range_from_latest(
     conn,
@@ -1076,6 +1365,35 @@ def _update_margin_range_from_latest(
         ):
             results.extend(
                 margin.update_margin_day(
+                    conn,
+                    trade_date=trade_date,
+                    markets=(market,),
+                    cooldown=cooldown,
+                    log=log,
+                )
+            )
+    return results
+
+
+def _update_day_trading_range_from_latest(
+    conn,
+    *,
+    target_date: str,
+    markets: tuple[str, ...] | None,
+    cooldown: CooldownController,
+    log,
+) -> list[day_trading.DayTradingUpdateResult]:
+    results: list[day_trading.DayTradingUpdateResult] = []
+    for market in markets or config.MARKETS:
+        for trade_date in _missing_open_dates_through(
+            conn,
+            table="day_trading",
+            market=market,
+            target_date=target_date,
+            cooldown=cooldown,
+        ):
+            results.extend(
+                day_trading.update_day_trading_day(
                     conn,
                     trade_date=trade_date,
                     markets=(market,),

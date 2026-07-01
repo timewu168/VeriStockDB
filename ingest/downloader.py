@@ -19,6 +19,8 @@ FetchAttentionCsv = Callable[[str, str, str], bytes]
 FetchDisposalCsv = Callable[[str, str, str], bytes]
 FetchLegalCsv = Callable[[str, str], bytes]
 FetchMarginFile = Callable[[str, str], bytes]
+FetchDayTradingFile = Callable[[str, str], bytes]
+FetchRevenueCsv = Callable[[str, str], bytes]
 FetchTradingDaysJson = Callable[[str], dict]
 LogFunc = Callable[[str], None]
 SleepFunc = Callable[[float], None]
@@ -124,6 +126,24 @@ def official_margin_url(market: str, trade_date: str) -> str:
     raise ValueError(f"unknown market: {market}")
 
 
+def official_day_trading_url(market: str, trade_date: str) -> str:
+    yyyymmdd = trade_date.replace("-", "")
+    date_url = quote(trade_date.replace("-", "/"), safe="")
+    if market == "TWSE":
+        return config.URL_TWSE_DAY_TRADING.format(date_yyyymmdd=yyyymmdd)
+    if market == "TPEX":
+        return config.URL_TPEX_DAY_TRADING.format(date_url=date_url)
+    raise ValueError(f"unknown market: {market}")
+
+
+def official_revenue_url(market: str, roc_month: str) -> str:
+    if market == "TWSE":
+        return config.URL_TWSE_REVENUE.format(roc_month=roc_month)
+    if market == "TPEX":
+        return config.URL_TPEX_REVENUE.format(roc_month=roc_month)
+    raise ValueError(f"unknown market: {market}")
+
+
 def download_close_csv(market: str, trade_date: str) -> bytes:
     url = official_close_url(market, trade_date)
     request = Request(
@@ -188,6 +208,34 @@ def download_margin_file(market: str, trade_date: str) -> bytes:
     )
     with urlopen(request, timeout=60, context=official_ssl_context()) as response:
         return response.read()
+
+
+def download_day_trading_file(market: str, trade_date: str) -> bytes:
+    url = official_day_trading_url(market, trade_date)
+    request = Request(
+        url,
+        headers={
+            "User-Agent": f"VeriStockDB/{config.APP_VERSION} (+https://github.com/timewu168/VeriStockDB)",
+            "Accept": "text/csv,*/*",
+        },
+    )
+    with urlopen(request, timeout=60, context=official_ssl_context()) as response:
+        return response.read()
+
+
+def download_revenue_csv(market: str, roc_month: str) -> bytes:
+    url = official_revenue_url(market, roc_month)
+    request = Request(
+        url,
+        headers={
+            "User-Agent": f"VeriStockDB/{config.APP_VERSION} (+https://github.com/timewu168/VeriStockDB)",
+            "Accept": "text/csv,*/*",
+            "Referer": config.URL_MOPS_REVENUE_REFERER,
+        },
+    )
+    with urlopen(request, timeout=60, context=official_ssl_context()) as response:
+        return response.read()
+
 
 def download_legal_csv(market: str, trade_date: str) -> bytes:
     url = official_legal_url(market, trade_date)
@@ -343,3 +391,44 @@ def save_official_margin_file(raw: bytes, market: str, trade_date: str) -> Path:
     path.write_bytes(raw)
     return path
 
+
+def official_day_trading_file_path(market: str, trade_date: str) -> Path:
+    year = trade_date[:4]
+    return config.CSV_DIR / "day_trading" / year / official_day_trading_file_name(market, trade_date)
+
+
+def official_day_trading_file_name(market: str, trade_date: str) -> str:
+    yyyymmdd = trade_date.replace("-", "")
+    if market == "TWSE":
+        return f"{yyyymmdd}DayTradingSII.csv"
+    if market == "TPEX":
+        return f"{yyyymmdd}DayTradingOTC.csv"
+    raise ValueError(f"unknown market: {market}")
+
+
+def save_official_day_trading_file(raw: bytes, market: str, trade_date: str) -> Path:
+    path = official_day_trading_file_path(market, trade_date)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(raw)
+    return path
+
+
+def official_revenue_csv_path(market: str, month: str) -> Path:
+    year = month[:4]
+    return config.CSV_DIR / "revenue" / year / official_revenue_csv_name(market, month)
+
+
+def official_revenue_csv_name(market: str, month: str) -> str:
+    yyyymm = month.replace("-", "")
+    if market == "TWSE":
+        return f"{yyyymm}RevenueSII.csv"
+    if market == "TPEX":
+        return f"{yyyymm}RevenueOTC.csv"
+    raise ValueError(f"unknown market: {market}")
+
+
+def save_official_revenue_csv(raw: bytes, market: str, month: str) -> Path:
+    path = official_revenue_csv_path(market, month)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(raw)
+    return path

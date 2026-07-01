@@ -102,6 +102,22 @@ CREATE INDEX IF NOT EXISTS idx_margin_trading_date ON margin_trading(trade_date)
 CREATE INDEX IF NOT EXISTS idx_margin_trading_stock ON margin_trading(stock_id);
 CREATE INDEX IF NOT EXISTS idx_margin_trading_date_stock ON margin_trading(trade_date, stock_id);
 
+CREATE TABLE IF NOT EXISTS day_trading (
+  trade_date TEXT NOT NULL,
+  market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),
+  stock_id TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  suspend_sell_note TEXT,
+  day_trade_volume INTEGER NOT NULL,
+  day_trade_buy_amount INTEGER NOT NULL,
+  day_trade_sell_amount INTEGER NOT NULL,
+  PRIMARY KEY (trade_date, market, stock_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_day_trading_date ON day_trading(trade_date);
+CREATE INDEX IF NOT EXISTS idx_day_trading_stock ON day_trading(stock_id);
+CREATE INDEX IF NOT EXISTS idx_day_trading_date_stock ON day_trading(trade_date, stock_id);
+
 CREATE TABLE IF NOT EXISTS import_batches (
   batch_id TEXT PRIMARY KEY,
   dataset TEXT NOT NULL,
