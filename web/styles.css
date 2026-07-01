@@ -314,6 +314,32 @@ tbody tr:hover {
   background: rgba(255, 255, 255, 0.025);
 }
 
+.clickable-row {
+  cursor: pointer;
+}
+
+.failed-row {
+  background: rgba(224, 108, 117, 0.08);
+}
+
+.failed-row:hover {
+  background: rgba(224, 108, 117, 0.13);
+}
+
+.job-error-cell {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.error-text {
+  color: var(--error) !important;
+}
+
+.dashboard-jobs-panel {
+  margin-top: 14px;
+}
+
 .compact-list {
   display: grid;
   gap: 8px;

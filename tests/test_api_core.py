@@ -143,6 +143,43 @@ class CoreApiTests(unittest.TestCase):
         self.assertEqual(error_body["meta"]["filters"]["from"], "2026-06-15")
         self.assertEqual(event_body["data"][0]["stored_close_cents"], 12345)
 
+    def test_pwa_query_route_smoke_for_table_contract(self) -> None:
+        close_body = daily_close(
+            start="2026-06-15",
+            end="2026-06-15",
+            market="TWSE",
+            require_quality="any",
+            limit=10000,
+            offset=0,
+            conn=self.conn,
+        )
+        attention_body = attention_notices(
+            start="2026-06-15",
+            end="2026-06-15",
+            market="TWSE",
+            require_quality="any",
+            limit=10000,
+            offset=0,
+            conn=self.conn,
+        )
+        disposal_body = disposal_notices(
+            start="2026-06-15",
+            end="2026-06-15",
+            market="TWSE",
+            require_quality="any",
+            limit=10000,
+            offset=0,
+            conn=self.conn,
+        )
+
+        for body in (close_body, attention_body, disposal_body):
+            self.assertTrue(body["ok"])
+            self.assertIsInstance(body["data"], list)
+            self.assertIn("fields", body["meta"])
+            self.assertIn("pagination", body["meta"])
+            self.assertEqual(body["meta"]["pagination"]["limit"], 10000)
+            self.assertEqual(body["meta"]["pagination"]["offset"], 0)
+
     def _create_schema(self) -> None:
         self.conn.executescript(
             """

@@ -24,6 +24,7 @@
           <button class="nav-item" data-view="batches">批次</button>
           <button class="nav-item" data-view="events">錯誤事件</button>
           <button class="nav-item" data-view="query">查詢</button>
+          <button class="nav-item" data-view="jobs">手動更新</button>
           <button class="nav-item" data-view="system">系統</button>
         </nav>
       </aside>
@@ -81,6 +82,13 @@
               <div class="compact-list" id="dashboard-batches"></div>
             </section>
           </div>
+          <section class="panel dashboard-jobs-panel">
+            <div class="panel-head">
+              <h2>最近手動更新</h2>
+              <button class="text-button" data-jump="jobs">查看全部</button>
+            </div>
+            <div class="compact-list" id="dashboard-jobs"></div>
+          </section>
         </section>
 
         <section class="view" id="view-datasets">
@@ -208,6 +216,30 @@
           </section>
         </section>
 
+        <section class="view" id="view-jobs">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>手動更新紀錄</h2>
+              <button class="text-button" id="reload-jobs">重新整理</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>資料集</th>
+                    <th>狀態</th>
+                    <th>建立時間</th>
+                    <th>完成時間</th>
+                    <th>returncode</th>
+                    <th>錯誤摘要</th>
+                  </tr>
+                </thead>
+                <tbody id="job-table"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
         <section class="view" id="view-system">
           <div class="split-grid">
             <section class="panel">
@@ -236,7 +268,7 @@
       <button class="bottom-item" data-view="datasets">資料集</button>
       <button class="bottom-item" data-view="events">錯誤</button>
       <button class="bottom-item" data-view="query">查詢</button>
-      <button class="bottom-item" data-view="system">系統</button>
+      <button class="bottom-item" data-view="jobs">更新</button>
     </nav>
 
     <div class="modal-backdrop" id="update-modal" hidden>

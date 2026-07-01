@@ -89,6 +89,7 @@ const pageTitles = {
   batches: ["批次紀錄", "查看 import_batches 狀態與最近更新結果"],
   events: ["錯誤事件", "查看 import_errors 與 data_events"],
   query: ["查詢", "使用 Local Truth API 查詢正式資料"],
+  jobs: ["手動更新", "查看手動更新紀錄、錯誤摘要與輸出尾端"],
   system: ["系統", "版本、API 與本機 PWA 設定"],
 };
 
@@ -126,6 +127,7 @@ function bindActions() {
   $("#reload-batches").addEventListener("click", loadBatches);
   $("#reload-errors").addEventListener("click", loadErrors);
   $("#reload-events").addEventListener("click", loadEvents);
+  $("#reload-jobs").addEventListener("click", loadJobs);
   $("#cancel-update").addEventListener("click", closeUpdateModal);
   $("#confirm-update").addEventListener("click", startUpdateJob);
   $("#query-dataset").addEventListener("change", updateQueryDateInputs);
@@ -329,7 +331,7 @@ function renderEvent(event) {
 
 async function loadJobs() {
   try {
-    const response = await api("/api/v1/jobs?limit=5");
+    const response = await api("/api/v1/jobs?limit=20");
     const running = response.data.find((job) => !job.terminal);
     const latest = response.data[0];
     $("#metric-job").textContent = running ? running.status : latest ? latest.status : "待命";
@@ -338,12 +340,62 @@ async function loadJobs() {
       : latest
         ? `${labelDataset(latest.dataset)} · ${latest.finished_at || latest.created_at || "-"}`
         : "single writer guard";
+    renderJobs(response.data);
     if (running) {
       renderJob(running);
       pollJob(running.job_id);
     }
-  } catch {
+  } catch (error) {
     $("#metric-job").textContent = "未啟用";
+    $("#job-table").innerHTML = rowMessage(`讀取手動更新失敗：${escapeHtml(error.message)}`, 6);
+    $("#dashboard-jobs").innerHTML = `<div class="list-row"><span>讀取手動更新失敗：${escapeHtml(error.message)}</span></div>`;
+  }
+}
+
+function renderJobs(jobs) {
+  $("#job-table").innerHTML = jobs.map(renderJobRow).join("") || rowMessage("沒有手動更新紀錄", 6);
+  $("#dashboard-jobs").innerHTML = jobs.slice(0, 5).map(renderJobCompact).join("") || `<div class="list-row"><span>沒有手動更新紀錄</span></div>`;
+  $$("[data-job-id]").forEach((node) => {
+    node.addEventListener("click", () => openJobDetail(node.dataset.jobId));
+  });
+}
+
+function renderJobRow(job) {
+  const failedClass = job.status === "FAILED" ? " failed-row" : "";
+  return `
+    <tr class="clickable-row${failedClass}" data-job-id="${escapeHtml(job.job_id)}">
+      <td>
+        <strong>${labelDataset(job.dataset)}</strong>
+        <div class="subtle">${escapeHtml(job.job_id)}</div>
+      </td>
+      <td>${pill(job.status)}</td>
+      <td>${escapeHtml(job.created_at || "-")}</td>
+      <td>${escapeHtml(job.finished_at || "-")}</td>
+      <td>${job.returncode ?? "-"}</td>
+      <td class="job-error-cell">${escapeHtml(job.error_message || "-")}</td>
+    </tr>
+  `;
+}
+
+function renderJobCompact(job) {
+  return `
+    <div class="list-row clickable-row ${job.status === "FAILED" ? "failed-row" : ""}" data-job-id="${escapeHtml(job.job_id)}">
+      <div>
+        <strong>${labelDataset(job.dataset)} · ${escapeHtml(job.status)}</strong>
+        <span>${escapeHtml(job.finished_at || job.created_at || "-")}</span>
+        ${job.error_message ? `<span class="error-text">${escapeHtml(job.error_message)}</span>` : ""}
+      </div>
+      ${pill(job.status)}
+    </div>
+  `;
+}
+
+async function openJobDetail(jobId) {
+  try {
+    const response = await api(`/api/v1/jobs/${encodeURIComponent(jobId)}`);
+    renderJob(response.data);
+  } catch (error) {
+    alert(`讀取 job 失敗：${error.message}`);
   }
 }
 
@@ -386,7 +438,7 @@ function pollJob(jobId) {
       renderJob(response.data);
       if (response.data.terminal) {
         clearInterval(state.jobPollTimer);
-        await Promise.allSettled([loadDatasets(), loadBatches(), loadErrors(), loadEvents()]);
+        await Promise.allSettled([loadDatasets(), loadBatches(), loadErrors(), loadEvents(), loadJobs()]);
       }
     } catch {
       clearInterval(state.jobPollTimer);

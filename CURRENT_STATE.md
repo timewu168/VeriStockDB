@@ -2,8 +2,8 @@
 
 ## Current Stage
 
-- Latest release target: `v0.5.1` Local Management PWA job persistence and query table improvements.
-- Latest pushed release before this update: `v0.5.0`.
+- Latest release target: `v0.5.2` Local Management PWA job list and smoke-test improvements.
+- Latest pushed release before this update: `v0.5.1`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, batches, errors, events, and ops summary.
@@ -11,6 +11,7 @@
 - PWA dataset status page includes manual update buttons backed by allow-listed job API commands.
 - Manual update job API persists job records in `ops_jobs`; one active job at a time and no arbitrary command execution remain required.
 - PWA query result view uses table output. Empty stock ID means query the full date/month range; non-empty stock ID filters to that stock.
+- PWA manual update view now includes a full recent jobs table; selecting a row opens the job detail drawer with messages, stdout/stderr tail, and error summary.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -82,6 +83,11 @@
   - Query output is table-based with Chinese column labels.
   - Query limit is user-configurable up to `10000`; default is `10000`, not `20`.
   - Close price fields are displayed in TWD by dividing API cent values by `100`; API and DB remain integer cents.
+- Latest `v0.5.2` implementation state on 2026-07-01:
+  - Query pagination controls and CSV export were intentionally not added.
+  - Recent manual update jobs are visible in a dedicated PWA view and dashboard summary.
+  - Failed jobs are highlighted and show error summaries.
+  - API smoke tests cover jobs list/detail and PWA query table contract.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -141,7 +147,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.5.1`.
+- Current code version in `config.py`: `APP_VERSION=0.5.2`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -156,18 +162,23 @@
 
 ## Modified Files
 
-- `v0.5.1` working tree changes before commit/tag/push:
-  - `api/app.py`
-  - `api/routes/jobs.py`
+- `v0.5.2` working tree changes before commit/tag/push:
+  - `CURRENT_STATE.md`
   - `config.py`
-  - `db/schema.sql`
-  - `README.md`
-  - `docs/ubuntu_private_deployment.md`
+  - `tests/test_api_core.py`
   - `tests/test_api_jobs.py`
   - `web/app.js`
   - `web/index.html`
   - `web/service-worker.js`
   - `web/styles.css`
+
+Previously committed `v0.5.1` files:
+
+  - `api/app.py`
+  - `api/routes/jobs.py`
+  - `db/schema.sql`
+  - `README.md`
+  - `docs/ubuntu_private_deployment.md`
 
 Previously committed `v0.5.0` files:
 
@@ -184,8 +195,8 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: final validation, then commit/tag/push `v0.5.1`.
-- After `v0.5.1`, next functional gate is fuller PWA query controls, pagination controls, and optional job log refresh UX.
+- Current gate: validate and optionally commit/tag/push `v0.5.2`.
+- After `v0.5.2`, next functional gate is optional job log refresh UX or broader PWA smoke coverage.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 

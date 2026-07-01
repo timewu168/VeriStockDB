@@ -81,6 +81,23 @@ class JobsApiTests(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.detail["code"], "INVALID_PAGINATION")
 
+    def test_jobs_list_and_detail_smoke(self) -> None:
+        created = jobs_route.update_dataset_job(
+            jobs_route.UpdateDatasetRequest(dataset="margin"),
+            BackgroundTasks(),
+        )["data"]
+
+        list_body = jobs_route.jobs(limit=10)
+        detail_body = jobs_route.job_detail(created["job_id"])
+
+        self.assertTrue(list_body["ok"])
+        self.assertEqual(list_body["data"][0]["job_id"], created["job_id"])
+        self.assertEqual(list_body["data"][0]["dataset"], "margin")
+        self.assertIn("running_job_id", list_body["meta"])
+        self.assertTrue(detail_body["ok"])
+        self.assertEqual(detail_body["data"]["command"], ["python3", "main.py", "update-margin"])
+        self.assertFalse(detail_body["data"]["terminal"])
+
     def test_initialize_job_store_marks_abandoned_jobs_failed(self) -> None:
         body = jobs_route.update_dataset_job(
             jobs_route.UpdateDatasetRequest(dataset="daily_close"),
