@@ -76,6 +76,66 @@ class ScheduleHealthTests(unittest.TestCase):
         self.assertEqual(close["timer"]["status"], "ERROR")
         self.assertIn("not enabled", close["timer"]["message"])
 
+    def test_schedule_health_ignores_zero_problem_counts(self) -> None:
+        self._write_logs("OK: 2 FIXED: 0 BLOCKED: 0 RECHECK: 0 MISSING: 0\n")
+
+        result = run_schedule_health(
+            db_path=self.db_path,
+            log_dir=self.log_dir,
+            today=date(2026, 7, 1),
+            runner=self._ok_runner,
+        )
+
+        close = next(item for item in result.schedules if item["dataset"] == config.DATASET_DAILY_CLOSE)
+        self.assertEqual(close["log"]["status"], "OK")
+        self.assertEqual(result.status, "OK")
+
+    def test_schedule_health_warns_on_nonzero_problem_counts(self) -> None:
+        self._write_logs("OK: 1 FIXED: 0 BLOCKED: 0 RECHECK: 0 MISSING: 1\n")
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM daily_close WHERE market = 'TPEX'")
+
+        result = run_schedule_health(
+            db_path=self.db_path,
+            log_dir=self.log_dir,
+            today=date(2026, 7, 1),
+            runner=self._ok_runner,
+        )
+
+        close = next(item for item in result.schedules if item["dataset"] == config.DATASET_DAILY_CLOSE)
+        self.assertEqual(close["log"]["status"], "WARN")
+        self.assertEqual(result.status, "WARN")
+
+    def test_schedule_health_treats_log_warning_as_resolved_when_data_current(self) -> None:
+        self._write_logs("OK: 1 FIXED: 0 BLOCKED: 0 RECHECK: 0 MISSING: 1\n")
+
+        result = run_schedule_health(
+            db_path=self.db_path,
+            log_dir=self.log_dir,
+            today=date(2026, 7, 1),
+            runner=self._ok_runner,
+        )
+
+        close = next(item for item in result.schedules if item["dataset"] == config.DATASET_DAILY_CLOSE)
+        self.assertEqual(close["data"]["status"], "OK")
+        self.assertEqual(close["log"]["status"], "OK")
+        self.assertIn("canonical data is current", close["log"]["message"])
+        self.assertEqual(result.status, "OK")
+
+    def test_monthly_revenue_missing_log_is_ok_when_data_current(self) -> None:
+        (self.log_dir / "update-revenue.log").unlink()
+
+        result = run_schedule_health(
+            db_path=self.db_path,
+            log_dir=self.log_dir,
+            today=date(2026, 7, 1),
+            runner=self._ok_runner,
+        )
+
+        revenue = next(item for item in result.schedules if item["dataset"] == config.DATASET_REVENUE)
+        self.assertEqual(revenue["data"]["status"], "OK")
+        self.assertEqual(revenue["log"]["status"], "OK")
+
     def _create_db(self) -> None:
         conn = sqlite3.connect(self.db_path)
         try:
@@ -111,7 +171,9 @@ class ScheduleHealthTests(unittest.TestCase):
                 "day_trading",
             ):
                 conn.execute(f"INSERT INTO {table}(trade_date, market, stock_id) VALUES ('2026-07-01', 'TWSE', '2330')")
+                conn.execute(f"INSERT INTO {table}(trade_date, market, stock_id) VALUES ('2026-07-01', 'TPEX', '5483')")
             conn.execute("INSERT INTO monthly_revenue VALUES ('2026-05', 'TWSE', '2330')")
+            conn.execute("INSERT INTO monthly_revenue VALUES ('2026-05', 'TPEX', '5483')")
             for dataset, period in (
                 (config.DATASET_DAILY_CLOSE, "2026-07-01"),
                 (config.DATASET_LEGAL_INVESTOR, "2026-07-01"),

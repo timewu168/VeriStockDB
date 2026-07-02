@@ -837,7 +837,7 @@ function labelDataset(dataset) {
 
 function pill(status) {
   const value = String(status || "UNKNOWN");
-  const cls = value === "OK" || value === "DONE" ? "ok" : value === "BLOCKED" || value === "FAILED" || value === "ERROR" ? "error" : value === "RECHECK" || value === "MISSING" || value === "RUNNING" ? "warn" : "";
+  const cls = value === "OK" || value === "DONE" ? "ok" : value === "BLOCKED" || value === "FAILED" || value === "ERROR" ? "error" : value === "WARN" || value === "RECHECK" || value === "MISSING" || value === "RUNNING" ? "warn" : "";
   return `<span class="pill ${cls}">${escapeHtml(value)}</span>`;
 }
 

@@ -115,7 +115,13 @@ SCHEDULES = (
 )
 
 LOG_ERROR_PATTERNS = ("Traceback", "ERROR", "Exception", "Internal Server Error")
-LOG_WARN_PATTERNS = ("FAILED", "BLOCKED", "RECHECK")
+LOG_PROBLEM_COUNT_PATTERN = re.compile(r"\b(BLOCKED|RECHECK|MISSING|FAILED)\s*[=:]\s*([1-9]\d*)\b")
+DENSE_MARKET_DATASETS = {
+    config.DATASET_DAILY_CLOSE,
+    config.DATASET_LEGAL_INVESTOR,
+    config.DATASET_MARGIN,
+    config.DATASET_DAY_TRADING,
+}
 
 
 def run_schedule_health(
@@ -160,8 +166,17 @@ def _schedule_report(
     runner: Runner,
 ) -> dict:
     timer = _timer_report(definition, check_systemd=check_systemd, runner=runner)
-    log = _log_report(log_dir / definition.log_file)
     data = _data_report(conn, definition, expected_open_date=expected_open_date, today=today)
+    log = _log_report(
+        log_dir / definition.log_file,
+        allow_missing_ok=definition.period_type == "month" and data["status"] == "OK",
+    )
+    if data["status"] == "OK" and log["status"] == "WARN":
+        log = {
+            **log,
+            "status": "OK",
+            "message": "warning markers found but canonical data is current",
+        }
     status = _overall_status(timer["status"], log["status"], data["status"])
     return {
         "dataset": definition.dataset,
@@ -236,13 +251,13 @@ def _timer_report(
     }
 
 
-def _log_report(path: Path, *, tail_bytes: int = 64_000) -> dict:
+def _log_report(path: Path, *, tail_bytes: int = 64_000, allow_missing_ok: bool = False) -> dict:
     if not path.exists():
         return {
-            "status": "WARN",
+            "status": "OK" if allow_missing_ok else "WARN",
             "path": str(path),
             "size": 0,
-            "message": "log file missing",
+            "message": "log file not created yet; data is current" if allow_missing_ok else "log file missing",
             "matches": [],
         }
     size = path.stat().st_size
@@ -254,7 +269,7 @@ def _log_report(path: Path, *, tail_bytes: int = 64_000) -> dict:
             "message": "log file empty",
             "matches": [],
         }
-    text = _read_tail(path, tail_bytes)
+    text = _latest_log_segment(_read_tail(path, tail_bytes))
     matches = _log_matches(text)
     status = "OK"
     message = "no error markers in recent log tail"
@@ -281,6 +296,7 @@ def _data_report(
     today: date,
 ) -> dict:
     canonical_latest = _canonical_latest(conn, definition.table, definition.period_column)
+    latest_by_market = _canonical_latest_by_market(conn, definition.table, definition.period_column)
     batch_latest = _batch_latest(conn, definition.dataset)
     expected = _expected_period(definition, expected_open_date=expected_open_date, today=today)
     observed = _max_period(canonical_latest, batch_latest["period_end"], definition.period_type)
@@ -295,6 +311,17 @@ def _data_report(
     elif observed < expected:
         status = "WARN"
         message = f"latest observed period {observed} is before expected {expected}"
+    elif definition.dataset in DENSE_MARKET_DATASETS:
+        lagging = [
+            market
+            for market, latest in latest_by_market.items()
+            if latest is None or latest < expected
+        ]
+        if lagging:
+            status = "WARN"
+            message = "market data before expected: " + ", ".join(
+                f"{market}={latest_by_market.get(market) or '-'}" for market in lagging
+            )
     elif batch_latest["status"] in {"BLOCKED", "RECHECK", "MISSING"}:
         status = "WARN"
         message = f"latest batch status is {batch_latest['status']}"
@@ -302,6 +329,7 @@ def _data_report(
         "status": status,
         "expected_period": expected,
         "canonical_latest": canonical_latest,
+        "latest_by_market": latest_by_market,
         "batch_latest": batch_latest,
         "observed_period": observed,
         "message": message,
@@ -326,6 +354,19 @@ def _canonical_latest(conn: sqlite3.Connection, table: str, period_column: str) 
         f"SELECT MAX({period_column}) AS latest_period FROM {table}",
     ).fetchone()
     return row["latest_period"] if row and row["latest_period"] else None
+
+
+def _canonical_latest_by_market(conn: sqlite3.Connection, table: str, period_column: str) -> dict[str, str | None]:
+    rows = conn.execute(
+        f"""
+        SELECT market, MAX({period_column}) AS latest_period
+        FROM {table}
+        GROUP BY market
+        """
+    ).fetchall()
+    latest = {market: None for market in config.MARKETS}
+    latest.update({str(row["market"]): row["latest_period"] for row in rows})
+    return latest
 
 
 def _batch_latest(conn: sqlite3.Connection, dataset: str) -> dict:
@@ -408,13 +449,23 @@ def _log_matches(text: str) -> list[dict]:
     matches: list[dict] = []
     for line in text.splitlines():
         level = None
-        if any(pattern in line for pattern in LOG_ERROR_PATTERNS):
+        if any(pattern in line for pattern in LOG_ERROR_PATTERNS) and "retrying" not in line:
             level = "ERROR"
-        elif any(pattern in line for pattern in LOG_WARN_PATTERNS):
+        elif LOG_PROBLEM_COUNT_PATTERN.search(line):
             level = "WARN"
         if level:
             matches.append({"level": level, "line": line[-500:]})
     return matches[-8:]
+
+
+def _latest_log_segment(text: str) -> str:
+    lines = text.splitlines()
+    notification_indexes = [
+        index for index, line in enumerate(lines) if "INFO telegram notification sent" in line
+    ]
+    if len(notification_indexes) >= 2:
+        return "\n".join(lines[notification_indexes[-2] + 1 :])
+    return text
 
 
 def _overall_status(*statuses: str) -> str:

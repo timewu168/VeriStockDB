@@ -284,6 +284,12 @@ class LegalMarginApiTests(unittest.TestCase):
               note TEXT NOT NULL DEFAULT '',
               PRIMARY KEY (revenue_month, market, stock_id)
             );
+            CREATE TABLE trading_days (
+              trade_date TEXT PRIMARY KEY,
+              is_open INTEGER NOT NULL,
+              source TEXT NOT NULL,
+              note TEXT
+            );
             CREATE TABLE import_batches (
               batch_id TEXT PRIMARY KEY,
               dataset TEXT NOT NULL,
@@ -301,6 +307,16 @@ class LegalMarginApiTests(unittest.TestCase):
               manual_approved_at TEXT,
               manual_approved_reason TEXT,
               note TEXT
+            );
+            CREATE TABLE import_errors (
+              error_id TEXT PRIMARY KEY,
+              batch_id TEXT NOT NULL,
+              severity TEXT NOT NULL,
+              code TEXT NOT NULL,
+              message TEXT NOT NULL,
+              sample_stock_id TEXT,
+              sample_value TEXT,
+              created_at TEXT NOT NULL
             );
             """
         )
@@ -420,6 +436,11 @@ class LegalMarginApiTests(unittest.TestCase):
                 "",
             ),
         )
+        for trade_date in ("2026-06-15", "2026-06-30"):
+            conn.execute(
+                "INSERT INTO trading_days VALUES (?, 1, 'test', NULL)",
+                (trade_date,),
+            )
         batches = [
             ("legal_investor:TWSE:2026-06-15", "legal_investor", "TWSE", "2026-06-15", "OK", 1),
             ("margin:TWSE:2026-06-15", "margin", "TWSE", "2026-06-15", "OK", 1),
@@ -434,6 +455,66 @@ class LegalMarginApiTests(unittest.TestCase):
                 "VALUES (?, ?, ?, ?, ?, ?, '2026-06-15T00:00:00+00:00')",
                 batch,
             )
+
+    def test_status_summary_warns_when_one_market_lags_latest_open_date(self) -> None:
+        conn = self._conn()
+        try:
+            conn.execute("INSERT INTO trading_days VALUES (?, 1, 'test', NULL)", ("2026-07-02",))
+            conn.execute(
+                "INSERT INTO legal_investors VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "2026-06-30",
+                    "TWSE",
+                    "2330",
+                    "台積電",
+                    1,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO legal_investors VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "2026-07-02",
+                    "TPEX",
+                    "5483",
+                    "中美晶",
+                    1,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ),
+            )
+
+            body = datasets_status_summary(conn=conn)
+
+            rows = {row["dataset"]: row for row in body["data"]}
+            legal = rows["legal_investor"]
+            self.assertEqual(legal["latest_period"], "2026-07-02")
+            self.assertEqual(legal["quality"]["status"], "WARN")
+            self.assertEqual(legal["quality"]["health_status"], "WARN")
+            self.assertEqual(legal["quality"]["gap_count"], 1)
+            self.assertEqual(legal["quality"]["latest_by_market"]["TWSE"], "2026-06-30")
+            self.assertEqual(legal["quality"]["latest_by_market"]["TPEX"], "2026-07-02")
+        finally:
+            conn.close()
 
 
 if __name__ == "__main__":
