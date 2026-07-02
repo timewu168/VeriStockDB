@@ -5,6 +5,28 @@
 <!-- /i18n-switch -->
 
 
+## v0.6.6 - 2026-07-03
+
+### 修正
+
+- 修正 PWA 資料集摘要未顯示單一市場落後的問題；`status-summary` 現在會檢查 TWSE/TPEX 各市場 latest 是否追上最新交易日。
+- 修正排程健康 log 判定過度敏感的問題；`BLOCKED=0`、`MISSING=0` 不再被視為警告。
+- 修正已補齊資料後，舊 log warning 仍讓排程健康維持 WARN 的問題。
+- 修正排程健康 data 檢查只看整張表最大日期的問題，改為 dense datasets 必須 TWSE/TPEX 各市場都追上。
+- PWA 狀態標籤支援 `WARN` 顯示。
+
+### 變更
+
+- 將 app version bump 至 `0.6.6`。
+- 更新 PWA service worker cache。
+
+### 驗證
+
+- 單元測試通過：`118 tests OK`。
+- `node --check web/app.js` 通過。
+- `schedule-health --log-dir /srv/veristockdb/logs` 回傳 `OK`。
+- 收盤、當沖、法人、資券依交易日分 TWSE/TPEX 全量缺日檢查，缺日期皆為 `0`。
+
 ## v0.6.5 - 2026-07-02
 
 ### 新增

@@ -5,7 +5,7 @@
 [中文](README.md) | [English](README.en.md)
 <!-- /i18n-switch -->
 
-Version: v0.6.5
+Version: v0.6.6
 
 VeriStockDB is a local Taiwan stock-market SQLite canonical truth database. It downloads official market data, validates source files, blocks suspicious records, and only then writes accepted data into canonical tables. The goal is to make daily close, attention notices, disposal notices, institutional investors, margin trading, day trading, monthly revenue, and trading-day data stable for local CLI, API, PWA, and analysis workflows.
 
@@ -115,7 +115,7 @@ Production timer changes require explicit operator approval and manual sudo acti
 
 ### Source Boundary
 
-VeriStockDB v0.6.5 canonical pipeline currently uses verified official CSV/JSON download flows, local cache/archive, and user-supplied CSV import. TWSE/TPEX OpenAPI endpoints are not used as replacements at this stage because their fields, semantics, or coverage may differ from the CSV/JSON sources used by the canonical database. Users must comply with the terms of each data source; VeriStockDB does not grant redistribution rights for official raw data.
+VeriStockDB v0.6.6 canonical pipeline currently uses verified official CSV/JSON download flows, local cache/archive, and user-supplied CSV import. TWSE/TPEX OpenAPI endpoints are not used as replacements at this stage because their fields, semantics, or coverage may differ from the CSV/JSON sources used by the canonical database. Users must comply with the terms of each data source; VeriStockDB does not grant redistribution rights for official raw data.
 
 ## Local Truth API
 

@@ -5,7 +5,7 @@
 <!-- /i18n-switch -->
 
 
-Version: v0.6.5
+Version: v0.6.6
 
 VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
@@ -268,7 +268,7 @@ PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command�
 
 ### 資料源邊界
 
-VeriStockDB v0.6.5 的 canonical pipeline 目前使用已驗證的官方 CSV/JSON 下載流程、本機 cache/archive，以及使用者提供的 CSV 匯入。TWSE/TPEX OpenAPI 端點在現階段不作為 canonical database 既有 CSV/JSON 來源的替代品，因為其欄位、語意或涵蓋範圍可能與目前驗證流程使用的來源不同。使用者必須自行遵守各資料來源的使用條款；VeriStockDB 不授予官方原始資料的再散布權利。
+VeriStockDB v0.6.6 的 canonical pipeline 目前使用已驗證的官方 CSV/JSON 下載流程、本機 cache/archive，以及使用者提供的 CSV 匯入。TWSE/TPEX OpenAPI 端點在現階段不作為 canonical database 既有 CSV/JSON 來源的替代品，因為其欄位、語意或涵蓋範圍可能與目前驗證流程使用的來源不同。使用者必須自行遵守各資料來源的使用條款；VeriStockDB 不授予官方原始資料的再散布權利。
 
 ## Documentation Boundary
 

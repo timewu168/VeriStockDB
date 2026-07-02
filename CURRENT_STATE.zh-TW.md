@@ -6,7 +6,7 @@
 
 ## 目前階段
 
-- 最新完成版本：`v0.6.5`，主題為全資料集健康檢查。
+- 最新完成版本：`v0.6.6`，主題為 PWA 健康狀態顯示與排程健康誤判修正。
 - 已完成 public preview、repo hygiene、Local Truth API、Local Management PWA、手動更新 jobs、排程健康、restore SOP、新資料集 SOP 與全資料集健康檢查。
 - SQLite 仍是 canonical truth；ClickHouse 尚未成為真理資料庫。
 - PWA 只透過 Local Truth API，不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command。
@@ -33,7 +33,7 @@
 - `settings`
 - `ops_jobs`
 
-`v0.6.5` 正式 DB smoke：
+`v0.6.6` 正式 DB smoke：
 
 - `dataset-health-check OK`
 - duplicate keys：`0`
@@ -82,7 +82,7 @@
 
 ## Schema / Migration 狀態
 
-- `APP_VERSION=0.6.5`。
+- `APP_VERSION=0.6.6`。
 - `SCHEMA_VERSION=0.4-monthly-revenue`。
 - `db/schema.sql` 已包含所有已接受 canonical 與 operational tables。
 - 目前沒有待執行 SQLite schema migration。

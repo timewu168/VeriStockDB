@@ -7,8 +7,8 @@
 
 ## Current Stage
 
-- Latest release target: `v0.6.5` all-dataset health check.
-- Latest pushed release before this update: `v0.6.4`.
+- Latest release target: `v0.6.6` PWA health status reporting patch.
+- Latest pushed release before this update: `v0.6.5`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
 - Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, dataset health, all-dataset health check, batches, errors, events, ops summary, schedule health, and jobs.
@@ -23,6 +23,7 @@
 - `v0.6.3` adds DB backup/restore SOP and validates a non-destructive restore drill from latest backup.
 - `v0.6.4` adds `docs/new_dataset_sop.md` for future dataset additions from source discovery through PWA/API/release.
 - `v0.6.5` adds all-dataset health check CLI/API/PWA for row count, duplicate key, latest, gap, recent errors, and recent non-OK batches.
+- `v0.6.6` fixes PWA dataset status visibility for single-market lag and schedule-health false WARN behavior.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -195,7 +196,7 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.6.5`.
+- Current code version in `config.py`: `APP_VERSION=0.6.6`.
 - Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
 - `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -246,8 +247,8 @@ Previously committed `v0.5.0` files:
 
 ## Next Gate
 
-- Current gate: validate `v0.6.5` all-dataset health check and release with commit/tag/push after user approval.
-- After `v0.6.5`, planned `v0.6.x` close-out items are complete; next phase is long-running observation unless reprioritized.
+- Current gate: validate and release `v0.6.6` patch with commit/tag/push after user approval.
+- After `v0.6.6`, planned `v0.6.x` close-out items are complete; next phase is long-running observation unless reprioritized.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 
