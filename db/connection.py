@@ -44,6 +44,16 @@ def _insert_default_settings(conn: sqlite3.Connection) -> None:
         "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)",
         sorted(defaults.items()),
     )
+    conn.executemany(
+        """
+        INSERT INTO settings(key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        [
+            ("app_version", config.APP_VERSION),
+            ("schema_version", config.SCHEMA_VERSION),
+        ],
+    )
 
 
 def seed_trading_days_from_legacy_db(

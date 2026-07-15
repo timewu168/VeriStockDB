@@ -59,6 +59,17 @@ class JobsApiTests(unittest.TestCase):
         self.assertEqual(saved.dataset, "legal_investor")
         self.assertEqual(saved.status, "QUEUED")
 
+    def test_security_master_update_is_allowlisted(self) -> None:
+        body = jobs_route.update_dataset_job(
+            jobs_route.UpdateDatasetRequest(dataset="security_master"),
+            BackgroundTasks(),
+        )
+
+        self.assertEqual(
+            body["data"]["command"],
+            ["python3", "main.py", "update-security-master"],
+        )
+
     def test_single_writer_guard_blocks_second_job(self) -> None:
         jobs_route.update_dataset_job(
             jobs_route.UpdateDatasetRequest(dataset="daily_close"),

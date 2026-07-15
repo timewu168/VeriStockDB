@@ -7,6 +7,15 @@
 
 This file is the English release-history companion. The Chinese `CHANGELOG.md` remains the canonical detailed changelog.
 
+## v0.7.0 - 2026-07-15
+
+- Added the effective-dated `security_master` canonical dataset from official TWSE/TPEX OpenAPI company profiles.
+- Added `update-security-master`, allow-listed PWA jobs, dataset status, and health-check integration.
+- Added `GET /api/v1/disposal-notices/active` with official industry names, normalized 5/20-minute intervals, deterministic ordering, pagination, deduplication, and fail-closed quality rules.
+- Kept the existing `/api/v1/disposal-notices` contract unchanged.
+- Bumped app version to `0.7.0`, schema version to `0.5-security-master`, and the PWA cache.
+- Production source smoke imported 1,089 TWSE and 891 TPEX security-master rows on 2026-07-15.
+
 ## v0.6.6 - 2026-07-03
 
 - Fixed PWA dataset summary so single-market lag is visible directly in dataset status.

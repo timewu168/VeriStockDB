@@ -26,6 +26,7 @@ CANONICAL_PERIOD_COLUMNS = {
     config.DATASET_MARGIN: ("margin_trading", "trade_date"),
     config.DATASET_DAY_TRADING: ("day_trading", "trade_date"),
     config.DATASET_REVENUE: ("monthly_revenue", "revenue_month"),
+    config.DATASET_SECURITY_MASTER: ("security_master", "source_updated_date"),
 }
 
 

@@ -15,6 +15,7 @@ from ingest import day_trading
 from ingest import legal_investor
 from ingest import margin
 from ingest import revenue
+from ingest import security_master
 from ingest.downloader import CooldownController
 from ingest import trading_calendar
 from ingest.trading_calendar import validate_iso_date
@@ -259,6 +260,15 @@ def build_parser() -> argparse.ArgumentParser:
     update_disposal.add_argument("--to", dest="end", help="target end date YYYY-MM-DD, default today")
     update_disposal.add_argument("--market", choices=config.MARKETS)
     update_disposal.add_argument("--no-cooldown", action="store_true", help="disable official cooldown")
+
+    update_security_master = subparsers.add_parser(
+        "update-security-master",
+        help="replace the current TWSE/TPEX stock master from official OpenAPI snapshots",
+    )
+    update_security_master.add_argument("--market", choices=config.MARKETS)
+    update_security_master.add_argument(
+        "--no-cooldown", action="store_true", help="disable official cooldown"
+    )
 
     status = subparsers.add_parser("status", help="show batch status")
     status.add_argument("--dataset", default=None)
@@ -510,6 +520,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _cmd_update_attention(conn, args)
             elif args.command == "update-disposal":
                 result = _cmd_update_disposal(conn, args)
+            elif args.command == "update-security-master":
+                result = _cmd_update_security_master(conn, args)
             elif args.command == "download-legal":
                 result = _cmd_download_legal(conn, args)
             elif args.command == "import-legal":
@@ -1821,6 +1833,19 @@ def _cmd_update_disposal(conn, args: argparse.Namespace) -> int:
             markets=markets,
         ),
     )
+    return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
+
+
+def _cmd_update_security_master(conn, args: argparse.Namespace) -> int:
+    cooldown = CooldownController(enabled=not args.no_cooldown)
+    markets = (args.market,) if args.market else None
+    stats = security_master.update_security_master(
+        conn,
+        markets=markets,
+        cooldown=cooldown,
+        log=print,
+    )
+    print(_format_stats(stats))
     return 0 if not any(stats[key] for key in ("BLOCKED", "RECHECK", "MISSING")) else 2
 
 

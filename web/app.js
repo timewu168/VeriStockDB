@@ -6,6 +6,7 @@ const DATASET_LABELS = {
   margin: "資券",
   day_trading: "當沖",
   revenue: "月營收",
+  security_master: "股票基本資料",
 };
 
 const UPDATE_HINTS = {
@@ -16,6 +17,7 @@ const UPDATE_HINTS = {
   margin: "update-margin",
   day_trading: "update-day-trading",
   revenue: "update-revenue",
+  security_master: "update-security-master",
 };
 
 const MONTHLY_QUERY_ROUTES = new Set(["monthly-revenue"]);

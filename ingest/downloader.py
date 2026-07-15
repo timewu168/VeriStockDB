@@ -22,6 +22,7 @@ FetchMarginFile = Callable[[str, str], bytes]
 FetchDayTradingFile = Callable[[str, str], bytes]
 FetchRevenueCsv = Callable[[str, str], bytes]
 FetchTradingDaysJson = Callable[[str], dict]
+FetchSecurityMasterJson = Callable[[str], bytes]
 LogFunc = Callable[[str], None]
 SleepFunc = Callable[[float], None]
 
@@ -102,6 +103,14 @@ def official_disposal_url(market: str, start: str, end: str) -> str:
             start_date_url=quote(start.replace("-", "/"), safe=""),
             end_date_url=quote(end.replace("-", "/"), safe=""),
         )
+    raise ValueError(f"unknown market: {market}")
+
+
+def official_security_master_url(market: str) -> str:
+    if market == "TWSE":
+        return config.URL_TWSE_SECURITY_MASTER
+    if market == "TPEX":
+        return config.URL_TPEX_SECURITY_MASTER
     raise ValueError(f"unknown market: {market}")
 
 
@@ -193,6 +202,18 @@ def download_disposal_csv(market: str, start: str, end: str) -> bytes:
         },
     )
     with urlopen(request, timeout=30, context=official_ssl_context()) as response:
+        return response.read()
+
+
+def download_security_master_json(market: str) -> bytes:
+    request = Request(
+        official_security_master_url(market),
+        headers={
+            "User-Agent": f"VeriStockDB/{config.APP_VERSION} (+https://github.com/timewu168/VeriStockDB)",
+            "Accept": "application/json,*/*",
+        },
+    )
+    with urlopen(request, timeout=60, context=official_ssl_context()) as response:
         return response.read()
 
 
@@ -344,6 +365,19 @@ def official_disposal_csv_name(market: str, start: str, end: str) -> str:
 
 def save_official_disposal_csv(raw: bytes, market: str, start: str, end: str) -> Path:
     path = official_disposal_csv_path(market, start, end)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(raw)
+    return path
+
+
+def official_security_master_json_path(market: str, source_date: str) -> Path:
+    suffix = "SII" if market == "TWSE" else "OTC"
+    name = f"{source_date.replace('-', '')}SecurityMaster{suffix}.json"
+    return config.CSV_DIR / "security_master" / source_date[:4] / name
+
+
+def save_official_security_master_json(raw: bytes, market: str, source_date: str) -> Path:
+    path = official_security_master_json_path(market, source_date)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(raw)
     return path

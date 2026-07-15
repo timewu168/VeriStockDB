@@ -6,7 +6,7 @@
 
 ## 目前階段
 
-- 最新完成版本：`v0.6.6`，主題為 PWA 健康狀態顯示與排程健康誤判修正。
+- 最新完成版本目標：`v0.7.0`，新增官方證券主檔與 active disposal API 契約。
 - 已完成 public preview、repo hygiene、Local Truth API、Local Management PWA、手動更新 jobs、排程健康、restore SOP、新資料集 SOP 與全資料集健康檢查。
 - SQLite 仍是 canonical truth；ClickHouse 尚未成為真理資料庫。
 - PWA 只透過 Local Truth API，不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command。
@@ -19,6 +19,7 @@
 - `daily_close`
 - `attention_notices`
 - `disposal_notices`
+- `security_master`
 - `legal_investors`
 - `margin_trading`
 - `day_trading`
@@ -33,12 +34,14 @@
 - `settings`
 - `ops_jobs`
 
-`v0.6.6` 正式 DB smoke：
+`v0.7.0` 正式 DB smoke：
 
 - `dataset-health-check OK`
 - duplicate keys：`0`
 - gaps：`0`
 - recent errors：`0`
+- `security_master`：TWSE `1089`、TPEX `891`，合計 `1980` 筆。
+- `GET /api/v1/disposal-notices/active` 於 `2026-07-15` 回傳 `27` 檔有效股票，另排除 `10` 筆非股票商品。
 
 最新 row count baseline：
 
@@ -73,7 +76,8 @@
 
 ## 資料來源與 ETL 狀態
 
-- Close、注意、處置、法人、資券、當沖、月營收、交易日都已 canonicalized in SQLite。
+- Close、注意、處置、證券主檔、法人、資券、當沖、月營收、交易日都已 canonicalized in SQLite。
+- `security_master` 僅取 TWSE/TPEX 官方 OpenAPI 公司基本資料，並以 effective period 保存名稱與產業異動。
 - 日資料 API 日期格式為 `YYYY-MM-DD`。
 - 月資料 API 日期格式為 `YYYY-MM`。
 - `20260615` 這類 compact date 應拒絕。
@@ -82,8 +86,8 @@
 
 ## Schema / Migration 狀態
 
-- `APP_VERSION=0.6.6`。
-- `SCHEMA_VERSION=0.4-monthly-revenue`。
+- `APP_VERSION=0.7.0`。
+- `SCHEMA_VERSION=0.5-security-master`。
 - `db/schema.sql` 已包含所有已接受 canonical 與 operational tables。
 - 目前沒有待執行 SQLite schema migration。
 
@@ -95,10 +99,11 @@
 - `docs/new_dataset_sop.md` / `docs/en/new_dataset_sop.md`：新增資料集 SOP。
 - `docs/project_completion_inventory.md` / `docs/en/project_completion_inventory.md`：PM/整合盤點。
 - `docs/backup_restore_sop.md` / `docs/en/backup_restore_sop.md`：備份還原 SOP。
+- `docs/security_master.md`：官方證券主檔來源、欄位與品質邊界。
 
 ## 下一道關卡
 
-- 目前 `v0.6.x` close-out items 已完成。
+- `v0.7.0` 待完成 Git commit、push 與 draft PR。
 - 下一階段應優先做長時間排程觀察與手動補救流程驗證。
 - 不要在未明確授權下新增資料集、改 schema、改正式排程或執行破壞性 DB 操作。
 

@@ -64,6 +64,13 @@ SUPPORTED_DATASETS = {
         markets=config.MARKETS,
         status_endpoint=f"/api/v1/datasets/{config.DATASET_REVENUE}/status",
     ),
+    config.DATASET_SECURITY_MASTER: DatasetDefinition(
+        dataset=config.DATASET_SECURITY_MASTER,
+        title="Security Master",
+        period_type="date",
+        markets=config.MARKETS,
+        status_endpoint=f"/api/v1/datasets/{config.DATASET_SECURITY_MASTER}/status",
+    ),
 }
 
 

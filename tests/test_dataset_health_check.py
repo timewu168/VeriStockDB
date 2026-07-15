@@ -37,6 +37,10 @@ class DatasetHealthCheckTests(unittest.TestCase):
         self.assertEqual(close["gap"]["samples"], [{"market": "TWSE", "period": "2026-07-02"}])
         self.assertEqual(close["recent_error_count"], 1)
         self.assertEqual(close["recent_errors"][0]["code"], "BAD_SOURCE_FILE")
+        master = next(
+            item for item in result.datasets if item["dataset"] == config.DATASET_SECURITY_MASTER
+        )
+        self.assertEqual(master["gap"]["scope"], "full_snapshot")
 
     def test_ops_route_returns_dataset_health_check(self) -> None:
         if ops_dataset_health_check is None:
@@ -69,6 +73,12 @@ class DatasetHealthCheckTests(unittest.TestCase):
                 CREATE TABLE margin_trading(trade_date TEXT, market TEXT, stock_id TEXT);
                 CREATE TABLE day_trading(trade_date TEXT, market TEXT, stock_id TEXT);
                 CREATE TABLE monthly_revenue(revenue_month TEXT, market TEXT, stock_id TEXT);
+                CREATE TABLE security_master(
+                  market TEXT,
+                  stock_id TEXT,
+                  effective_from TEXT,
+                  source_updated_date TEXT
+                );
                 CREATE TABLE import_batches(
                   batch_id TEXT PRIMARY KEY,
                   dataset TEXT NOT NULL,
@@ -120,6 +130,13 @@ class DatasetHealthCheckTests(unittest.TestCase):
                 "INSERT INTO monthly_revenue VALUES (?, ?, ?)",
                 [("2026-05", "TWSE", "2330"), ("2026-05", "TPEX", "8069")],
             )
+            conn.executemany(
+                "INSERT INTO security_master VALUES (?, ?, ?, ?)",
+                [
+                    ("TWSE", "2330", "2026-07-01", "2026-07-02"),
+                    ("TPEX", "8069", "2026-07-01", "2026-07-02"),
+                ],
+            )
             for dataset in (
                 config.DATASET_DAILY_CLOSE,
                 config.DATASET_LEGAL_INVESTOR,
@@ -137,6 +154,7 @@ class DatasetHealthCheckTests(unittest.TestCase):
                         self._insert_batch(conn, dataset, market, period)
             for market in config.MARKETS:
                 self._insert_batch(conn, config.DATASET_REVENUE, market, "2026-05")
+                self._insert_batch(conn, config.DATASET_SECURITY_MASTER, market, "2026-07-02")
             conn.execute(
                 "INSERT INTO import_errors VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (

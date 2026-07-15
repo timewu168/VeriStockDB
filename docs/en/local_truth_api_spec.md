@@ -27,6 +27,7 @@ This is the English companion for the Local Truth API contract. The API exposes 
 - `GET /api/v1/daily-close`
 - `GET /api/v1/attention-notices`
 - `GET /api/v1/disposal-notices`
+- `GET /api/v1/disposal-notices/active`
 - `GET /api/v1/legal-investors`
 - `GET /api/v1/margin-trading`
 - `GET /api/v1/day-trading`
@@ -50,6 +51,20 @@ This is the English companion for the Local Truth API contract. The API exposes 
 - `fields` may restrict returned columns where supported.
 - Pagination uses `limit` and `offset`.
 - Error responses must identify invalid parameters rather than silently coercing them.
+
+## Active Disposal Contract
+
+`GET /api/v1/disposal-notices/active` returns securities that remain under disposal measures on the current `Asia/Taipei` date and have an effective official security-master row.
+
+- `interval`: `all`, `5`, or `20`; default `all`.
+- `sort`: only `announcement_date_desc`.
+- `limit`: default `100`, maximum `10000`; `offset` defaults to `0`.
+- Each item contains `stock_id`, `stock_name`, `market`, `industry_name`, `interval_minutes`, `announcement_date`, `disposal_start_date`, and `disposal_end_date`.
+- Duplicate market/stock rows retain the newest announcement with deterministic ordering.
+- Missing four-digit stock master rows and unresolved intervals fail closed with warning messages.
+- Warrants, bonds, and other non-stock identifiers are excluded with informational messages.
+- No effective security-master data returns `503 DATA_UNAVAILABLE`.
+- The existing `/api/v1/disposal-notices` raw-notice contract remains unchanged.
 
 ## Manual Update Jobs
 
