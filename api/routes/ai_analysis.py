@@ -42,7 +42,8 @@ def _report(snapshot: dict, provider: str, generated: str, analysis_id: str, dig
     return "\n\n".join(text) + "\n"
 
 def _run_codex(snapshot_path: Path, output_path: Path) -> str:
-    prompt = """使用 disposition-stock-analysis Skill 分析 snapshot.json。只輸出符合固定章節的 Markdown，必須包含 YAML front matter、所有要求章節與免責聲明。只能使用 snapshot.json，不得編造資料。"""
+    skill = Path(__file__).resolve().parents[2] / "skills/disposition-stock-analysis/SKILL.md"
+    prompt = f"""請先閱讀共用 Skill：{skill}，再分析同一目錄的 snapshot.json。只輸出 Skill 規定的 Markdown 正文，不要輸出 YAML front matter。只能使用 snapshot.json，不得編造資料。"""
     try:
         completed = subprocess.run([
             "/home/timewu/.local/bin/codex", "exec", "-s", "read-only", "--ephemeral", "--skip-git-repo-check",
