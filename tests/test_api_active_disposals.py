@@ -56,6 +56,7 @@ class ActiveDisposalApiTests(unittest.TestCase):
         self.assertEqual(
             set(body["data"]["items"][0]),
             {
+                "disposition_id",
                 "stock_id",
                 "stock_name",
                 "market",

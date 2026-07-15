@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 import config
 from api.date_utils import validate_api_date
 from api.deps import read_only_connection, require_permission
+from api.disposition_utils import disposition_notice_id
 from api.schemas import success_response
 from validate.close_rules import _clean_stock_id
 
@@ -408,6 +409,13 @@ def _normalize_active_rows(rows: list[sqlite3.Row]) -> tuple[list[dict], list[di
             continue
         items.append(
             {
+                "disposition_id": disposition_notice_id(
+                    str(row["market"]),
+                    str(row["stock_id"]),
+                    str(row["announcement_date"]),
+                    str(row["disposal_start_date"]),
+                    str(row["disposal_end_date"]),
+                ),
                 "stock_id": row["stock_id"],
                 "stock_name": row["stock_name"],
                 "market": row["market"],
