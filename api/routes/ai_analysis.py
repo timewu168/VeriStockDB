@@ -51,7 +51,10 @@ def _run_codex(snapshot_path: Path, output_path: Path) -> str:
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise HTTPException(status_code=503, detail=f"Codex provider unavailable: {exc}") from exc
     if completed.returncode != 0 or not output_path.exists() or not output_path.read_text().strip():
-        raise HTTPException(status_code=503, detail="Codex provider failed to generate analysis")
+        log = Path("/srv/veristockdb/logs/ai-analysis.log")
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text((completed.stderr or completed.stdout or "empty Codex output")[-8000:])
+        raise HTTPException(status_code=503, detail=f"Codex provider failed (exit={completed.returncode}); see ai-analysis.log")
     return output_path.read_text()
 
 @router.get("/stocks/{market}/{stock_id}/ai-analyses/latest")
