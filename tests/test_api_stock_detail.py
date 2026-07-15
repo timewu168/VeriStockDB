@@ -58,7 +58,7 @@ class StockDetailApiTests(unittest.TestCase):
         )
         self.assertNotIn("2026-07-16", [row["date"] for row in body["data"]["ohlcv"]])
         self.assertEqual(body["meta"]["price_scale"], 100)
-        self.assertEqual(body["meta"]["institutional_unit"], "shares")
+        self.assertEqual(body["meta"]["institutional_unit"], "lots")
 
     def test_pre_start_reference_uses_three_open_rows_before_start(self) -> None:
         body = disposition_detail(
@@ -90,7 +90,7 @@ class StockDetailApiTests(unittest.TestCase):
 
         self.assertEqual(len(body["data"]["institutional"]), 1)
         self.assertEqual(len(body["data"]["margin"]), 1)
-        self.assertEqual(body["data"]["institutional"][0]["foreign_net_shares"], -1200)
+        self.assertEqual(body["data"]["institutional"][0]["foreign_net_lots"], -1200)
 
     def test_unknown_disposition_id_returns_404(self) -> None:
         with self.assertRaises(HTTPException) as cm:

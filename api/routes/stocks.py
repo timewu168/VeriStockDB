@@ -98,8 +98,8 @@ def disposition_detail(
             "as_of_date": as_of_date,
             "price_scale": PRICE_SCALE,
             "volume_unit": "shares",
-            "institutional_unit": "shares",
-            "margin_unit": "shares",
+            "institutional_unit": "lots",
+            "margin_unit": "lots",
             "ohlcv_trading_days": len(ohlcv),
         },
     )
@@ -461,17 +461,17 @@ def _ohlcv_to_dict(row: sqlite3.Row) -> dict:
 def _institutional_to_dict(row: sqlite3.Row) -> dict:
     return {
         "date": row["trade_date"],
-        "foreign_net_shares": row["foreign_net"],
-        "investment_trust_net_shares": row["investment_trust_net"],
-        "dealer_net_shares": row["dealer_net"],
+        "foreign_net_lots": row["foreign_net"],
+        "investment_trust_net_lots": row["investment_trust_net"],
+        "dealer_net_lots": row["dealer_net"],
     }
 
 
 def _margin_to_dict(row: sqlite3.Row) -> dict:
     return {
         "date": row["trade_date"],
-        "margin_balance_shares": row["margin_balance"],
-        "short_balance_shares": row["short_balance"],
+        "margin_balance_lots": row["margin_balance"],
+        "short_balance_lots": row["short_balance"],
     }
 
 
