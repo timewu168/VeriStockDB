@@ -45,7 +45,7 @@ def _run_codex(snapshot_path: Path, output_path: Path) -> str:
     prompt = """使用 disposition-stock-analysis Skill 分析 snapshot.json。只輸出符合固定章節的 Markdown，必須包含 YAML front matter、所有要求章節與免責聲明。只能使用 snapshot.json，不得編造資料。"""
     try:
         completed = subprocess.run([
-            "/home/timewu/.local/bin/codex", "exec", "-s", "read-only", "--ephemeral",
+            "/home/timewu/.local/bin/codex", "exec", "-s", "read-only", "--ephemeral", "--skip-git-repo-check",
             "-C", str(snapshot_path.parent), "-o", str(output_path), prompt,
         ], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
