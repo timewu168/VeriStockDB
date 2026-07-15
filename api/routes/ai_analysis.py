@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import subprocess
 from datetime import datetime
@@ -17,7 +18,8 @@ from api.schemas import success_response
 
 router = APIRouter(tags=["ai-analysis"])
 ROOT = Path(__import__("os").environ.get("DISPOSITION_AI_ROOT", "/data/appdata/disposition-pwa/ai-analysis"))
-SKILL_VERSION = "2.1.0"
+SKILL_NAME = "taiwan-stock-analysis"
+SKILL_VERSION = "1.0.0"
 SCHEMA_VERSION = "1.0.0"
 
 def _now() -> str:
@@ -61,13 +63,18 @@ def _report(snapshot: dict, provider: str, generated: str, analysis_id: str, dig
     return "\n\n".join(text) + "\n"
 
 def _run_codex(snapshot_path: Path, output_path: Path) -> str:
-    skill = Path(__file__).resolve().parents[2] / "skills/disposition-stock-analysis/SKILL.md"
-    prompt = f"""請先閱讀共用 Skill：{skill}，再分析同一目錄的 snapshot.json。只輸出 Skill 規定的 Markdown 正文，不要輸出 YAML front matter。只能使用 snapshot.json，不得編造資料。"""
+    skill = Path("/home/timewu/.agents/skills/taiwan-stock-analysis/SKILL.md")
+    prompt = f"""請使用 $taiwan-stock-analysis Skill 分析同一目錄的 snapshot.json。
+Skill 入口為 {skill}，必須完整遵循其中的官方資料來源、日期、單位與交叉驗證規則。
+這是單一處置股的綜合分析，請充分使用 Skill 允許的 TWSE、TPEx、MOPS、TDCC、公司投資人專區與合法本機資料來源補足 snapshot 缺口。
+只輸出繁體中文 Markdown 正文，不要輸出 YAML front matter、CLI 或內部 metadata；不要產生買賣指令、目標價或通知邀請。"""
+    env = os.environ.copy()
+    env.update({"HOME": "/home/timewu", "CODEX_HOME": "/home/timewu/.codex"})
     try:
         completed = subprocess.run([
             "/home/timewu/.local/bin/codex", "exec", "-s", "read-only", "--ephemeral", "--skip-git-repo-check",
             "-C", str(snapshot_path.parent), "-o", str(output_path), prompt,
-        ], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, check=False)
+        ], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=600, check=False, env=env)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise HTTPException(status_code=503, detail=f"Codex provider unavailable: {exc}") from exc
     if completed.returncode != 0 or not output_path.exists() or not output_path.read_text().strip():
@@ -102,7 +109,7 @@ def create(market: str, stock_id: str, body: dict, _: None = Depends(require_per
     (folder / "snapshot.json").write_bytes(raw)
     markdown = _run_codex(folder / "snapshot.json", folder / "result.tmp.md")
     (folder / "analysis.md").write_text(markdown)
-    (folder / "metadata.json").write_text(json.dumps({"analysis_id": analysis_id, "provider": "codex", "snapshot_hash": f"sha256:{digest}", "generated_at": generated, "status": "completed"}, ensure_ascii=False, indent=2))
+    (folder / "metadata.json").write_text(json.dumps({"analysis_id": analysis_id, "provider": "codex", "skill_name": SKILL_NAME, "skill_version": SKILL_VERSION, "snapshot_hash": f"sha256:{digest}", "generated_at": generated, "status": "completed"}, ensure_ascii=False, indent=2))
     info = {"analysis_id": analysis_id, "generated_at": generated, "provider": "codex", "data_as_of": snapshot["meta"]["as_of_date"], "relative_path": f"analyses/{analysis_id}/analysis.md"}
     root.joinpath("latest.json").write_text(json.dumps(info, ensure_ascii=False, indent=2))
     history_path = root / "history.json"
