@@ -5,11 +5,12 @@ import json
 import os
 import sqlite3
 import subprocess
+import uuid
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 import config
 from api.deps import read_only_connection, require_permission
@@ -27,6 +28,22 @@ def _now() -> str:
 
 def _base(market: str, stock_id: str, disposition_id: str) -> Path:
     return ROOT / market / stock_id / disposition_id
+
+def _job_path(job_id: str) -> Path:
+    return ROOT / "work" / f"{job_id}.json"
+
+def _write_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2))
+    temporary.replace(path)
+
+def _update_job(job_id: str, **changes: object) -> dict:
+    path = _job_path(job_id)
+    job = json.loads(path.read_text())
+    job.update(changes)
+    _write_json(path, job)
+    return job
 
 def _enrich_snapshot(snapshot: dict, conn: sqlite3.Connection, market: str, stock_id: str) -> dict:
     snapshot["data"]["monthly_revenue"] = [dict(row) for row in conn.execute(
@@ -74,15 +91,39 @@ Skill 入口為 {skill}，必須完整遵循其中的官方資料來源、日期
         completed = subprocess.run([
             "/home/timewu/.local/bin/codex", "exec", "-s", "read-only", "--ephemeral", "--skip-git-repo-check",
             "-C", str(snapshot_path.parent), "-o", str(output_path), prompt,
-        ], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=600, check=False, env=env)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise HTTPException(status_code=503, detail=f"Codex provider unavailable: {exc}") from exc
+        ], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=1800, check=False, env=env)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("Codex analysis exceeded 30 minutes") from exc
+    except OSError as exc:
+        raise RuntimeError(f"Codex provider unavailable: {exc}") from exc
     if completed.returncode != 0 or not output_path.exists() or not output_path.read_text().strip():
         log = Path("/srv/veristockdb/logs/ai-analysis.log")
         log.parent.mkdir(parents=True, exist_ok=True)
         log.write_text((completed.stderr or completed.stdout or "empty Codex output")[-8000:])
-        raise HTTPException(status_code=503, detail=f"Codex provider failed (exit={completed.returncode}); see ai-analysis.log")
+        raise RuntimeError(f"Codex provider failed (exit={completed.returncode}); see ai-analysis.log")
     return output_path.read_text()
+
+def _run_analysis_job(job_id: str, folder: Path, root: Path, info: dict, digest: str) -> None:
+    try:
+        _update_job(job_id, status="running_codex", started_at=_now())
+        markdown = _run_codex(folder / "snapshot.json", folder / "result.tmp.md")
+        (folder / "analysis.md").write_text(markdown)
+        _write_json(folder / "metadata.json", {
+            "analysis_id": info["analysis_id"], "job_id": job_id, "provider": "codex",
+            "skill_name": SKILL_NAME, "skill_version": SKILL_VERSION,
+            "snapshot_hash": f"sha256:{digest}", "generated_at": info["generated_at"],
+            "status": "completed",
+        })
+        _write_json(root / "latest.json", info)
+        history_path = root / "history.json"
+        history = json.loads(history_path.read_text()) if history_path.exists() else {"items": []}
+        history["items"] = [{**info, "is_latest": True}] + [
+            {**item, "is_latest": False} for item in history.get("items", [])
+        ]
+        _write_json(history_path, history)
+        _update_job(job_id, status="completed", completed_at=_now(), analysis_id=info["analysis_id"])
+    except Exception as exc:
+        _update_job(job_id, status="failed", completed_at=_now(), error_message=str(exc))
 
 @router.get("/stocks/{market}/{stock_id}/ai-analyses/latest")
 def latest(market: str, stock_id: str, disposition_id: str = Query(...), _: None = Depends(require_permission("read"))):
@@ -97,23 +138,28 @@ def history(market: str, stock_id: str, disposition_id: str = Query(...), _: Non
     path = _base(market, stock_id, disposition_id) / "history.json"
     return success_response(json.loads(path.read_text()) if path.exists() else {"items": []})
 
+@router.get("/ai-analysis/jobs/{job_id}")
+def analysis_job(job_id: str, _: None = Depends(require_permission("read"))):
+    path = _job_path(job_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="AI analysis job was not found")
+    return success_response(json.loads(path.read_text()))
+
 @router.post("/stocks/{market}/{stock_id}/ai-analyses")
-def create(market: str, stock_id: str, body: dict, _: None = Depends(require_permission("read")), conn: sqlite3.Connection = Depends(read_only_connection)):
+def create(market: str, stock_id: str, body: dict, background_tasks: BackgroundTasks, _: None = Depends(require_permission("read")), conn: sqlite3.Connection = Depends(read_only_connection)):
     disposition_id = str(body.get("disposition_id") or "").strip()
     if not disposition_id: raise HTTPException(status_code=400, detail="disposition_id is required")
     snapshot = disposition_detail(market, stock_id, disposition_id, None, conn, __import__("api.routes.stocks", fromlist=["_taipei_today"])._taipei_today())
     snapshot = _enrich_snapshot(snapshot, conn, market.upper(), stock_id)
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, default=str).encode(); digest = hashlib.sha256(raw).hexdigest()
     root = _base(market, stock_id, disposition_id); root.joinpath("work").mkdir(parents=True, exist_ok=True); root.joinpath("analyses").mkdir(exist_ok=True)
-    generated = _now(); analysis_id = generated.replace("-", "").replace(":", "").replace("+08:00", "") + "-codex"; folder = root / "analyses" / analysis_id; folder.mkdir()
+    generated = _now(); analysis_id = generated.replace("-", "").replace(":", "").replace("+08:00", "") + f"-{uuid.uuid4().hex[:8]}-codex"; folder = root / "analyses" / analysis_id; folder.mkdir()
     (folder / "snapshot.json").write_bytes(raw)
-    markdown = _run_codex(folder / "snapshot.json", folder / "result.tmp.md")
-    (folder / "analysis.md").write_text(markdown)
-    (folder / "metadata.json").write_text(json.dumps({"analysis_id": analysis_id, "provider": "codex", "skill_name": SKILL_NAME, "skill_version": SKILL_VERSION, "snapshot_hash": f"sha256:{digest}", "generated_at": generated, "status": "completed"}, ensure_ascii=False, indent=2))
     info = {"analysis_id": analysis_id, "generated_at": generated, "provider": "codex", "data_as_of": snapshot["meta"]["as_of_date"], "relative_path": f"analyses/{analysis_id}/analysis.md"}
-    root.joinpath("latest.json").write_text(json.dumps(info, ensure_ascii=False, indent=2))
-    history_path = root / "history.json"
-    history = json.loads(history_path.read_text()) if history_path.exists() else {"items": []}
-    history["items"] = [{**info, "is_latest": True}] + [{**item, "is_latest": False} for item in history.get("items", [])]
-    history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2))
-    return success_response({"status": "completed", **info, "markdown": markdown})
+    job_id = f"job_{uuid.uuid4().hex}"
+    _write_json(_job_path(job_id), {
+        "job_id": job_id, "status": "queued", "market": market.upper(), "stock_id": stock_id,
+        "disposition_id": disposition_id, "created_at": generated,
+    })
+    background_tasks.add_task(_run_analysis_job, job_id, folder, root, info, digest)
+    return success_response({"status": "queued", "job_id": job_id})
