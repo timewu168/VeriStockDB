@@ -47,7 +47,7 @@ def _run_codex(snapshot_path: Path, output_path: Path) -> str:
         completed = subprocess.run([
             "/home/timewu/.local/bin/codex", "exec", "-s", "read-only", "--ephemeral",
             "-C", str(snapshot_path.parent), "-o", str(output_path), prompt,
-        ], capture_output=True, text=True, timeout=300, check=False)
+        ], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise HTTPException(status_code=503, detail=f"Codex provider unavailable: {exc}") from exc
     if completed.returncode != 0 or not output_path.exists() or not output_path.read_text().strip():
