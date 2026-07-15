@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -40,6 +41,19 @@ def _report(snapshot: dict, provider: str, generated: str, analysis_id: str, dig
     text.append("\n---\n\n本內容為資料整理與模型解讀，不構成投資建議。")
     return "\n\n".join(text) + "\n"
 
+def _run_codex(snapshot_path: Path, output_path: Path) -> str:
+    prompt = """使用 disposition-stock-analysis Skill 分析 snapshot.json。只輸出符合固定章節的 Markdown，必須包含 YAML front matter、所有要求章節與免責聲明。只能使用 snapshot.json，不得編造資料。"""
+    try:
+        completed = subprocess.run([
+            "/home/timewu/.local/bin/codex", "exec", "-s", "read-only", "--ephemeral",
+            "-C", str(snapshot_path.parent), "-o", str(output_path), prompt,
+        ], capture_output=True, text=True, timeout=300, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(status_code=503, detail=f"Codex provider unavailable: {exc}") from exc
+    if completed.returncode != 0 or not output_path.exists() or not output_path.read_text().strip():
+        raise HTTPException(status_code=503, detail="Codex provider failed to generate analysis")
+    return output_path.read_text()
+
 @router.get("/stocks/{market}/{stock_id}/ai-analyses/latest")
 def latest(market: str, stock_id: str, disposition_id: str = Query(...), _: None = Depends(require_permission("read"))):
     path = _base(market, stock_id, disposition_id) / "latest.json"
@@ -61,7 +75,10 @@ def create(market: str, stock_id: str, body: dict, _: None = Depends(require_per
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, default=str).encode(); digest = hashlib.sha256(raw).hexdigest()
     root = _base(market, stock_id, disposition_id); root.joinpath("work").mkdir(parents=True, exist_ok=True); root.joinpath("analyses").mkdir(exist_ok=True)
     generated = _now(); analysis_id = generated.replace("-", "").replace(":", "").replace("+08:00", "") + "-codex"; folder = root / "analyses" / analysis_id; folder.mkdir()
-    (folder / "snapshot.json").write_bytes(raw); (folder / "analysis.md").write_text(_report(snapshot, "codex", generated, analysis_id, digest)); (folder / "metadata.json").write_text(json.dumps({"analysis_id": analysis_id, "provider": "codex", "snapshot_hash": f"sha256:{digest}", "generated_at": generated, "status": "completed"}, ensure_ascii=False, indent=2))
+    (folder / "snapshot.json").write_bytes(raw)
+    markdown = _run_codex(folder / "snapshot.json", folder / "result.tmp.md")
+    (folder / "analysis.md").write_text(markdown)
+    (folder / "metadata.json").write_text(json.dumps({"analysis_id": analysis_id, "provider": "codex", "snapshot_hash": f"sha256:{digest}", "generated_at": generated, "status": "completed"}, ensure_ascii=False, indent=2))
     info = {"analysis_id": analysis_id, "generated_at": generated, "provider": "codex", "data_as_of": snapshot["meta"]["as_of_date"], "relative_path": f"analyses/{analysis_id}/analysis.md"}
     root.joinpath("latest.json").write_text(json.dumps(info, ensure_ascii=False, indent=2)); root.joinpath("history.json").write_text(json.dumps({"items": [info]}, ensure_ascii=False, indent=2))
-    return success_response({"status": "completed", **info, "markdown": (folder / "analysis.md").read_text()})
+    return success_response({"status": "completed", **info, "markdown": markdown})
