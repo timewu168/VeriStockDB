@@ -17,7 +17,7 @@ from api.schemas import success_response
 
 router = APIRouter(tags=["ai-analysis"])
 ROOT = Path(__import__("os").environ.get("DISPOSITION_AI_ROOT", "/data/appdata/disposition-pwa/ai-analysis"))
-SKILL_VERSION = "1.0.0"
+SKILL_VERSION = "2.1.0"
 SCHEMA_VERSION = "1.0.0"
 
 def _now() -> str:
@@ -25,6 +25,25 @@ def _now() -> str:
 
 def _base(market: str, stock_id: str, disposition_id: str) -> Path:
     return ROOT / market / stock_id / disposition_id
+
+def _enrich_snapshot(snapshot: dict, conn: sqlite3.Connection, market: str, stock_id: str) -> dict:
+    snapshot["data"]["monthly_revenue"] = [dict(row) for row in conn.execute(
+        "SELECT * FROM monthly_revenue WHERE market = ? AND stock_id = ? ORDER BY revenue_month DESC LIMIT 12",
+        (market, stock_id),
+    ).fetchall()]
+    snapshot["data"]["day_trading"] = [dict(row) for row in conn.execute(
+        "SELECT * FROM day_trading WHERE market = ? AND stock_id = ? ORDER BY trade_date DESC LIMIT 30",
+        (market, stock_id),
+    ).fetchall()]
+    snapshot["data"]["attention_notices"] = [dict(row) for row in conn.execute(
+        "SELECT trade_date, notice_text FROM attention_notices WHERE market = ? AND stock_id = ? ORDER BY trade_date DESC LIMIT 20",
+        (market, stock_id),
+    ).fetchall()]
+    snapshot["data"]["unavailable_sections"] = [
+        "broker_branches", "shareholding_distribution", "financial_statements",
+        "self_reported_financials", "news_and_market_themes",
+    ]
+    return snapshot
 
 def _report(snapshot: dict, provider: str, generated: str, analysis_id: str, digest: str) -> str:
     s = snapshot["data"]; stock = s["stock"]; disp = s["disposition"]
@@ -76,6 +95,7 @@ def create(market: str, stock_id: str, body: dict, _: None = Depends(require_per
     disposition_id = str(body.get("disposition_id") or "").strip()
     if not disposition_id: raise HTTPException(status_code=400, detail="disposition_id is required")
     snapshot = disposition_detail(market, stock_id, disposition_id, None, conn, __import__("api.routes.stocks", fromlist=["_taipei_today"])._taipei_today())
+    snapshot = _enrich_snapshot(snapshot, conn, market.upper(), stock_id)
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, default=str).encode(); digest = hashlib.sha256(raw).hexdigest()
     root = _base(market, stock_id, disposition_id); root.joinpath("work").mkdir(parents=True, exist_ok=True); root.joinpath("analyses").mkdir(exist_ok=True)
     generated = _now(); analysis_id = generated.replace("-", "").replace(":", "").replace("+08:00", "") + "-codex"; folder = root / "analyses" / analysis_id; folder.mkdir()
@@ -84,5 +104,9 @@ def create(market: str, stock_id: str, body: dict, _: None = Depends(require_per
     (folder / "analysis.md").write_text(markdown)
     (folder / "metadata.json").write_text(json.dumps({"analysis_id": analysis_id, "provider": "codex", "snapshot_hash": f"sha256:{digest}", "generated_at": generated, "status": "completed"}, ensure_ascii=False, indent=2))
     info = {"analysis_id": analysis_id, "generated_at": generated, "provider": "codex", "data_as_of": snapshot["meta"]["as_of_date"], "relative_path": f"analyses/{analysis_id}/analysis.md"}
-    root.joinpath("latest.json").write_text(json.dumps(info, ensure_ascii=False, indent=2)); root.joinpath("history.json").write_text(json.dumps({"items": [info]}, ensure_ascii=False, indent=2))
+    root.joinpath("latest.json").write_text(json.dumps(info, ensure_ascii=False, indent=2))
+    history_path = root / "history.json"
+    history = json.loads(history_path.read_text()) if history_path.exists() else {"items": []}
+    history["items"] = [{**info, "is_latest": True}] + [{**item, "is_latest": False} for item in history.get("items", [])]
+    history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2))
     return success_response({"status": "completed", **info, "markdown": markdown})
