@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 import config
 from api.routes import (
     attention_notices,
+    ai_analysis,
     batches,
     daily_close,
     day_trading,
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(datasets.router, prefix="/api/v1")
     app.include_router(daily_close.router, prefix="/api/v1")
     app.include_router(attention_notices.router, prefix="/api/v1")
+    app.include_router(ai_analysis.router, prefix="/api/v1")
     app.include_router(disposal_notices.router, prefix="/api/v1")
     app.include_router(legal_investors.router, prefix="/api/v1")
     app.include_router(margin_trading.router, prefix="/api/v1")
