@@ -7,10 +7,10 @@
 
 ## Current Stage
 
-- Latest release target: `v0.6.6` PWA health status reporting patch.
+- Latest release target: `v0.7.0` official security master and active disposal API contract.
 - Latest pushed release before this update: `v0.6.5`.
 - Public-preview gate status: `v0.4.0` completed; public repo polish and repo hygiene completed.
-- Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
+- Completed production SQLite datasets: `daily_close`, `attention_notices`, `disposal_notices`, `security_master`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`.
 - Completed read-only Local Truth API endpoints: Close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, trading days, dataset status, dataset health, all-dataset health check, batches, errors, events, ops summary, schedule health, and jobs.
 - Local Management PWA MVP is implemented under `web/` and served by FastAPI static mount at `/`.
 - PWA dataset status page includes manual update buttons backed by allow-listed job API commands.
@@ -24,6 +24,7 @@
 - `v0.6.4` adds `docs/new_dataset_sop.md` for future dataset additions from source discovery through PWA/API/release.
 - `v0.6.5` adds all-dataset health check CLI/API/PWA for row count, duplicate key, latest, gap, recent errors, and recent non-OK batches.
 - `v0.6.6` fixes PWA dataset status visibility for single-market lag and schedule-health false WARN behavior.
+- `v0.7.0` adds an official effective-dated security master and `/api/v1/disposal-notices/active` for downstream projects.
 - Repository hygiene now includes MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, GitHub issue templates, GitHub Actions CI, public README positioning, and public maintenance issues.
 
 ## Accepted Baseline
@@ -134,7 +135,11 @@
   - production DB smoke returned `dataset-health-check OK`.
   - latest production smoke row counts: daily_close `8715496`, attention_notices `102605`, disposal_notices `7716`, legal_investors `5832010`, margin_trading `8146089`, day_trading `4037752`, monthly_revenue `280711`.
   - latest production smoke latest periods: daily_close `2026-07-01`, legal_investors `2026-07-01`, margin_trading `2026-07-01`, day_trading `2026-07-01`, monthly_revenue `2026-05`.
-  - duplicate keys `0`, gaps `0`, recent errors `0` for all seven canonical datasets in latest smoke.
+  - duplicate keys `0`, gaps `0`, recent errors `0` for all seven datasets in that v0.6.5 smoke.
+- `v0.7.0` production validation on 2026-07-15:
+  - `security_master`: TWSE `1089`, TPEX `891`, total `1980`; duplicate keys, gaps, and recent errors all `0`.
+  - active disposal API returned `27` verified stocks and excluded `10` non-stock securities with quality status `OK`.
+  - all eight datasets returned `dataset-health-check OK`; `PRAGMA integrity_check` returned `ok`.
 - Latest public repository verification on 2026-06-29:
   - GitHub repository `timewu168/VeriStockDB` is public.
   - GitHub profile `timewu168` is publicly accessible.
@@ -147,6 +152,7 @@
   - `daily_close`
   - `attention_notices`
   - `disposal_notices`
+  - `security_master`
   - `legal_investors`
   - `margin_trading`
   - `day_trading`
@@ -159,7 +165,8 @@
 
 ## Data Sources And ETL State
 
-- Daily close, attention notices, disposal notices, legal investors, margin trading, day trading, monthly revenue, and trading days are canonicalized in SQLite.
+- Daily close, attention notices, disposal notices, security master, legal investors, margin trading, day trading, monthly revenue, and trading days are canonicalized in SQLite.
+- Security master uses official TWSE/TPEX OpenAPI company profiles and stores effective-dated name and industry history.
 - API date query parameters for daily datasets must use strict `YYYY-MM-DD`; monthly revenue uses strict `YYYY-MM`; compact dates such as `20260615` are rejected and are not used as DB values.
 - PWA data source is Local Truth API only. It must not parse CLI stdout, directly read SQLite, or execute arbitrary shell commands.
 - Manual PWA update commands are allow-listed to the existing `main.py update-*` commands for completed datasets only.
@@ -196,9 +203,9 @@
 
 ## Schema/Migration State
 
-- Current code version in `config.py`: `APP_VERSION=0.6.6`.
-- Current schema version in `config.py`: `SCHEMA_VERSION=0.4-monthly-revenue`.
-- `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
+- Current code version in `config.py`: `APP_VERSION=0.7.0`.
+- Current schema version in `config.py`: `SCHEMA_VERSION=0.5-security-master`.
+- `db/schema.sql` includes accepted tables and indexes for `daily_close`, `attention_notices`, `disposal_notices`, `security_master`, `legal_investors`, `margin_trading`, `day_trading`, `monthly_revenue`, `trading_days`, `import_batches`, `import_errors`, `data_events`, `settings`, and `ops_jobs`.
 - `legal_investors` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `margin_trading` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
 - `day_trading` canonical key: `PRIMARY KEY (trade_date, market, stock_id)`.
@@ -211,44 +218,14 @@
 
 ## Modified Files
 
-- `v0.6.5` working tree changes before commit:
-  - `CURRENT_STATE.md`
-  - `CHANGELOG.md`
-  - `README.md`
-  - `api/routes/ops.py`
-  - `config.py`
-  - `docs/local_truth_api_spec.md`
-  - `docs/version_roadmap_checklist.md`
-  - `main.py`
-  - `services/dataset_health_check.py`
-  - `tests/test_dataset_health_check.py`
-  - `web/app.js`
-  - `web/index.html`
-  - `web/service-worker.js`
-
-Previously committed `v0.5.1` files:
-
-  - `api/app.py`
-  - `api/routes/jobs.py`
-  - `db/schema.sql`
-  - `README.md`
-  - `docs/ubuntu_private_deployment.md`
-
-Previously committed `v0.5.0` files:
-
-  - `api/deps.py`
-  - `api/routes/datasets.py`
-  - `tests/test_api_core.py`
-  - `tests/test_api_legal_margin.py`
-  - `web/`
+- `v0.7.0` changes cover the security-master schema/ingestion, active disposal API, dataset/jobs/PWA integration, tests, and bilingual release/API documentation.
 - Current local untracked files/directories not intended for Git:
   - `.venv/`
-  - `reports/`
 
 ## Next Gate
 
-- Current gate: validate and release `v0.6.6` patch with commit/tag/push after user approval.
-- After `v0.6.6`, planned `v0.6.x` close-out items are complete; next phase is long-running observation unless reprioritized.
+- Current gate: validate, commit, push, and open the `v0.7.0` draft PR.
+- After the `v0.7.0` PR is reviewed and merged, create the release tag; production security-master scheduling remains an explicit operator action.
 - Production schedule verification for day trading and monthly revenue remains open and should be checked after the next real timer runs.
 - Do not start a new dataset import, schema migration, or production schedule change until explicitly requested.
 

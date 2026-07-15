@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.6.6"
-SCHEMA_VERSION = "0.4-monthly-revenue"
+APP_VERSION = "0.7.0"
+SCHEMA_VERSION = "0.5-security-master"
 
 
 def _path_from_env(name: str, default: Path) -> Path:
@@ -53,6 +53,7 @@ DATASET_LEGAL_INVESTOR = "legal_investor"
 DATASET_MARGIN = "margin"
 DATASET_DAY_TRADING = "day_trading"
 DATASET_REVENUE = "revenue"
+DATASET_SECURITY_MASTER = "security_master"
 MARKETS = ("TWSE", "TPEX")
 
 API_HOST = os.environ.get("VERISTOCK_API_HOST", "127.0.0.1")
@@ -158,3 +159,5 @@ URL_TPEX_DISPOSAL_NOTICE = (
     "?startDate={start_date_url}&endDate={end_date_url}"
     "&code=&cate=&type=all&reason=-1&measure=-1&order=date&id=&response=csv"
 )
+URL_TWSE_SECURITY_MASTER = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
+URL_TPEX_SECURITY_MASTER = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"

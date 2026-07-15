@@ -14,6 +14,7 @@
 - `../CHANGELOG.md`：唯一正式版本紀錄；舊 handoff 內的 `CHANGELOG.md` 不再作為 release history。
 - `project_completion_inventory.md`：專案完成度總盤點，供 PM 或整合 owner 評估接入其他專案/服務。
 - `local_truth_api_spec.md`：Local Truth API 契約。
+- `security_master.md`：官方證券主檔來源、SCD 生效期間、產業對應與 active disposal 品質邊界。
 - `version_roadmap_checklist.md`：版本路線、完成條件與 deferred 工作。
 - `data_ingestion_global_policy.md`：資料入庫防禦與驗證原則。
 - `new_dataset_sop.md`：未來新增官方資料表時，從爬蟲、驗證、入庫、排程、API 到 PWA 的標準流程。

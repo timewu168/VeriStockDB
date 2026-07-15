@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
+from datetime import date, datetime
+import re
+from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -32,6 +35,101 @@ FIELD_SQL = {
     "disposal_text": "disposal_text",
 }
 DEFAULT_FIELDS = tuple(FIELD_SQL.keys())
+ACTIVE_SORT = "announcement_date_desc"
+INTERVAL_PATTERNS = {
+    5: re.compile(r"每\s*(?:5|５|五)\s*分鐘"),
+    20: re.compile(r"每\s*(?:20|２０|二十)\s*分鐘"),
+}
+
+
+def _taipei_today() -> str:
+    return datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
+
+
+@router.get("/disposal-notices/active")
+def active_disposal_notices(
+    interval: Literal["all", "5", "20"] = "all",
+    limit: int = 100,
+    offset: int = 0,
+    sort: Literal["announcement_date_desc"] = ACTIVE_SORT,
+    _: None = Depends(require_permission("read")),
+    conn: sqlite3.Connection = Depends(read_only_connection),
+    as_of_date: str = Depends(_taipei_today),
+) -> dict:
+    if limit < 1 or limit > MAX_LIMIT or offset < 0:
+        raise _api_error(
+            "INVALID_PAGINATION",
+            status.HTTP_400_BAD_REQUEST,
+            f"limit must be 1..{MAX_LIMIT} and offset must be >= 0",
+            {"limit": limit, "offset": offset},
+        )
+    as_of_date = _validate_date_filter("as_of_date", as_of_date)
+    try:
+        master_count = conn.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM security_master
+            WHERE effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)
+            """,
+            (as_of_date, as_of_date),
+        ).fetchone()["count"]
+        if not master_count:
+            raise _api_error(
+                "DATA_UNAVAILABLE",
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "security_master has no effective rows for as_of_date",
+                {"as_of_date": as_of_date},
+            )
+        rows = _query_active_disposal_notices(conn, as_of_date)
+        generated_at = _active_generated_at(conn)
+    except HTTPException:
+        raise
+    except sqlite3.Error as exc:
+        raise _api_error(
+            "DB_UNAVAILABLE",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "active disposal notices are not readable",
+            {"reason": str(exc)},
+        ) from exc
+
+    normalized, messages = _normalize_active_rows(rows)
+    if interval != "all":
+        normalized = [item for item in normalized if item["interval_minutes"] == int(interval)]
+    total = len(normalized)
+    items = normalized[offset : offset + limit]
+    warning_count = sum(
+        int(message["count"]) for message in messages if message["level"] == "warning"
+    )
+    excluded_count = sum(
+        int(message["count"])
+        for message in messages
+        if message["code"] == "NON_STOCK_SECURITY_EXCLUDED"
+    )
+    meta = {
+        "filters": {
+            "as_of_date": as_of_date,
+            "interval": interval,
+            "sort": sort,
+        },
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "returned": len(items),
+            "has_more": offset + len(items) < total,
+        },
+        "quality": {
+            "status": "WARN" if warning_count else "OK",
+            "rejected": warning_count,
+            "excluded": excluded_count,
+        },
+    }
+    if generated_at:
+        meta["generated_at"] = generated_at
+    return success_response(
+        {"as_of_date": as_of_date, "total": total, "items": items},
+        meta=meta,
+        messages=messages,
+    )
 
 
 @router.get("/disposal-notices")
@@ -245,6 +343,119 @@ def _query_disposal_notices(
         """,
         params,
     ).fetchall()
+
+
+def _query_active_disposal_notices(
+    conn: sqlite3.Connection, as_of_date: str
+) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT
+          d.trade_date AS announcement_date,
+          d.market,
+          d.stock_id,
+          COALESCE(sm.stock_name, d.stock_name) AS stock_name,
+          sm.industry_name,
+          d.disposal_start_date,
+          d.disposal_end_date,
+          d.disposal_text
+        FROM disposal_notices AS d
+        LEFT JOIN security_master AS sm
+          ON sm.market = d.market
+         AND sm.stock_id = d.stock_id
+         AND sm.effective_from <= ?
+         AND (sm.effective_to IS NULL OR sm.effective_to >= ?)
+        WHERE d.disposal_start_date <= ? AND d.disposal_end_date >= ?
+        ORDER BY
+          d.trade_date DESC,
+          d.disposal_start_date DESC,
+          d.market ASC,
+          d.stock_id ASC
+        """,
+        (as_of_date, as_of_date, as_of_date, as_of_date),
+    ).fetchall()
+
+
+def normalize_interval_minutes(disposal_text: str) -> int | None:
+    matches = {
+        interval
+        for interval, pattern in INTERVAL_PATTERNS.items()
+        if pattern.search(disposal_text)
+    }
+    return matches.pop() if len(matches) == 1 else None
+
+
+def _normalize_active_rows(rows: list[sqlite3.Row]) -> tuple[list[dict], list[dict]]:
+    items: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    problems: dict[str, dict] = {}
+    for row in rows:
+        key = (str(row["market"]), str(row["stock_id"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        interval = normalize_interval_minutes(str(row["disposal_text"]))
+        if not row["industry_name"]:
+            code = (
+                "NON_STOCK_SECURITY_EXCLUDED"
+                if len(str(row["stock_id"])) > 4
+                else "MISSING_SECURITY_MASTER"
+            )
+            _record_active_problem(problems, code, key)
+            continue
+        if interval is None:
+            _record_active_problem(problems, "UNRESOLVED_INTERVAL", key)
+            continue
+        items.append(
+            {
+                "stock_id": row["stock_id"],
+                "stock_name": row["stock_name"],
+                "market": row["market"],
+                "industry_name": row["industry_name"],
+                "interval_minutes": interval,
+                "announcement_date": row["announcement_date"],
+                "disposal_start_date": row["disposal_start_date"],
+                "disposal_end_date": row["disposal_end_date"],
+            }
+        )
+    messages = [problems[code] for code in sorted(problems)]
+    return items, messages
+
+
+def _record_active_problem(
+    problems: dict[str, dict], code: str, key: tuple[str, str]
+) -> None:
+    problem = problems.setdefault(
+        code,
+        {
+            "code": code,
+            "level": "info" if code == "NON_STOCK_SECURITY_EXCLUDED" else "warning",
+            "message": {
+                "MISSING_SECURITY_MASTER": "active stock has no effective security master row",
+                "NON_STOCK_SECURITY_EXCLUDED": "active non-stock security is excluded from the stock list",
+                "UNRESOLVED_INTERVAL": "active notice interval cannot be normalized to 5 or 20 minutes",
+            }[code],
+            "count": 0,
+            "samples": [],
+        },
+    )
+    problem["count"] += 1
+    if len(problem["samples"]) < 5:
+        problem["samples"].append({"market": key[0], "stock_id": key[1]})
+
+
+def _active_generated_at(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute(
+        """
+        SELECT MAX(checked_at) AS checked_at
+        FROM import_batches
+        WHERE dataset IN (?, ?) AND status IN ('OK', 'FIXED')
+        """,
+        (config.DATASET_DISPOSAL_NOTICE, config.DATASET_SECURITY_MASTER),
+    ).fetchone()
+    if not row or not row["checked_at"]:
+        return None
+    return str(row["checked_at"]).replace("+00:00", "Z")
 
 
 def _row_to_dict(row: sqlite3.Row, selected_fields: list[str]) -> dict:

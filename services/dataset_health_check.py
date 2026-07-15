@@ -106,6 +106,15 @@ DATASET_CHECKS = (
         key_columns=("revenue_month", "market", "stock_id"),
         coverage_mode="dense_month",
     ),
+    DatasetCheckDefinition(
+        dataset=config.DATASET_SECURITY_MASTER,
+        title="股票基本資料",
+        table="security_master",
+        period_column="source_updated_date",
+        period_type="date",
+        key_columns=("market", "stock_id", "effective_from"),
+        coverage_mode="full_snapshot",
+    ),
 )
 
 
@@ -250,6 +259,14 @@ def _gap_report(
     latest_open_date: str | None,
     sample_limit: int,
 ) -> dict:
+    if definition.coverage_mode == "full_snapshot":
+        return {
+            "scope": "full_snapshot",
+            "missing_count": 0,
+            "samples": [],
+            "by_market": {},
+            "message": "full official snapshot dataset; daily row gaps are not applicable",
+        }
     if definition.coverage_mode == "sparse_notice":
         return {
             "scope": "sparse_notice",

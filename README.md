@@ -5,9 +5,9 @@
 <!-- /i18n-switch -->
 
 
-Version: v0.6.6
+Version: v0.7.0
 
-VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
+VeriStockDB 是本機台股 SQLite 真理資料庫。它把官方資料下載、驗證、擋錯後才寫入主表，目標是讓 Close、注意、處置、證券主檔、法人、資券、當沖、月營收與交易日資料可被本地 CLI、API、PWA 或分析程式穩定查詢。
 
 VeriStockDB 不是交易建議系統，不連接券商，不下單，也不是公開雲端 API。
 
@@ -22,6 +22,7 @@ VeriStockDB 不是交易建議系統，不連接券商，不下單，也不是�
 - `daily_close`
 - `attention_notices`
 - `disposal_notices`
+- `security_master`
 - `legal_investors`
 - `margin_trading`
 - `day_trading`
@@ -111,6 +112,7 @@ python3 main.py inspect-disposal --twse-file path/to/twse.csv --tpex-file path/t
 python3 main.py import-disposal --file path/to/disposal.csv --market TWSE
 python3 main.py update-disposal
 python3 main.py query-disposal --stock-id 2330 --from 2026-06-01 --to 2026-06-18
+python3 main.py update-security-master
 ```
 
 三大法人：
@@ -206,6 +208,7 @@ Local Truth API 已完成以下端點：
 - `GET /api/v1/daily-close`
 - `GET /api/v1/attention-notices`
 - `GET /api/v1/disposal-notices`
+- `GET /api/v1/disposal-notices/active`
 - `GET /api/v1/legal-investors`
 - `GET /api/v1/margin-trading`
 - `GET /api/v1/day-trading`
@@ -260,6 +263,7 @@ PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command�
 - Trading days：TWSE `FMTQIK` 月曆，TWSE 異常時使用 TPEX 備援。
 - Attention notices：TWSE/TPEX 官方注意股公告 CSV。
 - Disposal notices：TWSE/TPEX 官方處置公告 CSV；查詢區間會延伸到目標日後方以取得最新公告。
+- Security master：TWSE/TPEX 官方 OpenAPI 上市櫃公司基本資料，以生效期間保存名稱與產業別。
 - Legal investors：TWSE/TPEX 官方三大法人 CSV。
 - Margin trading：TWSE `MI_MARGN`，TPEX `margin/balance` CSV；TPEX canonical scope 從 `2008-09-30` 開始。
 - Day trading：TWSE `TWTB4U`、TPEX `intraday/stat` CSV，canonical scope 從 `2014-01-06` 開始。
@@ -268,7 +272,7 @@ PWA 不直接讀 SQLite、不解析 CLI stdout、不執行任意 shell command�
 
 ### 資料源邊界
 
-VeriStockDB v0.6.6 的 canonical pipeline 目前使用已驗證的官方 CSV/JSON 下載流程、本機 cache/archive，以及使用者提供的 CSV 匯入。TWSE/TPEX OpenAPI 端點在現階段不作為 canonical database 既有 CSV/JSON 來源的替代品，因為其欄位、語意或涵蓋範圍可能與目前驗證流程使用的來源不同。使用者必須自行遵守各資料來源的使用條款；VeriStockDB 不授予官方原始資料的再散布權利。
+VeriStockDB v0.7.0 的 canonical pipeline 使用已驗證的官方 CSV/JSON 下載流程、本機 cache/archive，以及使用者提供的 CSV 匯入。證券主檔明確使用 TWSE/TPEX OpenAPI 的公司基本資料；其餘既有資料集不以 OpenAPI 取代已驗證來源。使用者必須自行遵守各資料來源的使用條款；VeriStockDB 不授予官方原始資料的再散布權利。
 
 ## Documentation Boundary
 

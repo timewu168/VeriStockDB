@@ -5,9 +5,9 @@
 [中文](README.md) | [English](README.en.md)
 <!-- /i18n-switch -->
 
-Version: v0.6.6
+Version: v0.7.0
 
-VeriStockDB is a local Taiwan stock-market SQLite canonical truth database. It downloads official market data, validates source files, blocks suspicious records, and only then writes accepted data into canonical tables. The goal is to make daily close, attention notices, disposal notices, institutional investors, margin trading, day trading, monthly revenue, and trading-day data stable for local CLI, API, PWA, and analysis workflows.
+VeriStockDB is a local Taiwan stock-market SQLite canonical truth database. It downloads official market data, validates source files, blocks suspicious records, and only then writes accepted data into canonical tables. The goal is to make daily close, attention notices, disposal notices, security master, institutional investors, margin trading, day trading, monthly revenue, and trading-day data stable for local CLI, API, PWA, and analysis workflows.
 
 VeriStockDB is not a trading-advice system, broker integration, order-execution system, or public cloud API.
 
@@ -22,6 +22,7 @@ Canonical SQLite datasets:
 - `daily_close`
 - `attention_notices`
 - `disposal_notices`
+- `security_master`
 - `legal_investors`
 - `margin_trading`
 - `day_trading`
@@ -77,6 +78,7 @@ Dataset update commands:
 python3 main.py update-close
 python3 main.py update-attention
 python3 main.py update-disposal
+python3 main.py update-security-master
 python3 main.py update-legal
 python3 main.py update-margin
 python3 main.py update-day-trading
@@ -107,6 +109,7 @@ Production timer changes require explicit operator approval and manual sudo acti
 - Trading days: TWSE `FMTQIK` monthly calendar, with TPEX fallback when TWSE is abnormal.
 - Attention notices: official TWSE/TPEX attention notice CSV.
 - Disposal notices: official TWSE/TPEX disposal notice CSV; update windows extend past the target date to capture newly published notices.
+- Security master: official TWSE/TPEX OpenAPI company profiles, stored with effective periods for stock name and industry.
 - Legal investors: official TWSE/TPEX institutional-investor CSV.
 - Margin trading: TWSE `MI_MARGN` and TPEX `margin/balance` CSV; TPEX canonical scope starts from `2008-09-30`.
 - Day trading: TWSE `TWTB4U` and TPEX `intraday/stat` CSV; canonical scope starts from `2014-01-06`.
@@ -115,7 +118,7 @@ Production timer changes require explicit operator approval and manual sudo acti
 
 ### Source Boundary
 
-VeriStockDB v0.6.6 canonical pipeline currently uses verified official CSV/JSON download flows, local cache/archive, and user-supplied CSV import. TWSE/TPEX OpenAPI endpoints are not used as replacements at this stage because their fields, semantics, or coverage may differ from the CSV/JSON sources used by the canonical database. Users must comply with the terms of each data source; VeriStockDB does not grant redistribution rights for official raw data.
+VeriStockDB v0.7.0 uses verified official CSV/JSON downloads, local cache/archive, and user-supplied CSV import. The security master explicitly uses the TWSE/TPEX OpenAPI company-profile datasets; existing datasets keep their previously validated sources. Users must comply with each source's terms; VeriStockDB does not grant redistribution rights for official raw data.
 
 ## Local Truth API
 
@@ -139,6 +142,7 @@ Important endpoints:
 - `GET /api/v1/daily-close`
 - `GET /api/v1/attention-notices`
 - `GET /api/v1/disposal-notices`
+- `GET /api/v1/disposal-notices/active`
 - `GET /api/v1/legal-investors`
 - `GET /api/v1/margin-trading`
 - `GET /api/v1/day-trading`

@@ -5,7 +5,7 @@
 <!-- /i18n-switch -->
 
 
-狀態：Local Truth API 已完成至 `v0.5.2`，涵蓋 Close、注意、處置、法人、資券、當沖、月營收、交易日、批次、錯誤、事件、ops summary、dataset status summary 與 PWA 手動更新 jobs。PWA jobs 僅能執行 allow-listed `update-*` 命令，不提供任意 shell command。
+狀態：Local Truth API 已完成至 `v0.7.0`，涵蓋 Close、注意、處置、active disposal、證券主檔、法人、資券、當沖、月營收、交易日、批次、錯誤、事件、ops summary、dataset status summary 與 PWA 手動更新 jobs。PWA jobs 僅能執行 allow-listed `update-*` 命令，不提供任意 shell command。
 
 建立日期：2026-06-04
 
@@ -298,6 +298,7 @@ require_quality=any
 | `GET` | `/api/v1/daily-close` | read | 第一版實作 | Close 查詢 |
 | `GET` | `/api/v1/attention-notices` | read | `v0.3.1` 實作 | 注意股公告查詢 |
 | `GET` | `/api/v1/disposal-notices` | read | `v0.3.2` 實作 | 處置股公告查詢 |
+| `GET` | `/api/v1/disposal-notices/active` | read | `v0.7.0` 實作 | 當日有效股票處置契約 |
 | `GET` | `/api/v1/legal-investors` | read | `v0.3.4` 實作 | 三大法人查詢 |
 | `GET` | `/api/v1/margin-trading` | read | `v0.3.5` 實作 | 資券查詢 |
 | `GET` | `/api/v1/day-trading` | read | `v0.4.5` 實作 | 當沖查詢 |
@@ -794,6 +795,65 @@ Query：
 - `disposal_start_date` / `disposal_end_date` 是處置起迄期間。
 - `reason_text` 統一保存 TWSE 的「處置條件」或 TPEX 的「處置原因」。
 - `disposal_text` 保留官方處置內容原文，不在 API 層解析條款或措施。
+
+### 13.6c `GET /api/v1/disposal-notices/active`
+
+用途：提供下游獨立專案查詢台北當日仍有效、已對上官方證券主檔的股票處置公告。
+
+Query：
+
+| 參數 | 必填 | 說明 |
+| --- | --- | --- |
+| `interval` | 否 | `all`、`5` 或 `20`，預設 `all` |
+| `sort` | 否 | 目前只接受 `announcement_date_desc` |
+| `limit` | 否 | 預設 `100`，最大 `10000` |
+| `offset` | 否 | 預設 `0` |
+
+回傳 envelope：
+
+```json
+{
+  "ok": true,
+  "code": "OK",
+  "meta": {
+    "api_version": "v1",
+    "request_id": "req_...",
+    "generated_at": "2026-07-15T01:53:49Z",
+    "quality": {
+      "status": "OK",
+      "rejected": 0,
+      "excluded": 10
+    }
+  },
+  "data": {
+    "as_of_date": "2026-07-15",
+    "total": 27,
+    "items": [
+      {
+        "stock_id": "4542",
+        "stock_name": "科嶠",
+        "market": "TPEX",
+        "industry_name": "電子零組件業",
+        "interval_minutes": 20,
+        "announcement_date": "2026-07-14",
+        "disposal_start_date": "2026-07-15",
+        "disposal_end_date": "2026-07-28"
+      }
+    ]
+  },
+  "messages": []
+}
+```
+
+品質與排序契約：
+
+- `as_of_date` 由 API 的 `Asia/Taipei` 當日決定，不接受用戶指定任意日期。
+- 同市場同股票只保留最新公告；依公告日、處置起日遞減，再依市場與股票代號穩定排序。
+- `industry_name` 必須來自該處置日有效的 `security_master` 版本。
+- `interval_minutes` 只會是 `5` 或 `20`；無法由官方處置原文明確判定時，該筆 fail-closed 排除並回報 warning。
+- 四碼股票若缺主檔，該筆 fail-closed 排除並回報 warning；權證、債券等非四碼商品以 info 訊息排除。
+- 查無任何有效證券主檔時回傳 `503 DATA_UNAVAILABLE`，不回傳未驗證替代值。
+- 原有 `/api/v1/disposal-notices` 保留原始公告查詢契約，不受此 endpoint 影響。
 
 ### 13.7 `GET /api/v1/batches`
 

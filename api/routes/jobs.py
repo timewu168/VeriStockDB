@@ -29,6 +29,7 @@ UPDATE_COMMANDS: dict[str, tuple[str, ...]] = {
     config.DATASET_MARGIN: ("update-margin",),
     config.DATASET_DAY_TRADING: ("update-day-trading",),
     config.DATASET_REVENUE: ("update-revenue",),
+    config.DATASET_SECURITY_MASTER: ("update-security-master",),
 }
 
 TERMINAL_STATUSES = {"DONE", "FAILED"}

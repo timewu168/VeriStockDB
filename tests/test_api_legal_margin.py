@@ -284,6 +284,11 @@ class LegalMarginApiTests(unittest.TestCase):
               note TEXT NOT NULL DEFAULT '',
               PRIMARY KEY (revenue_month, market, stock_id)
             );
+            CREATE TABLE security_master (
+              market TEXT NOT NULL,
+              stock_id TEXT NOT NULL,
+              source_updated_date TEXT NOT NULL
+            );
             CREATE TABLE trading_days (
               trade_date TEXT PRIMARY KEY,
               is_open INTEGER NOT NULL,

@@ -52,6 +52,25 @@ CREATE INDEX IF NOT EXISTS idx_disposal_notices_date_stock ON disposal_notices(t
 CREATE INDEX IF NOT EXISTS idx_disposal_notices_active_stock
 ON disposal_notices(disposal_start_date, disposal_end_date, stock_id);
 
+CREATE TABLE IF NOT EXISTS security_master (
+  market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),
+  stock_id TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  industry_code TEXT NOT NULL,
+  industry_name TEXT NOT NULL,
+  effective_from TEXT NOT NULL,
+  effective_to TEXT,
+  source_updated_date TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  PRIMARY KEY (market, stock_id, effective_from),
+  CHECK (effective_to IS NULL OR effective_to >= effective_from)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_security_master_current
+ON security_master(market, stock_id) WHERE effective_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_security_master_effective
+ON security_master(market, stock_id, effective_from, effective_to);
+
 CREATE TABLE IF NOT EXISTS legal_investors (
   trade_date TEXT NOT NULL,
   market TEXT NOT NULL CHECK (market IN ('TWSE', 'TPEX')),

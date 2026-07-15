@@ -5,6 +5,32 @@
 <!-- /i18n-switch -->
 
 
+## v0.7.0 - 2026-07-15
+
+### 新增
+
+- 新增 `security_master` canonical dataset，從 TWSE/TPEX 官方 OpenAPI 取得上市櫃公司名稱與產業別，保存來源日期、來源 URL 與生效期間。
+- 新增 `update-security-master` CLI、PWA allow-listed job、dataset status 與健康檢查整合。
+- 新增 `GET /api/v1/disposal-notices/active`，回傳台北當日有效的股票處置公告、官方產業別與正規化 `interval_minutes`。
+- 新增證券主檔與 active disposal API 的 parser、SCD、分頁、排序、去重與 fail-closed 測試。
+
+### 契約
+
+- active endpoint 僅接受 `interval=all|5|20`，固定以最新公告排序，並回傳穩定欄位集合。
+- 無法對上證券主檔的四碼股票與無法判定處置間隔的公告不會進入結果；權證、債券等非股票商品以資訊訊息排除。
+- 原有 `GET /api/v1/disposal-notices` 契約保持不變。
+
+### 變更
+
+- 將 app version bump 至 `0.7.0`，schema version bump 至 `0.5-security-master`。
+- `init-db` 會同步更新 DB 內的 app/schema version metadata。
+- 更新 PWA service worker cache。
+
+### 驗證
+
+- 2026-07-15 正式來源 smoke：TWSE `1089` 筆、TPEX `891` 筆證券主檔已驗證入庫。
+- 完整測試、JavaScript syntax、正式 DB active endpoint、dataset health 與 SQLite integrity 於發布前重新驗證。
+
 ## v0.6.6 - 2026-07-03
 
 ### 修正
